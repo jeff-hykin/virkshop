@@ -1,0 +1,6 @@
+# FIXME: this will need to switch to using the virkshop API to register env variables
+export __VIRKSHOP_NIX_SETTINGS_PATH="$VIRKSHOP_FOLDER/mixins/nix/settings/nix/settings.toml"
+export __VIRKSHOP_NIX_MAIN_CODE_PATH="$VIRKSHOP_FOLDER/mixins/nix/internals/parse_dependencies.nix"
+export __VIRKSHOP_NIX_PACKAGES_FILE_PATH="$VIRKSHOP_FOLDER/mixins/nix/settings/system_tools.toml"
+export __VIRKSHOP_NIX_PATH_EXPORT_FILE="$VIRKSHOP_FOLDER/temporary/nix/dependency_paths.do_not_sync.json"
+export __VIRKSHOP_NIX_COMMANDS="$VIRKSHOP_FOLDER/mixins/nix/commands/nix/"

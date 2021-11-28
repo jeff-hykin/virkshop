@@ -5,8 +5,8 @@
 # What is this file doing?
 # 
 # 
-    # 1. trying to install nix (this is the guesses-have-to-be-made part)
-    # 2. find the "enter_virkshop" file
+    # 1. finding the "enter_virkshop" file
+    # 2. trying to install nix (this is the guesses-have-to-be-made part)
     # 3. execute the "enter_virkshop" file with a specific executable
 
 { # <- Prevent execution if this script was only partially downloaded
@@ -55,7 +55,7 @@ fi
 # Find our virkshop entrypoint
 # 
 path_to_virkshop_entry=""
-file_name="virkshop/core/enter_virkshop"
+file_name="virkshop/internals/enter_virkshop"
 folder_to_look_in="$PWD"
 while :
 do
@@ -83,7 +83,7 @@ then
     echo "|                                                                        |" 1>&2
     echo "|    Looks like you have nix installed (that's good)                     |" 1>&2
     echo "|                                                                        |" 1>&2
-    echo "|    However, I can't find the virkshop/core/enter_virkshop file         |" 1>&2
+    echo "|    However, I can't find the virkshop/internals/enter_virkshop file    |" 1>&2
     echo "|    I started looking in your current folder                            |" 1>&2
     echo "|         current directory is: '$PWD'                                 " 1>&2
     echo "|    I also looked in all the parent folders, but couldn't find it       |" 1>&2
