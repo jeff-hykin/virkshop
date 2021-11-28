@@ -11,58 +11,157 @@
 
 { # <- Prevent execution if this script was only partially downloaded
 
-# dependencies (some depend on the OS): command, uname, echo, printf, read, dirname, uname, sh, sed, curl, sw_vers, pidof, whoami, mktemp, rm, basename, xz, mkdir, tar
+# dependencies (some depend on the OS): command, uname, echo, printf, cat, read, dirname, uname, chmod, sh, sed, curl, sw_vers, pidof, whoami, mktemp, rm, basename, xz, mkdir, tar
 
-# setup some helpers
+
+# saftey/cleanup
+if [ -n "$(command -v "trap")" ] # <- if trap exists
+then
+    trap 'unset repo; unset branch; unset setup_or_copy; unset mixin_remote_name' INT TERM
+fi
+
+# 
+# 
+# Setup colors
+# 
+# 
 newline='
 '
-light_yellow="\e[0;1;33m"
-light_purple="\e[0;1;35m"
-light_green="\e[0;1;32m"
-light_red="\e[0;1;31m"
-blue="\e[0;94m"
-cyan="\e[0;36m"
-color_reset="\e[0m"
+# do-nothing functions
+black      () { :; }
+red        () { :; }
+green      () { :; }
+yellow     () { :; }
+blue       () { :; }
+magenta    () { :; }
+cyan       () { :; }
+white      () { :; }
+color_reset() { :; }
+# if tput exists
+if [ -n "$(command -v "tput")" ]
+then
+    black      () { tput setaf 0; }
+    red        () { tput setaf 1; }
+    green      () { tput setaf 2; }
+    yellow     () { tput setaf 3; }
+    blue       () { tput setaf 4; }
+    magenta    () { tput setaf 5; }
+    cyan       () { tput setaf 6; }
+    white      () { tput setaf 7; }
+    color_reset() { tput sgr0; }
+fi
+
+# 
+# Find our virkshop entrypoint
+# 
+path_to_virkshop_entry=""
+file_name="virkshop/core/enter_virkshop"
+folder_to_look_in="$PWD"
+while :
+do
+    # check if file exists
+    if [ -f "$folder_to_look_in/$file_name" ]
+    then
+        path_to_virkshop_entry="$folder_to_look_in/$file_name"
+        break
+    else
+        if [ "$folder_to_look_in" = "/" ]
+        then
+            break
+        else
+            folder_to_look_in="$(dirname "$folder_to_look_in")"
+        fi
+    fi
+done
+if [ -z "$path_to_virkshop_entry" ]
+then
+    #
+    # what to do if file never found
+    #
+    echo "$(yellow)"
+    echo "|-- Problem -------------------------------------------------------------| $(color_reset)" 1>&2
+    echo "|                                                                        |" 1>&2
+    echo "|    Looks like you have nix installed (that's good)                     |" 1>&2
+    echo "|                                                                        |" 1>&2
+    echo "|    However, I can't find the virkshop/core/enter_virkshop file         |" 1>&2
+    echo "|    I started looking in your current folder                            |" 1>&2
+    echo "|         current directory is: '$PWD'                                 " 1>&2
+    echo "|    I also looked in all the parent folders, but couldn't find it       |" 1>&2
+    echo "|                                                                        |" 1>&2
+    echo "|    todo:                                                               |" 1>&2
+    echo "|      - make sure you're in the right folder (very likely)              |" 1>&2
+    echo "|      - make sure the virkshop folder isn't corrupted (re-download)     |" 1>&2
+    echo "|                                                                        |" 1>&2
+    echo "|------------------------------------------------------------------------|" 1>&2
+    echo ""
+    # TODO: in the future, offer to redownload (encase the script is being run directly from curl)
+    # TODO: in the future, check if already inside of a virkshop (accidentally doing virkshop inception)
+    exit
+fi
 
 # 
 # 
 # Color Test
 # 
-# 
-echo "             COLOR TEST              "
-echo "|-----------------------------------|"
-echo "|    $light_yellow light_yellow $color_reset    |"
-echo "|    $light_purple light_purple $color_reset    |"
-echo "|    $light_green light_green $color_reset     |"
-echo "|    $light_red light_red $color_reset       |"
-echo "|    $blue blue $color_reset            |"
-echo "|    $cyan cyan $color_reset            |"
-echo "|-----------------------------------|"
-echo "
-     Do each of these look good?
-(there should be one color per line)
-";read ANSWER;echo
-# if answer is no
-if ! [ "$ANSWER" =~ ^[Yy] ]
+#
+color_test_cache_location="$HOME/.config/answered_questions/does_color_test_work"
+# check if already answered this questions
+if [ -f "$color_test_cache_location" ]
 then
-    echo "Okay I'll disable color"
-    light_yellow=""
-    light_purple=""
-    light_green=""
-    light_red=""
-    blue=""
-    cyan=""
-    color_reset=""
+    ANSWER="$(cat "$color_test_cache_location")"
+fi
+# ensure the answer is well-formed
+while true; do
+    case "$ANSWER" in
+        [Yy]* ) ANSWER='yes'; break;;
+        [Nn]* ) ANSWER='no'; break;;
+        * ) echo "${newline}Please answer yes or no. ${newline}";;
+    esac
+    echo "                                   "
+    echo "               COLOR TEST              "
+    echo "          |------------------|"
+    echo "          |     $(red) red $(color_reset)        |"
+    echo "          |     $(green) green $(color_reset)      |"
+    echo "          |     $(yellow) yellow $(color_reset)     |"
+    echo "          |     $(blue) blue $(color_reset)       |"
+    echo "          |     $(magenta) magenta $(color_reset)    |"
+    echo "          |     $(cyan) cyan $(color_reset)       |"
+    echo "          |------------------|"
+    echo "     
+          Does this look good?
+  (there should be one color per line)
+    "; printf "yes/no:";
+    read ANSWER
+done
+
+# create the cache file
+mkdir -p "$(dirname "$color_test_cache_location")"
+echo "$ANSWER" > "$color_test_cache_location"
+# NOTE: this^ doesn't cover the edgecase of one of the parent "folders"
+#       actually being a file, which would cause a failure
+#       in the future lets plan to to a corruption check on this structure
+
+# 
+# if colors don't work/look good
+# 
+if [ "$answer" = 'no' ]
+then
+    echo " :( Okay I'll disable color"
+    black      () { :; }
+    red        () { :; }
+    green      () { :; }
+    yellow     () { :; }
+    blue       () { :; }
+    magenta    () { :; }
+    cyan       () { :; }
+    white      () { :; }
+    color_reset() { :; }
 fi
 
-# saftey/cleanup
-# if trap exists
-if [ -n "$(command -v "trap")" ]
-then
-    trap 'unset repo; unset branch; unset setup_or_copy; unset mixin_remote_name; return 0' INT TERM
-fi
-        
+
+# 
 # if nix doesnt exist
+# 
 if [ -z "$(command -v "nix")" ]
 then
     echo "|------------------------------------------------------|" 1>&2
@@ -75,11 +174,11 @@ then
     # check for root
     if [ "$(whoami)" = "root" ]
     then
-        echo "$light_yellow"
+        echo "$(yellow)"
         echo "looks like you're logged in as root"
         echo "sadly nix can't install on the root user"
         echo "please use a regular user, then re-run this script"
-        echo "$color_reset"
+        echo "$(color_reset)"
         # if users exists
         if [ -n "$(command -v "users")" ]
         then
@@ -88,7 +187,7 @@ then
                 echo "the available users are:"
                 users
                 echo 
-                echo "you should be able to run ${cyan}su ${light_yellow}USER_NAME${color_reset}"
+                echo "you should be able to run $(cyan)su $(yellow)USER_NAME$(color_reset)"
                 echo "to login as one of those users"
             else
                 echo ""
@@ -108,19 +207,19 @@ then
                     done
                     
                     if [ "$answer" = 'yes' ]; then
-                        echo "${light_purple}Enter a username:${color_reset}"
+                        echo "$(magenta)Enter a username:$(color_reset)"
                         read username
                         if sudo useradd --create-home "$username" --password "password" --groups sudo
                         then
                             echo ""
                             echo "user created successfully"
                             echo "run:"
-                            echo "    ${cyan}sudo passwd "$username"${color_reset}"
+                            echo "    $(cyan)sudo passwd "$username"$(color_reset)"
                             echo "to set the password"
                         else
                             echo ""
                             echo "Sorry, there was an error when creating the user"
-                            echo "I used this command: ${cyan}sudo useradd --create-home "'"'"$username"'"'" --password 'password' --groups sudo${color_reset}"
+                            echo "I used this command: $(cyan)sudo useradd --create-home "'"'"$username"'"'" --password 'password' --groups sudo$(color_reset)"
                         fi
                     else
                         echo "Okay"
@@ -191,11 +290,13 @@ then
     fi
 fi
 
+# 
 # if nix was not installed
+# 
 if ! [ -d "/nix/store" ]
 then
-    echo "$light_yellow"
-    echo "|-- Problem ------------------------------------------------------------------------------------| $color_reset" 1>&2
+    echo "$(yellow)"
+    echo "|-- Problem ------------------------------------------------------------------------------------| $(color_reset)" 1>&2
     echo "|                                                                                               |" 1>&2
     echo "|    Looks like there was a problem installing nix :/                                           |" 1>&2
     echo "|    Hopefully there are error messages above                                                   |" 1>&2
@@ -223,8 +324,8 @@ else
     # if nix-env doesnt exist
     if [ -z "$(command -v "nix-env")" ] || [ -z "$(command -v "nix-shell")" ]
     then
-        echo "$light_yellow"
-        echo "|-- Action Needed ------------------------------------------------------------------------------| $color_reset" 1>&2
+        echo "$(yellow)"
+        echo "|-- Action Needed ------------------------------------------------------------------------------| $(color_reset)" 1>&2
         echo "|                                                                                               |" 1>&2
         echo "|    - Try closing/reopening your terminal and running this command again                       |" 1>&2
         echo "|      (I dont see the nix-env and nix-shell command)                                           |" 1>&2
@@ -245,66 +346,26 @@ unset repo; unset branch; unset mixin_remote_name;
 
 # 
 # 
-# Nix should now be installed
-# 
-# 
-
-# 
-# Find our virkshop entrypoint
-# 
-path_to_virkshop_entry=""
-file_name="virkshop/core/enter_virkshop"
-folder_to_look_in="$PWD"
-while :
-do
-    # check if file exists
-    if [ -f "$folder_to_look_in/$file_name" ]
-    then
-        path_to_virkshop_entry="$folder_to_look_in/$file_name"
-        break
-    else
-        if [ "$folder_to_look_in" = "/" ]
-        then
-            break
-        else
-            folder_to_look_in="$(dirname "$folder_to_look_in")"
-        fi
-    fi
-done
-if [ -z "$path_to_virkshop_entry" ]
-then
-    #
-    # what to do if file never found
-    #
-    echo "$light_yellow"
-    echo "|-- Problem -------------------------------------------------------------| $color_reset" 1>&2
-    echo "|                                                                        |" 1>&2
-    echo "|    Looks like you have nix installed (that's good)                     |" 1>&2
-    echo "|                                                                        |" 1>&2
-    echo "|    However, I can't find the virkshop/core/enter_virkshop file         |" 1>&2
-    echo "|    I started looking in your current folder                            |" 1>&2
-    echo "|         current directory is: '$PWD'                                 " 1>&2
-    echo "|    I also looked in all the parent folders, but couldn't find it       |" 1>&2
-    echo "|                                                                        |" 1>&2
-    echo "|    todo:                                                               |" 1>&2
-    echo "|      - make sure you're in the right folder (very likely)              |" 1>&2
-    echo "|      - make sure the virkshop folder isn't corrupted (re-download)     |" 1>&2
-    echo "|                                                                        |" 1>&2
-    echo "|------------------------------------------------------------------------|" 1>&2
-    echo ""
-    # TODO: in the future, offer to redownload (encase the script is being run directly from curl)
-    exit
-fi
-
-
-# 
-# 
-# Enter the virkshop! 
+# Nix should now be installed => Enter the virkshop!
 # 
 # 
 
 # make sure the file is executable
-chmod ugo+x "$path_to_virkshop_entry" 2>/dev/null || sudo chmod ugo+x "$path_to_virkshop_entry"
+if [ -n "$(command -v "chmod")" ]
+then
+    # if sudo exists
+    if [ -n "$(command -v "sudo")" ]
+    then
+        chmod ugo+x "$path_to_virkshop_entry" 2>/dev/null || sudo chmod ugo+x "$path_to_virkshop_entry"
+    # if doas exists
+    elif [ -n "$(command -v "doas")" ]
+    then
+        chmod ugo+x "$path_to_virkshop_entry" 2>/dev/null || sudo chmod ugo+x "$path_to_virkshop_entry"
+    # if neither exist
+    else
+        chmod ugo+x "$path_to_virkshop_entry" 2>/dev/null
+    fi
+fi
 
 # 
 # parse and escape the arguments
@@ -323,6 +384,7 @@ for arg in "$@"; do
         else
             # if in the future this script needs args this is where they would be parsed
             # for now there arent any
+            true
         fi
     # once the -- has been found, the args go to the deno script
     else
