@@ -180,13 +180,13 @@ then
         echo "please use a regular user, then re-run this script"
         echo "$(color_reset)"
         # if users exists
-        if [ -n "$(command -v "users")" ]
+        if [ -n "$(command -v "cut")" ]
         then
-            if [ -n "$(users)" ] && [ "$(users)" != "root" ]
+            users="$(grep '^sudo:.*$' /etc/group | cut -d: -f4)"
+            if [ -n "$users" ] && [ "$users" != "root" ] && [ "$users" != "root root" ]
             then
                 echo "the available users are:"
-                users
-                echo 
+                grep '^sudo:.*$' /etc/group | cut -d: -f4
                 echo "you should be able to run $(cyan)su $(yellow)USER_NAME$(color_reset)"
                 echo "to login as one of those users"
             else
@@ -228,6 +228,9 @@ then
                 
             fi
         fi
+        echo 
+        echo "login as a new user then try re-running this command"
+        exit
     fi
     #       
     # MacOS 
