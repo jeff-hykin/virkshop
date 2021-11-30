@@ -280,15 +280,18 @@ then
         # if now curl exists
         if [ -n "$(command -v "curl")" ]
         then
-            # check if systemd exists
-            if pidof systemd
-            then
-                # multi-user install if systemd exists
-                curl -Lk https://nixos.org/nix/install | sh -s -- --daemon
-            else
-                # single-user install if systemd exists
-                curl -Lk https://nixos.org/nix/install | sh -s
-            fi
+            # prefer single-user (no shell reload)
+            curl -L https://releases.nixos.org/nix/nix-2.3.8/install | sh
+            # # check if systemd exists
+            # if pidof systemd
+            # then
+            #     # multi-user install if systemd exists
+            #     curl -Lk https://nixos.org/nix/install | sh -s -- --daemon
+            # else
+            #     # single-user install if systemd exists
+            #     curl -L https://releases.nixos.org/nix/nix-2.3.8/install | sh
+            #     # curl -Lk https://nixos.org/nix/install | sh -s
+            # fi
         fi
     fi
 fi
