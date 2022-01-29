@@ -28,21 +28,13 @@
     # pull info from the config files
     # 
     nixSettings = (main.fromTOML
-        (main.readFile 
-            (main.getEnv
-                "__VIRKSHOP_NIX_SETTINGS_PATH"
-            )
-        )
+        (main.readFile ''${(main.getEnv "VIRKSHOP_FOLDER" )}/mixins/nix/settings/nix/settings.toml'')
     );
     # 
     # load the nix.toml cause were going to extract basically everything from there
     # 
     packageToml = (main.fromTOML
-        (main.readFile
-            (main.getEnv 
-                ("__VIRKSHOP_NIX_PACKAGES_FILE_PATH")
-            )
-        )
+        (main.readFile ''${(main.getEnv "VIRKSHOP_FOLDER" )}/mixins/nix/settings/system_tools.toml'')
     );
     # 
     # load the store with all the packages, and load it with the config

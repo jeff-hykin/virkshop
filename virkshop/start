@@ -17,7 +17,14 @@
 # saftey/cleanup
 if [ -n "$(command -v "trap")" ] # <- if trap exists
 then
-    trap 'unset repo; unset branch; unset setup_or_copy; unset mixin_remote_name' INT TERM
+    trap 'unset repo; unset branch; unset mixin_remote_name' INT TERM
+fi
+
+# fix the windows WSL mkfifo problem
+if [ -d "/mnt/c" ]
+then
+    echo "Asking Windows to enable file metadata (to avoid permission errors)"
+    sudo umount /mnt/c && sudo mount -t drvfs C: /mnt/c -o metadata
 fi
 
 # 
@@ -49,54 +56,6 @@ then
     cyan       () { tput setaf 6; }
     white      () { tput setaf 7; }
     color_reset() { tput sgr0; }
-fi
-
-# 
-# Find our virkshop entrypoint
-# 
-path_to_virkshop_entry=""
-file_name="virkshop/internals/enter_virkshop"
-folder_to_look_in="$PWD"
-while :
-do
-    # check if file exists
-    if [ -f "$folder_to_look_in/$file_name" ]
-    then
-        path_to_virkshop_entry="$folder_to_look_in/$file_name"
-        break
-    else
-        if [ "$folder_to_look_in" = "/" ]
-        then
-            break
-        else
-            folder_to_look_in="$(dirname "$folder_to_look_in")"
-        fi
-    fi
-done
-if [ -z "$path_to_virkshop_entry" ]
-then
-    #
-    # what to do if file never found
-    #
-    echo "$(yellow)"
-    echo "|-- Problem -------------------------------------------------------------| $(color_reset)" 1>&2
-    echo "|                                                                        |" 1>&2
-    echo "|    Looks like you have nix installed (that's good)                     |" 1>&2
-    echo "|                                                                        |" 1>&2
-    echo "|    However, I can't find the virkshop/internals/enter_virkshop file    |" 1>&2
-    echo "|    I started looking in your current folder                            |" 1>&2
-    echo "|         current directory is: '$PWD'                                 " 1>&2
-    echo "|    I also looked in all the parent folders, but couldn't find it       |" 1>&2
-    echo "|                                                                        |" 1>&2
-    echo "|    todo:                                                               |" 1>&2
-    echo "|      - make sure you're in the right folder (very likely)              |" 1>&2
-    echo "|      - make sure the virkshop folder isn't corrupted (re-download)     |" 1>&2
-    echo "|                                                                        |" 1>&2
-    echo "|------------------------------------------------------------------------|" 1>&2
-    echo ""
-    # TODO: in the future, offer to redownload (encase the script is being run directly from curl)
-    # TODO: in the future, check if already inside of a virkshop (accidentally doing virkshop inception)
-    exit
 fi
 
 # 
@@ -356,6 +315,83 @@ unset repo; unset branch; unset mixin_remote_name;
 # 
 # 
 
+# 
+# Find our virkshop config
+# 
+path_to_virkshop_config=""
+file_name="virkshop/internals/configuration"
+folder_to_look_in="$PWD"
+while :
+do
+    # check if file exists
+    if [ -f "$folder_to_look_in/$file_name" ]
+    then
+        path_to_virkshop_config="$folder_to_look_in/$file_name"
+        break
+    else
+        if [ "$folder_to_look_in" = "/" ]
+        then
+            break
+        else
+            folder_to_look_in="$(dirname "$folder_to_look_in")"
+        fi
+    fi
+done
+if [ -z "$path_to_virkshop_config" ]
+then
+    #
+    # what to do if file never found
+    #
+    echo "$(yellow)"
+    echo "|-- Problem -------------------------------------------------------------| $(color_reset)" 1>&2
+    echo "|                                                                        |" 1>&2
+    echo "|    Looks like you have nix installed (that's good)                     |" 1>&2
+    echo "|                                                                        |" 1>&2
+    echo "|    However, I can't find the virkshop/internals/configuration folder   |" 1>&2
+    echo "|    I started looking in your current folder                            |" 1>&2
+    echo "|         current directory is: '$PWD'                                 " 1>&2
+    echo "|    I also looked in all the parent folders, but couldn't find it       |" 1>&2
+    echo "|                                                                        |" 1>&2
+    echo "|    todo:                                                               |" 1>&2
+    echo "|      - make sure you're in the right folder (likely to be the problem) |" 1>&2
+    echo "|      - make sure the virkshop folder isn't corrupted (re-download)     |" 1>&2
+    echo "|                                                                        |" 1>&2
+    echo "|------------------------------------------------------------------------|" 1>&2
+    echo ""
+    # TODO: in the future, offer to redownload (encase the script is being run directly from curl)
+    # TODO: in the future, check if already inside of a virkshop (accidentally doing virkshop inception)
+    exit
+fi
+
+# 
+# find virkshop entrypoint
+# 
+path_to_virkshop="$path_to_virkshop_config/../../"
+path_to_virkshop_entry="$path_to_virkshop/$(cat "$path_to_virkshop_config/path_to/entry_point")"
+path_to_virkshop_temp="$path_to_virkshop/$(cat "$path_to_virkshop_config/path_to/temporary")"
+# TODO: add a check to make sure the config isn't corrupt
+
+# 
+# check if entry_point exists
+# 
+if ! [ -f "$path_to_virkshop_entry" ]
+then
+    echo "$(yellow)"
+    echo "|-- Problem -------------------------------------------------------------| $(color_reset)" 1>&2
+    echo "|                                                                        |" 1>&2
+    echo "|    I was looking for the virkshop entry_point but I couldnt find it    |" 1>&2
+    echo "|                                                                        |" 1>&2
+    echo "|    The config (virkshop/internals/configuration/path_to/entry_point)   |" 1>&2
+    echo "|    says that the file is at: '$path_to_virkshop_entry'                  " 1>&2
+    echo "|    But that doesn't seem to be a file                                  |" 1>&2
+    echo "|                                                                        |" 1>&2
+    echo "|    todo:                                                               |" 1>&2
+    echo "|      - make sure the virkshop folder isn't corrupted (re-download)     |" 1>&2
+    echo "|                                                                        |" 1>&2
+    echo "|------------------------------------------------------------------------|" 1>&2
+    exit
+fi
+
 # make sure the file is executable
 if [ -n "$(command -v "chmod")" ]
 then
@@ -366,7 +402,7 @@ then
     # if doas exists
     elif [ -n "$(command -v "doas")" ]
     then
-        chmod ugo+x "$path_to_virkshop_entry" 2>/dev/null || sudo chmod ugo+x "$path_to_virkshop_entry"
+        chmod ugo+x "$path_to_virkshop_entry" 2>/dev/null || doas chmod ugo+x "$path_to_virkshop_entry"
     # if neither exist
     else
         chmod ugo+x "$path_to_virkshop_entry" 2>/dev/null
@@ -402,6 +438,7 @@ done
 # 
 # execute enter_virkshop with a specific version of deno and pass along the arguments
 # 
-nix-shell --packages deno --run "deno run --allow-all $escaped_arguments_for_entry_file" -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/7e9b0dff974c89e070da1ad85713ff3c20b0ca97.tar.gz
+# FIXME: this should be done without invoking the .bashrc/.bashprofile etc
+nix-shell --packages deno bash --run "$escaped_arguments_for_entry_file" -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/c82b46413401efa740a0b994f52e9903a4f6dcd5.tar.gz
 
 } # end: <- Prevent execution if this script was only partially downloaded

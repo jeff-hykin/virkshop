@@ -1,24 +1,35 @@
 #!/usr/bin/env -S deno run --allow-all
 
 // 
-// args
+// main
 // 
-const oldFolder = Deno.args[0]
-const incomingFolder = Deno.args[1]
-function main() {
-    safeRecursiveLinkedMerge({ oldFolder, incomingFolder })
+const whichFolder = Deno.args[0]
+async function main() {
+    const paths = FileSystem.recursiveFileList(whichFolder, {dontFollowSymlinks: true})
+    paths.forEach(async (each)=>{
+        // if its a symlink
+        if (await Deno.lstat(each).isSymlink) {
+            // remove only the link
+            Deno.remove(each)
+        }
+    })
 }
-
-const { copy } = await import("https://deno.land/std@0.123.0/streams/conversion.ts")
 
 // 
 // helpers
 // 
 const Path = await import("https://deno.land/std@0.117.0/path/mod.ts")
-
+const { copy } = await import("https://deno.land/std@0.123.0/streams/conversion.ts")
 const FileSystem = {
     get cwd() {
         return Deno.cwd()
+    },
+    read: async (filePath) => {
+        try {
+            return await Deno.readTextFile(file)
+        } catch (error) {
+            return null
+        }
     },
     info: async (fileOrFolder) => {
         const result1 = await Deno.lstat(fileOrFolder).catch(()=>({doesntExist: true}))
@@ -58,6 +69,27 @@ const FileSystem = {
             Deno.mkdir(Path.dirname(parentPath),{ recursive: true })
         }
     },
+    walkUpUntil = async (fileToFind, startPath=null)=> {
+        const cwd = Deno.cwd()
+        let here = startPath || cwd
+        if (!Path.isAbsolute(here)) {
+            here = Path.join(cwd, fileToFind)
+        }
+        while (1) {
+            let checkPath = Path.join(here, fileToFind)
+            const pathInfo = await Deno.stat(checkPath).catch(()=>({doesntExist: true}))
+            if (!pathInfo.doesntExist) {
+                return checkPath
+            }
+            // reached the top
+            if (here == Path.dirname(here)) {
+                return null
+            } else {
+                // go up a folder
+                here =  Path.dirname(here)
+            }
+        }
+    },
     copy: async ({from, to, force=true}) => {
         FileSystem.clearAPathFor(to)
         if (force) {
@@ -84,7 +116,14 @@ const FileSystem = {
         }
         return Deno.symlink(existingItem, newItem)
     },
-    // todo: should probably make this an async generator
+    listPaths: async (path, options)=> {
+        const results = []
+        for await (const dirEntry of Deno.readDir(path)) {
+            const eachPath = Path.join(path, dirEntry.name)
+            results.push(eachPath)
+        }
+        return results
+    },
     recursiveFileList: async (path, options)=> {
         if (!options.alreadySeached) {
             options.alreadySeached = new Set()
@@ -122,6 +161,8 @@ const FileSystem = {
         return results
     },
 }
+
+const getVirkshopConfigPath = ()=>FileSystem.walkUpUntil("virkshop/internals/configuration")
 
 const safeRecursiveLinkedMerge = async ({oldFolder, incomingFolder}) => {
     const oldFolderInfo = await FileSystem.info(oldFolder)
@@ -166,4 +207,7 @@ const safeRecursiveLinkedMerge = async ({oldFolder, incomingFolder}) => {
     }
 }
 
+// 
+// run main
+// 
 main()
