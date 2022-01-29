@@ -1,0 +1,7 @@
+- make the virkshop recurisve with project, not with virkshop itself
+- change the virkshop/configuration, remove most of it only keep like debugging and entrypoint
+- convert as much as possible of the enter_virkshop to use deno
+- look at the files in phase_2/ and phase_3/ and convert each one to use the new system
+- remove all the FORNIX references like FORNIX_COMMANDS
+- standardize and publish a deno FileSystem lib
+- standardize and publish a deno Virkshop lib
