@@ -8,7 +8,7 @@ DISABLE_UPDATE_PROMPT="true"
 # Get virkshop config
 # 
 path_to_virkshop_config=""
-file_name="virkshop/internals/configuration"
+file_name="virkshop/mixins/#core/settings/virkshop/"
 folder_to_look_in="$PWD"
 while :
 do
@@ -34,7 +34,7 @@ then
     echo "$(yellow)"
     echo "|-- Problem -------------------------------------------------------------| $(color_reset)" 1>&2
     echo "|                                                                        |" 1>&2
-    echo "|    I can't find the virkshop/internals/configuration folder            |" 1>&2
+    echo "|    I can't find the virkshop/mixins/#core/settings/virkshop/ folder            |" 1>&2
     echo "|    I started looking in your current folder                            |" 1>&2
     echo "|         current directory is: '$PWD'                                 " 1>&2
     echo "|    I also looked in all the parent folders, but couldn't find it       |" 1>&2

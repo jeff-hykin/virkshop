@@ -3,23 +3,16 @@
 // 
 // main
 // 
+const whichFolder = Deno.args[0]
 async function main() {
-    const configPath = getVirkshopConfigPath()
-    const mixinPath         = FileSystem.read(`${configPath}/path_to/mixins`)
-    // 
-    // run all the mixin listerners giving them their own cwd
-    // 
-    for (const eachPath of FileSystem.listPaths(mixinPath)) {
-        const info = FileSystem.info(`${eachPath}/events/virkshop/phase_1`)
-        if (info.isDirectory) {
-            trigger(`${eachPath}/virkshop/phase_1`, {cwdFunc: ()=>eachPath})
+    const paths = FileSystem.recursiveFileList(whichFolder, {dontFollowSymlinks: true})
+    paths.forEach(async (each)=>{
+        // if its a symlink
+        if (await Deno.lstat(each).isSymlink) {
+            // remove only the link
+            Deno.remove(each)
         }
-    }
-    // 
-    // run all the manually created listeners
-    // 
-    const eventsPath  = FileSystem.read(`${configPath}/path_to/events`)
-    trigger(`${eventsPath}/virkshop/phase_1`, {cwdFunc: ()=>Deno.cwd(), skipSymlinks: true})
+    })
 }
 
 // 
@@ -56,27 +49,27 @@ const FileSystem = {
             return path
         }
     },
-    clearAPathFor: async (path)=>{
+    clearAPathFor: (path)=>{
         const parentPath = Path.dirname(path)
         // dont need to clear a path for the root folder
         if (parentPath == path) {
             return
         } else {
             // we do need to clear a path for the parent of this folder
-            await FileSystem.clearAPathFor(parentPath)
+            FileSystem.clearAPathFor(parentPath)
         }
         const { exists, isDirectory } = FileSystem.info(parentPath)
         // if a folder is in the way, delete it
         if (exists && !isDirectory) {
             await FileSystem.remove(parentPath)
         }
-        const parentPathInfo = await Deno.lstat(parentPath).catch(()=>({doesntExist: true}))
+        const parentPath = await Deno.lstat(parentPath).catch(()=>({doesntExist: true}))
         // if no folder was there, create one
-        if (!parentPathInfo.exists) {
-            Deno.mkdir(Path.dirname(parentPathInfo),{ recursive: true })
+        if (!parentPath.exists) {
+            Deno.mkdir(Path.dirname(parentPath),{ recursive: true })
         }
     },
-    walkUpUntil: async (fileToFind, startPath=null)=> {
+    walkUpUntil = async (fileToFind, startPath=null)=> {
         const cwd = Deno.cwd()
         let here = startPath || cwd
         if (!Path.isAbsolute(here)) {
@@ -98,7 +91,7 @@ const FileSystem = {
         }
     },
     copy: async ({from, to, force=true}) => {
-        await FileSystem.clearAPathFor(to)
+        FileSystem.clearAPathFor(to)
         if (force) {
             FileSystem.remove(to)
         }
@@ -109,7 +102,7 @@ const FileSystem = {
         Deno.close(target.rid)
         return result
     },
-    relativeLink: async ({existingItem, newItem}) => {
+    relativeLink: ({existingItem, newItem}) => {
         const cwd = Deno.cwd()
         existingItem = Deno.relative(Deno.cwd(), Path.normalize(existingItem))
         newItem = Deno.relative(Deno.cwd(), Path.normalize(newItem))
@@ -118,8 +111,8 @@ const FileSystem = {
         if (existingItemDoesntExist) {
             // FIXME: cause an error
         } else {
-            await FileSystem.clearAPathFor(newItem)
-            await FileSystem.remove(newItem)
+            FileSystem.clearAPathFor(newItem)
+            FileSystem.remove(newItem)
         }
         return Deno.symlink(existingItem, newItem)
     },
@@ -169,7 +162,7 @@ const FileSystem = {
     },
 }
 
-const getVirkshopConfigPath = ()=>FileSystem.walkUpUntil("virkshop/internals/configuration")
+const getVirkshopConfigPath = ()=>FileSystem.walkUpUntil("virkshop/mixins/#core/settings/virkshop/")
 
 const safeRecursiveLinkedMerge = async ({oldFolder, incomingFolder}) => {
     const oldFolderInfo = await FileSystem.info(oldFolder)
@@ -213,33 +206,6 @@ const safeRecursiveLinkedMerge = async ({oldFolder, incomingFolder}) => {
         }
     }
 }
-
-const trigger = (eventPath, { cwdFunc=({name, info})=>Deno.cwd(), originalPath=null, skipSymlinks=false }) => {
-    if (!originalPath) {
-        originalPath = eventPath
-    }
-    for await (const eachEntry of Deno.readDir(eventPath)) {
-        if (eachEntry.name.match(/^#comment# /)) {
-            continue
-        }
-        if (skipSymlinks && eachEntry.isSymlink) {
-            continue
-        }
-        const eachPath = `${eventPath}/${eachEntry.name}`
-        const info = FileSystem.info(eachPath)
-        if (isFile) {
-            Deno.run({
-                cmd: [ eachPath, ],
-                cwd: cwdFunc({name, info}),
-            })
-        } else {
-            trigger(eachPath, {cwdFunc, originalPath})
-        }
-    }
-}
-
-
-
 
 // 
 // run main

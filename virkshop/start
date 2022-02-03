@@ -459,7 +459,7 @@ fi
 # Find our virkshop config
 # 
 path_to_virkshop_config=""
-file_name="virkshop/internals/configuration"
+file_name="virkshop/mixins/#core/settings/virkshop/"
 folder_to_look_in="$PWD"
 while :
 do
@@ -483,20 +483,20 @@ then
     # what to do if file never found
     #
     echo "$(yellow)"
-    echo "|-- Problem -------------------------------------------------------------| $(color_reset)" 1>&2
-    echo "|                                                                        |" 1>&2
-    echo "|    Looks like you have nix installed (that's good)                     |" 1>&2
-    echo "|                                                                        |" 1>&2
-    echo "|    However, I can't find the virkshop/internals/configuration folder   |" 1>&2
-    echo "|    I started looking in your current folder                            |" 1>&2
-    echo "|         current directory is: '$PWD'                                 " 1>&2
-    echo "|    I also looked in all the parent folders, but couldn't find it       |" 1>&2
-    echo "|                                                                        |" 1>&2
-    echo "|    todo:                                                               |" 1>&2
-    echo "|      - make sure you're in the right folder (likely to be the problem) |" 1>&2
-    echo "|      - make sure the virkshop folder isn't corrupted (re-download)     |" 1>&2
-    echo "|                                                                        |" 1>&2
-    echo "|------------------------------------------------------------------------|" 1>&2
+    echo "|-- Problem -------------------------------------------------------------------| $(color_reset)" 1>&2
+    echo "|                                                                              |" 1>&2
+    echo "|    Looks like you have nix installed (that's good)                           |" 1>&2
+    echo "|                                                                              |" 1>&2
+    echo "|    However, I can't find the virkshop/mixins/#core/settings/virkshop/ folder |" 1>&2
+    echo "|    I started looking in your current folder                                  |" 1>&2
+    echo "|         current directory is: '$PWD'                                         " 1>&2
+    echo "|    I also looked in all the parent folders, but couldn't find it             |" 1>&2
+    echo "|                                                                              |" 1>&2
+    echo "|    todo:                                                                     |" 1>&2
+    echo "|      - make sure you're in the right folder (likely to be the problem)       |" 1>&2
+    echo "|      - make sure the virkshop folder isn't corrupted (re-download)           |" 1>&2
+    echo "|                                                                              |" 1>&2
+    echo "|------------------------------------------------------------------------------|" 1>&2
     echo ""
     # TODO: in the future, offer to redownload (encase the script is being run directly from curl)
     # TODO: in the future, check if already inside of a virkshop (accidentally doing virkshop inception)
@@ -506,7 +506,7 @@ fi
 # 
 # find virkshop entrypoint
 # 
-export VIRKSHOP_FOLDER="$path_to_virkshop_config/../../"
+export VIRKSHOP_FOLDER="$path_to_virkshop_config/../../../.."
 path_to_virkshop_entry="$VIRKSHOP_FOLDER/$(cat "$path_to_virkshop_config/path_to/entry_point")"
 # TODO: add a check to make sure the config isn't corrupt
 
@@ -516,18 +516,18 @@ path_to_virkshop_entry="$VIRKSHOP_FOLDER/$(cat "$path_to_virkshop_config/path_to
 if ! [ -f "$path_to_virkshop_entry" ]
 then
     echo "$(yellow)"
-    echo "|-- Problem -------------------------------------------------------------| $(color_reset)" 1>&2
-    echo "|                                                                        |" 1>&2
-    echo "|    I was looking for the virkshop entry_point but I couldnt find it    |" 1>&2
-    echo "|                                                                        |" 1>&2
-    echo "|    The config (virkshop/internals/configuration/path_to/entry_point)   |" 1>&2
-    echo "|    says that the file is at: '$path_to_virkshop_entry'                  " 1>&2
-    echo "|    But that doesn't seem to be a file                                  |" 1>&2
-    echo "|                                                                        |" 1>&2
-    echo "|    todo:                                                               |" 1>&2
-    echo "|      - make sure the virkshop folder isn't corrupted (re-download)     |" 1>&2
-    echo "|                                                                        |" 1>&2
-    echo "|------------------------------------------------------------------------|" 1>&2
+    echo "|-- Problem ------------------------------------------------------------------| $(color_reset)" 1>&2
+    echo "|                                                                             |" 1>&2
+    echo "|    I was looking for the virkshop entry_point but I couldnt find it         |" 1>&2
+    echo "|                                                                             |" 1>&2
+    echo "|    The config (virkshop/mixins/#core/settings/virkshop/path_to/entry_point) |" 1>&2
+    echo "|    says that the file is at: '$path_to_virkshop_entry'                       " 1>&2
+    echo "|    But that doesn't seem to be a file                                       |" 1>&2
+    echo "|                                                                             |" 1>&2
+    echo "|    todo:                                                                    |" 1>&2
+    echo "|      - make sure the virkshop folder isn't corrupted (re-download)          |" 1>&2
+    echo "|                                                                             |" 1>&2
+    echo "|-----------------------------------------------------------------------------|" 1>&2
     exit
 fi
 

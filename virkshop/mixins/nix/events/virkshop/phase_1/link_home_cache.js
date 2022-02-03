@@ -154,7 +154,7 @@ const FileSystem = {
     },
 }
 
-const getVirkshopConfigPath = ()=>FileSystem.walkUpUntil("virkshop/internals/configuration")
+const getVirkshopConfigPath = ()=>FileSystem.walkUpUntil("virkshop/mixins/#core/settings/virkshop/")
 
 const safeRecursiveLinkedMerge = async ({oldFolder, incomingFolder}) => {
     const oldFolderInfo = await FileSystem.info(oldFolder)
