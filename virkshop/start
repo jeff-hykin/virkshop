@@ -1,4 +1,4 @@
-#!/usr/bin/env -S env -i bash --norc --noprofile
+#!/usr/bin/env -S bash --norc --noprofile
 
 # 
 # 
@@ -13,12 +13,7 @@
 
 # dependencies (some depend on the OS): command, uname, echo, printf, cat, read, dirname, uname, chmod, sh, sed, curl, sw_vers, pidof, whoami, mktemp, rm, basename, xz, mkdir, tar
 
-
-# saftey/cleanup
-if [ -n "$(command -v "trap")" ] # <- if trap exists
-then
-    trap 'unset repo; unset branch; unset mixin_remote_name' INT TERM
-fi
+# TODO: later add a basic check for all universally-essential commands here
 
 # 
 # fix the windows WSL mkfifo problem
@@ -454,9 +449,6 @@ else
     fi
 fi
 
-# cleanup the variables
-unset repo; unset branch; unset mixin_remote_name;
-
 # 
 # 
 # Nix should now be installed => Enter the virkshop!
@@ -472,7 +464,7 @@ folder_to_look_in="$PWD"
 while :
 do
     # check if file exists
-    if [ -f "$folder_to_look_in/$file_name" ]
+    if [ -e "$folder_to_look_in/$file_name" ]
     then
         path_to_virkshop_config="$folder_to_look_in/$file_name"
         break
@@ -514,9 +506,8 @@ fi
 # 
 # find virkshop entrypoint
 # 
-path_to_virkshop="$path_to_virkshop_config/../../"
-path_to_virkshop_entry="$path_to_virkshop/$(cat "$path_to_virkshop_config/path_to/entry_point")"
-path_to_virkshop_temp="$path_to_virkshop/$(cat "$path_to_virkshop_config/path_to/temporary")"
+export VIRKSHOP_FOLDER="$path_to_virkshop_config/../../"
+path_to_virkshop_entry="$VIRKSHOP_FOLDER/$(cat "$path_to_virkshop_config/path_to/entry_point")"
 # TODO: add a check to make sure the config isn't corrupt
 
 # 
