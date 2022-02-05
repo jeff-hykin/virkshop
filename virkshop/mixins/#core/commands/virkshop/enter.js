@@ -85,9 +85,11 @@ if (!FileSystem.info(VIRKSHOP_FOLDER).isDirectory) {
     // create injection tools
         // home link folder
         // external binary wrap+inject
-    // design data storage
-        // env variable passthrough
-    
+    // design "affect" methods
+        // design data storage for holding these (auto generate a folder of .zshrc_peice's that each get sourced)
+        // env variable export (add to path)
+        // zsh function defintion
+        // adding raw text that will later be sourced by zsh
 // 
 // 
 // Phase 0: link everything!
