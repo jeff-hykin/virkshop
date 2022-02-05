@@ -70,6 +70,24 @@ if (!FileSystem.info(VIRKSHOP_FOLDER).isDirectory) {
     Deno.exit()
 }
 
+// todo
+    // link things externally
+    // link the mixins into virkshop
+    // make all commands executable
+    // read a config to get loading order of merged events
+        // default placement
+        // user override
+    // design combination method for mixins trying to request things from other mixins
+        // system dependencies (nix toml)
+        // adding to gitignore
+        // adding a pip module
+        // adding a git hook
+    // create injection tools
+        // home link folder
+        // external binary wrap+inject
+    // design data storage
+        // env variable passthrough
+    
 // 
 // 
 // Phase 0: link everything!
