@@ -1,0 +1,82 @@
+#!/usr/bin/env -S deno run --allow-all
+var { FileSystem } = (await import("https://cdn.skypack.dev/file-system-js@0.0.6")).default
+
+// 
+// main
+// 
+const settingsPath = Deno.args[0]
+async function main() {
+    const fullSettingsPath = `${Deno.env.VIRKSHOP_FOLDER}/mixins/#core/settings/virkshop/externally_link/${settingsPath}`
+    
+    const configPath = getVirkshopConfigPath()
+    const mixinPath         = FileSystem.read(`${configPath}/path_to/mixins`)
+    const commandsPath      = FileSystem.read(`${configPath}/path_to/commands`)
+    const eventsPath        = FileSystem.read(`${configPath}/path_to/events`)
+    const settingsPath      = FileSystem.read(`${configPath}/path_to/settings`)
+    const documentationPath = FileSystem.read(`${configPath}/path_to/documentation`)
+    const homePath          = FileSystem.read(`${configPath}/path_to/home`)
+    for (const eachPath of FileSystem.listPaths(mixinPath)) {
+        safeRecursiveLinkedMerge({ oldFolder: commandsPath     , incomingFolder: `${eachPath}/commands`     })
+        safeRecursiveLinkedMerge({ oldFolder: eventsPath       , incomingFolder: `${eachPath}/events`       })
+        safeRecursiveLinkedMerge({ oldFolder: settingsPath     , incomingFolder: `${eachPath}/settings`     })
+        safeRecursiveLinkedMerge({ oldFolder: documentationPath, incomingFolder: `${eachPath}/documentation`})
+        safeRecursiveLinkedMerge({ oldFolder: homePath         , incomingFolder: `${eachPath}/home`})
+    }
+}
+
+
+// 
+// helpers
+// 
+const getVirkshopConfigPath = ()=>FileSystem.walkUpUntil("virkshop/mixins/#core/settings/virkshop/")
+
+const safeRecursiveLinkedMerge = async ({oldFolder, incomingFolder}) => {
+    const oldFolderInfo = await FileSystem.info(oldFolder)
+    const incomingFolderInfo = await FileSystem.info(incomingFolder)
+    if (oldFolderInfo.isFile || incomingFolderInfo.isFile) {
+        return
+    }
+    if (incomingFolderInfo.doesntExist) {
+        return
+    }
+    if (oldFolderInfo.doesntExist) {
+        Deno.mkdir(oldFolder,{ recursive: true })
+    }
+    for (const each of Deno.readDir(incomingFolder)) {
+        const existingPath = Path.join(incomingFolder, each.name)
+        const targetPath   = Path.join(oldFolder, each.name)
+        const targetPathInfo = FileSystem.info(targetPath)
+        // 
+        // shallow part
+        // 
+        if (each.isFile) {
+            // dont overwrite (only perform if it doesnt exist)
+            if (!FileSystem.info(targetPath).exists)  {
+                FileSystem.relativeLink({existingItem: existingPath, newItem: targetPath })
+            } else {
+                // Todo: should probably do something like return which ones were skipped so they can be reported
+            }
+            continue
+        }
+        // 
+        // recursive part
+        // 
+        const existingPathInfo = FileSystem.info(existingPath)
+        if (existingPathInfo.isDirectory) {
+            // create a folder if it doesn't exist
+            if (!targetPathInfo.isDirectory) {
+                Deno.mkdir(targetPath,{ recursive: true })
+            }
+            // recursion
+            safeRecursiveLinkedMerge({oldFolder: targetPath, incomingFolder: existingPath})
+        }
+    }
+}
+
+
+
+
+// 
+// run main
+// 
+main()
