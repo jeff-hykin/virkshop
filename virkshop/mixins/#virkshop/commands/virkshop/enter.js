@@ -129,12 +129,8 @@ async function loadVirkshopData() {
 }
 
 // todo
-    // link things externally
-    // link the mixins into virkshop
     // make all commands executable
-    // read a config to get loading order of merged events
-        // default placement
-        // user override
+    // create a trigger event function
     // design combination method for mixins trying to request things from other mixins
         // system dependencies (nix toml)
         // adding to gitignore
@@ -172,6 +168,10 @@ const virkshop = await loadVirkshopData()
     // link mixins
     // 
     // FIXME: problem here with priority, what happens if two extensions write to the same location
+    //    probably just fix this by making extensions have a number in front of them, then using deno
+    //    to rename them as needed with leading 0's
+    //    then load extensions in that order
+    //    extensions can have two phases if needed, where it lists itself twice under different values
     for (const eachMixin of await FileSystem.listFolderItemsIn(`${virkshop.folder}/mixins`)) {
         for (const eachFolderName of virkshop.structure.mixins.linkedFolderNames) {
             await recursivelyFileLink({
@@ -191,6 +191,7 @@ const virkshop = await loadVirkshopData()
         existingFolder: `${virkshop.folder}/home`,
         targetFolder: virkshop.structure.fakeHome,
     })
+
     
 // // 
 // // Phase 1
