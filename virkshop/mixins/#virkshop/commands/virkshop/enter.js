@@ -139,7 +139,7 @@ async function loadVirkshopData() {
     // create injection tools
         // home link folder
         // external binary wrap+inject
-    // design "affect" methods
+    // design "affect" methods (set env vars, add to path)
         // design data storage for holding these (auto generate a folder of .zshrc_peice's that each get sourced)
         // env variable export (add to path)
         // zsh function defintion
