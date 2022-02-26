@@ -34,11 +34,29 @@ async function objectifyFolder(folder) {
         }
         // if file, just read it
         if (each.isFile) {
-            object[camelCase(each.name)] = await FileSystem.read(each.path)
+            object[each.name] = await FileSystem.read(each.path)
         // if its a folder convert it to an object
         } else if () {
-            object[camelCase(each.name)] = await objectifyFolder(each.path)
+            object[each.name] = await objectifyFolder(each.path)
         }
+    }
+}
+
+async function recursivelyFileLink({targetFolder, existingFolder}) {
+    const target = await FileSystem.info(targetFolder)
+    const existing = await FileSystem.info(existingFolder)
+    
+    const existingItems = await FileSystem.recursivelyListItemsIn(existing)
+    for (const existingItem of existingItems) {
+        const relativePart = await FileSystem.makeRelativePath({
+            from: existing.path,
+            to: existingItem.path 
+        })
+        // link the file (creating any folders necessary in the process)
+        await FileSystem.relativeLink({
+            existingItem: existingItem.path,
+            newItem: `${target.path}/${relativePart}`,
+        })
     }
 }
 
@@ -101,6 +119,12 @@ async function loadVirkshopData() {
     return {
         folder,
         settings,
+        structure: {
+            fakeHome: `${VIRKSHOP_FOLDER}/temporary/virkshop/home`,
+            mixins: {
+                linkedFolderNames: ['commands', 'documentation', 'events', 'home', 'settings'],
+            }
+        },
     }
 }
 
@@ -126,50 +150,47 @@ async function loadVirkshopData() {
         // adding raw text that will later be sourced by zsh
 
 
-const virkshop = loadVirkshopData()
+const virkshop = await loadVirkshopData()
 // 
 // 
 // Phase 0: link everything!
 // 
 //
-    for (const each of await FileSystem.listItemsIn(`${VIRKSHOP_FOLDER}/mixins/#virkshop/settings/#virkshop`)) {
-        
+    // link-out stuff
+    const promises = Object.entries(virkshop.settings.link_to_project_root).map(async ([key, value])=>{
+        const target = await FileSystem.info(`${virkshop.folder}/../${key}`)
+        if (target.isBrokenLink) {
+            await FileSystem.remove(target.path)
+        }
+        // create it, but dont destroy an existing folder (unless its a broken link)
+        if (!target.exists)  {
+            await FileSystem.relativeLink({existingItem: value, newItem: target.path})
+        }
+    })
+    
+    // 
+    // link mixins
+    // 
+    // FIXME: problem here with priority, what happens if two extensions write to the same location
+    for (const eachMixin of await FileSystem.listFolderItemsIn(`${virkshop.folder}/mixins`)) {
+        for (const eachFolderName of virkshop.structure.mixins.linkedFolderNames) {
+            await recursivelyFileLink({
+                existingFolder: `${eachMixin.path}/${eachFolderName}`,
+                targetFolder: `${virkshop.folder}/${eachFolderName}`,
+            })
+        }
     }
     
-//     // first: link out 
-//     commands="$(      cat "$VIRKSHOP_FOLDER/mixins/#virkshop/settings/virkshop/externally_link/commands"       )"
-//     documentation="$( cat "$VIRKSHOP_FOLDER/mixins/#virkshop/settings/virkshop/externally_link/documentation"  )"
-//     events="$(        cat "$VIRKSHOP_FOLDER/mixins/#virkshop/settings/virkshop/externally_link/events"         )"
-//     home="$(          cat "$VIRKSHOP_FOLDER/mixins/#virkshop/settings/virkshop/externally_link/home"           )"
-//     settings="$(      cat "$VIRKSHOP_FOLDER/mixins/#virkshop/settings/virkshop/externally_link/settings"       )"
-//     project="$(       cat "$VIRKSHOP_FOLDER/mixins/#virkshop/settings/virkshop/externally_link/mixins/project" )"
-    
-    
-//     // copy out
-//     //     commands
-//     //     documentation
-//     //     events
-//     //     settings
-//     if ! [ -e "$path_to_project/commands" ]
-//     then
-//         "$relative_link" "$path_to_commands" "$path_to_project/commands"
-//     fi
-//     if ! [ -e "$path_to_project/documentation" ]
-//     then
-//         "$relative_link" "$path_to_documentation" "$path_to_project/documentation"
-//     fi
-//     if ! [ -e "$path_to_project/events" ]
-//     then
-//         "$relative_link" "$path_to_events" "$path_to_project/events"
-//     fi
-//     if ! [ -e "$path_to_project/settings" ]
-//     then
-//         "$relative_link" "$path_to_settings" "$path_to_project/settings"
-//     fi
-//     // 
-//     // clean out
-//     // 
-//         # FIXME: run purge_system_links on folders
+
+    // TODO: purge broken system links
+
+    // 
+    // link stuff into fake home
+    // 
+    await recursivelyFileLink({
+        existingFolder: `${virkshop.folder}/home`,
+        targetFolder: virkshop.structure.fakeHome,
+    })
     
 // // 
 // // Phase 1
