@@ -4,11 +4,9 @@
     // unlike the start command, this one has access to a standardized version of deno and bash
     // similar to the previous command, it has access to external environment variables
 // what this script does:
-    // (check that VIRKSHOP_FOLDER exists)
-    // phase 0: establish linked files/folders, clean broken links
-    // phase 1: isolated setup (cant use other extensions)
-    // phase 2: pre_shell setup (can use commands created by extensions)
-    // phase 3: start shell/virkshop 
+    // phase 0: create folder structure (establish linked files/folders, clean broken links)
+    // phase 1: import all the .js files of mixins (they can access external ENV vars, and dont have the full env)
+    // phase 2: start shell/virkshop, which will run all the zsh scripts
 
 const { run, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo, zipInto, mergeInto, returnAsString, } = await import(`https://deno.land/x/sprinter@0.3.1/index.js`)
 const { FileSystem, Console } = await import(`https://deno.land/x/file_system_js@0.0.28/main/deno.js`)
