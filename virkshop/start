@@ -1,204 +1,137 @@
-#!/usr/bin/env -S bash --norc --noprofile
+#!/usr/bin/env sh
+'\' -split "\\" -join ""# 2>/dev/null; : "' /*
+<#" deno_version="1.20.3"; deno_install="$HOME/.deno/$deno_version";deno="$deno_install/bin/deno"; filepath="$deno"; has () { [ ! -z "$(command -v "unzip")" ]; } ; if [ ! -f "$filepath" ] || [ ! -r "$filepath" ] || [ ! -x "$filepath" ]; then if ! has unzip; then could_auto_install="true"; if has apt-get; then if has brew; then could_auto_install="false"; else if ! brew install unzip; then could_auto_install="false"; fi; fi; else if [ "$(whoami)" = "root" ]; then if ! apt-get install unzip -y; then could_auto_install="false"; fi; elif [ -n "$(command -v "sudo")" ]; then echo "Can I install unzip for you? (its required for this command to work)";read ANSWER;echo; if [ ! "$ANSWER" =~ ^[Yy] ]; then could_auto_install="false"; else if ! sudo apt-get install unzip -y; then could_auto_install="false"; fi; fi; elif has doas; then echo "Can I install unzip for you? (its required for this command to work)";read ANSWER;echo; if [ ! "$ANSWER" =~ ^[Yy] ]; then could_auto_install="false"; else if ! doas apt-get install unzip -y; then could_auto_install="false"; fi; fi; else could_auto_install="false"; fi; fi; fi; if [ "$could_auto_install" = "false" ]; then echo "";echo "So I couldn't find an 'unzip' command";echo "And I tried to auto install it, but it seems that failed";echo "(This script needs unzip and either curl or wget)";echo "Please install the unzip command manually then re-run this script";exit 1; fi; if [ "$OS" = "Windows_NT" ]; then target="x86_64-pc-windows-msvc" else ; case $(uname -sm) in "Darwin x86_64") target="x86_64-apple-darwin" ;; "Darwin arm64") target="aarch64-apple-darwin" ;; *) target="x86_64-unknown-linux-gnu" ;; esac; fi; deno_uri="https://github.com/denoland/deno/releases/download/v$deno_version/deno-$target.zip"; bin_dir="$deno_install/bin"; exe="$bin_dir/deno"; if [ ! -d "$bin_dir" ]; then mkdir -p "$bin_dir"; fi; if has curl; then curl --fail --location --progress-bar --output "$exe.zip" "$deno_uri"; elif has curl ; then wget --output-document="$exe.zip" "$deno_uri"; else echo "Howdy! I looked for the 'curl' and for 'wget' commands but I didn't see either of them."; echo "Please install one of them"; echo "Otherwise I have no way to install the missing deno version needed to run this code"; fi; unzip -d "$bin_dir" -o "$exe.zip"; chmod +x "$exe"; rm "$exe.zip"; fi; "$deno" run -A "$0" "$@"; exit $? ; #> $deno_version = "1.19.0"; $env:DENO_INSTALL = "${HOME}/.deno/${deno_version}"; $deno = "${env:DENO_INSTALL}/bin/deno"; if (-not(Test-Path -Path "${deno}" -PathType Leaf)) { $v="${deno_version}"; iwr https://deno.land/x/install/install.ps1 -useb | iex; }; & "${deno}" run -A "${PSCommandPath}" @args; Exit $LastExitCode; #
+*/;
 
-# 
-# 
-# What is this file doing?
-# 
-# 
-    # 1. finding the "enter_virkshop" file
-    # 2. trying to install nix (this is the guesses-have-to-be-made part)
-    # 3. execute the "enter_virkshop" file with a specific executable
+// 
+// 
+// What is this file doing?
+// 
+// 
+    // 1. validating the folder structure
+    // 2. trying to install nix
+    // 3. using nix to install the environment
+    // 4. launching the environment as soon as possible
 
-{ # <- Prevent execution if this script was only partially downloaded
+import { FileSystem } from "https://deno.land/x/quickr@0.2.1/main/file_system.js"
+import { OperatingSystem } from "https://deno.land/x/quickr@0.2.1/main/operating_system.js"
+import { run, hasCommand, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.2.1/main/run.js"
+import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.2.1/main/console.js"
+const {move} = await import("https://deno.land/std@0.133.0/fs/mod.ts")
 
-# dependencies (some depend on the OS): command, uname, echo, printf, cat, read, dirname, uname, chmod, sh, sed, curl, sw_vers, pidof, whoami, mktemp, rm, basename, xz, mkdir, tar
+let projectFolder = FileSystem.makeAbsolutePath(`${FileSystem.thisFolder}/..`)
+const projectName = FileSystem.basename(projectFolder)
 
-# TODO: later add a basic check for all universally-essential commands here
+if (OperatingSystem.commonChecks.isWindows) {
+    // FIXME
+    throw Error(`Not supported yet`)
+}
 
-# 
-# fix the windows WSL mkfifo problem
-# 
-if [ -d "/mnt/c" ]
-then
-    # create some helpers
-    move_out_of_the_way () {
-        if [[ -e "$1" ]]
-        then
-            # if something is in the way, move it out of the way
-            # (recursively)
-            if [[ -e "$1.old" ]]
-            then
-                move_out_of_the_way "$1.old"
-            fi
-            
-            # now that anything that would be in the way has been moved
-            mv "$1" "$1.old"
-        fi
+// 
+// fix the windows WSL mkfifo problem
+// 
+const mountCInfo = await FileSystem.info('/mnt/c')
+if (mountCInfo.isFolder) {
+    // 
+    // check for mounting with metadata
+    // 
+
+    // check if metadata not enabled
+    const result = await run("mount", "-l", Stdout(returnAsString))
+    if (!result.match(/C: on \/mnt\/c.*metadata/)) {
+        console.log('__________________________________________________________________________________')
+        console.log('|                                                                                |')
+        console.log('|  Howdy!                                                                        |')
+        console.log('|                                                                                |')
+        console.log('|  Looks like there`s a metadata hiccup/problem. It seems you`re using WSL       |')
+        console.log('|  Sadly, for some reason, WSL doesn`t (by default) support many features of the |')
+        console.log('|  linux file system. And For some reason, adding that support requires          |')
+        console.log('|  re-mounting the C drive (within WSL) with metadata enabled.                   |')
+        console.log('|                                                                                |')
+        console.log('|  I`ll run the command automatically, but if you don`t want to put              |')
+        console.log('|  your password in, cancel this (CTRL+C) and run the following yourself:        |')
+        console.log('|                                                                                |')
+        console.log('      {                                                                           ')
+        console.log('          cd ; sudo umount /mnt/c && sudo mount -t drvfs C: /mnt/c -o metadata    ')
+        console.log('      }                                                                           ')
+        console.log('|                                                                                |')
+        console.log('|  Then re-run this script                                                       |')
+        console.log('|  You can read more about this problem here if you like:                        |')
+        console.log('|  https://devblogs.microsoft.com/commandline/chmod-chown-wsl-improvements/      |')
+        console.log('|                                                                                |')
+        console.log('----------------------------------------------------------------------------------')
+        console.log('')
+        Console.askFor.confirmation('Continue?')
+        // this means we need to unmount and remount with metadata enabled
+        const originalDirectory = FileSystem.pwd
+        Deno.chdir(FileSystem.home)
+        var { success } = await run("sudo", "umount", "/mnt/c").outcome
+        var { success } = await run("sudo", "mount", "-t", "drvfs", "C:", "/mnt/c", "-o", "metadata").outcome
+        // TODO: add a check for an error ^here
+        
+        // go back
+        Deno.chdir(originalDirectory)
     }
-    prev_command_successful () {
-        return $?
-    }
     
-    # 
-    # check for mounting with metadata
-    # 
-    
-    # check if metadata enabled already
-    if ! mount -l | grep 'C: on /mnt/c' | grep 'metadata' &>/dev/null
-    then
-        echo '__________________________________________________________________________________'
-        echo '|                                                                                |'
-        echo '|  Howdy!                                                                        |'
-        echo '|                                                                                |'
-        echo '|  Looks like there`s a metadata hiccup/problem. It seems you`re using WSL       |'
-        echo '|  Sadly, for some reason, WSL doesn`t (by default) support many features of the |'
-        echo '|  linux file system. And For some reason, adding that support requires          |'
-        echo '|  re-mounting the C drive (within WSL) with metadata enabled.                   |'
-        echo '|                                                                                |'
-        echo '|  I`ll run the command automatically, but if you don`t want to put              |'
-        echo '|  your password in, cancel this (CTRL+C) and run the following yourself:        |'
-        echo '|                                                                                |'
-        echo '      {                                                                           '
-        echo '          cd ; sudo umount /mnt/c && sudo mount -t drvfs C: /mnt/c -o metadata    '
-        echo '      }                                                                           '
-        echo '|                                                                                |'
-        echo '|  Then re-run this script                                                       |'
-        echo '|  You can read more about this problem here if you like:                        |'
-        echo '|  https://devblogs.microsoft.com/commandline/chmod-chown-wsl-improvements/      |'
-        echo '|                                                                                |'
-        echo '----------------------------------------------------------------------------------'
-        echo
-        echo "Continue?"; read _
-        # this means we need to unmount and remount with metadata enabled
-        {
-            cd && sudo umount /mnt/c && sudo mount -t drvfs C: /mnt/c -o metadata
-        }
-        # the cd command will be undone/ignored externally because its in a subshell (the {}'s)
-    fi
-    
-    # if project is inside the windows C drive
-    if [[ "$FORNIX_FOLDER" == "/mnt/c"* ]]; then
-        echo '__________________________________________________________________________________'
-        echo '|                                                                                |'
-        echo '|  Howdy!                                                                        |'
-        echo '|                                                                                |'
-        echo '|  Looks like your project is saved in the windows file system                   |'
-        echo '|  (instead of the Linux/WSL file system)                                        |'
-        echo '|                                                                                |'
-        echo '|  This is a bit of a problem since the file systems of                          |'
-        echo '|  Linux/Mac/Android/ChromeBook/OpenBSD/etc have many features                   |'
-        echo '|  that the windows file system does not have.                                   |'
-        echo '|                                                                                |'
-        echo '|  Would it be okay if I move this project?                                      |'
-        echo '|      I`ll create a shortcut to it so you can still find it.                    |'
-        echo '|      https://devblogs.microsoft.com/commandline/chmod-chown-wsl-improvements/  |'
-        echo '|                                                                                |'
-        echo '----------------------------------------------------------------------------------'
-        echo
-        question="[y/n]: ";answer=''
-        while true; do
-            echo "$question"; read response
-            case "$response" in
-                [Yy]* ) answer='yes'; break;;
-                [Nn]* ) answer='no'; break;;
-                * ) echo "Please answer yes or no.";;
-            esac
-        done
-        if [ "$answer" = 'no' ]; then
-            echo '
-            
-            okay, in that case just re-run this command whenever
-            you have moved the project to the linux file system
-                
-                if you`re confused about what that^ means
-                take a look at the "fornix_framework.md" file inside
-                of the "documentation" folder (inside of this project folder)
-            '
-            exit
-        else
-            # 
-            # where to move project
-            # 
-            new_project_location="$HOME/repos/$(basename "$FORNIX_FOLDER")"
-            while true; do
-                question="Is it okay if I move the project to '$new_project_location'? [y/n]";answer=''
-                while true; do
-                    echo "$question"; read response
-                    case "$response" in
-                        [Yy]* ) answer='yes'; break;;
-                        [Nn]* ) answer='no'; break;;
-                        * ) echo "Please answer yes or no.";;
-                    esac
-                done
-                if [ "$answer" = 'no' ]; then
-                    echo ""
-                    echo "Where would you like to put it?"
-                    echo "(press enter when done typing the path):"
-                    echo ""
-                    read new_project_location
-                else
+    // 
+    // check if project is inside the windows C drive
+    // 
+    if (FileSystem.thisFolder.match(/^\/mnt\/c/)) {
+        console.log('__________________________________________________________________________________')
+        console.log('|                                                                                |')
+        console.log('|  Howdy!                                                                        |')
+        console.log('|                                                                                |')
+        console.log('|  Looks like your project is saved in the windows file system                   |')
+        console.log('|  (instead of the Linux/WSL file system)                                        |')
+        console.log('|                                                                                |')
+        console.log('|  This is a bit of a problem since the file systems of                          |')
+        console.log('|  Linux/Mac/Android/ChromeBook/OpenBSD/etc have many features                   |')
+        console.log('|  that the windows file system does not have.                                   |')
+        console.log('|                                                                                |')
+        console.log('|  Would it be okay if I move this project?                                      |')
+        console.log('|      I`ll create a shortcut to it so you can still find it.                    |')
+        console.log('|      https://devblogs.microsoft.com/commandline/chmod-chown-wsl-improvements/  |')
+        console.log('|                                                                                |')
+        console.log('----------------------------------------------------------------------------------')
+        const answeredYes = await Console.askFor.yesNo("[y/n]")
+        if (!answeredYes) {
+            console.log()
+            console.log('okay, in that case just re-run this command whenever')
+            console.log('you have moved the project to the linux file system')
+            console.log('    ')
+            console.log('    if youre confused about what that^ means')
+            console.log('    take a look at the "documentation" folder (inside of this project folder)')
+            console.log()
+            Deno.exit()
+        } else {
+            // 
+            // where to move project
+            // 
+            let newProjectLocation, answeredYes
+            while (true) {
+                newProjectLocation = `${FileSystem.home}/repos/${projectName}`
+                answeredYes = await Console.askFor.yesNo(`Is it okay if I move the project to: ${yellow`${newProjectLocation}`}?`)
+                if (!answeredYes) {
+                    console.log()
+                    newProjectLocation = await Console.askFor.line("Okay where should I move it? ")
+                } else {
                     break
-                fi
-            done
-            
-            # 
-            # move the project
-            # 
-            
-            # if something is in the way, move it out of the way
-            if [ -e "$new_project_location" ]
-            then
-                move_out_of_the_way "$new_project_location"
-            fi
-            
-            # make sure the parent folder exists
-            mkdir -p "$(dirname "$new_project_location")"
-            
-            # move the project itself
-            prev_command_successful && mv "$FORNIX_FOLDER" "$new_project_location"
-            
-            # create a shortcut to the project
-            prev_command_successful && ln -s "$new_project_location" "$FORNIX_FOLDER"
-            
-            # cd and start the project
-            prev_command_successful && cd "$new_project_location" && "$new_project_location/commands/start"
-            # note: commands/start is needed in the above command so the FORNIX_FOLDER and other checks/setup can be redone
-            # so just exit right after because this script has become just a wrapper at this point
-            exit $?
-        fi
-    fi
-fi
-
-# 
-# 
-# Setup colors
-# 
-# 
-newline='
-'
-# do-nothing functions
-black      () { :; }
-red        () { :; }
-green      () { :; }
-yellow     () { :; }
-blue       () { :; }
-magenta    () { :; }
-cyan       () { :; }
-white      () { :; }
-color_reset() { :; }
-# if tput exists
-if [ -n "$(command -v "tput")" ]
-then
-    black      () { tput setaf 0; }
-    red        () { tput setaf 1; }
-    green      () { tput setaf 2; }
-    yellow     () { tput setaf 3; }
-    blue       () { tput setaf 4; }
-    magenta    () { tput setaf 5; }
-    cyan       () { tput setaf 6; }
-    white      () { tput setaf 7; }
-    color_reset() { tput sgr0; }
-fi
+                }
+            }
+            // 
+            // move the project
+            // 
+            await FileSystem.clearAPathFor(newProjectLocation)
+            await move(projectFolder, newProjectLocation)
+            // create a link from the old location to the new location so they can still access the project
+            await FileSystem.relativeLink({
+                existingItem: newProjectLocation,
+                newItem: projectFolder,
+            })
+            projectFolder = newProjectLocation
+        }
+    }
+}
 
 # 
 # 
