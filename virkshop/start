@@ -13,18 +13,18 @@
     // 3. using nix to install the environment
     // 4. launching the environment as soon as possible
 
-import { FileSystem } from "https://deno.land/x/quickr@0.2.1/main/file_system.js"
-import { OperatingSystem } from "https://deno.land/x/quickr@0.2.1/main/operating_system.js"
-import { run, hasCommand, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.2.1/main/run.js"
-import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.2.1/main/console.js"
+import { OperatingSystem } from "https://deno.land/x/quickr@0.3.24/main/operating_system.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.3.24/main/file_system.js"
+import { run, hasCommand, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.3.
+import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.3.24/main/console.js"
 const {move} = await import("https://deno.land/std@0.133.0/fs/mod.ts")
 
 let projectFolder = FileSystem.makeAbsolutePath(`${FileSystem.thisFolder}/..`)
 const projectName = FileSystem.basename(projectFolder)
 
 if (OperatingSystem.commonChecks.isWindows) {
-    // FIXME
-    throw Error(`Not supported yet`)
+    throw Error(`\n\nWindows isn't directly supported, but if you install WSL then it should work.\nHere's a tutorial link for installing WSL Ubuntu: https://www.youtube.com/watch?v=EwRVswCtmX4\n\n`)
+    // TODO: auto check for WSL and if it's available, try to automatically enter WSL and run this script again inside of it
 }
 
 // 
@@ -51,9 +51,9 @@ if (mountCInfo.isFolder) {
         console.log('|  I`ll run the command automatically, but if you don`t want to put              |')
         console.log('|  your password in, cancel this (CTRL+C) and run the following yourself:        |')
         console.log('|                                                                                |')
-        console.log('      {                                                                           ')
-        console.log('          cd ; sudo umount /mnt/c && sudo mount -t drvfs C: /mnt/c -o metadata    ')
-        console.log('      }                                                                           ')
+        console.log('       cd                                                                         ')
+        console.log('       sudo umount /mnt/c && sudo mount -t drvfs C: /mnt/c -o metadata            ')
+        console.log('       cd -                                                                       ')
         console.log('|                                                                                |')
         console.log('|  Then re-run this script                                                       |')
         console.log('|  You can read more about this problem here if you like:                        |')
@@ -61,13 +61,17 @@ if (mountCInfo.isFolder) {
         console.log('|                                                                                |')
         console.log('----------------------------------------------------------------------------------')
         console.log('')
-        Console.askFor.confirmation('Continue?')
+        await Console.askFor.confirmation('Continue?')
         // this means we need to unmount and remount with metadata enabled
         const originalDirectory = FileSystem.pwd
         Deno.chdir(FileSystem.home)
         var { success } = await run("sudo", "umount", "/mnt/c").outcome
-        var { success } = await run("sudo", "mount", "-t", "drvfs", "C:", "/mnt/c", "-o", "metadata").outcome
+        var { success } = success ? await run("sudo", "mount", "-t", "drvfs", "C:", "/mnt/c", "-o", "metadata").outcome : { success }
         // TODO: add a check for an error ^here
+        if (!success) {
+            console.error('\nOne of the commands didn`t work :/\ntry running the commands mentioned above manually\n')
+            await Console.askFor.confirmation('Continue anyways?')
+        }
         
         // go back
         Deno.chdir(originalDirectory)
@@ -133,65 +137,27 @@ if (mountCInfo.isFolder) {
     }
 }
 
-# 
-# 
-# Color Test
-# 
-#
-color_test_cache_location="$HOME/.config/answered_questions/does_color_test_work"
-# check if already answered this questions
-if [ -f "$color_test_cache_location" ]
-then
-    ANSWER="$(cat "$color_test_cache_location")"
-fi
-# ensure the answer is well-formed
-while true; do
-    case "$ANSWER" in
-        [Yy]* ) ANSWER='yes'; break;;
-        [Nn]* ) ANSWER='no'; break;;
-        * ) echo "${newline}Please answer yes or no. ${newline}";;
-    esac
-    echo "                                   "
-    echo "               COLOR TEST              "
-    echo "          |------------------|"
-    echo "          |     $(red) red $(color_reset)        |"
-    echo "          |     $(green) green $(color_reset)      |"
-    echo "          |     $(yellow) yellow $(color_reset)     |"
-    echo "          |     $(blue) blue $(color_reset)       |"
-    echo "          |     $(magenta) magenta $(color_reset)    |"
-    echo "          |     $(cyan) cyan $(color_reset)       |"
-    echo "          |------------------|"
-    echo "     
-          Does this look good?
-  (there should be one color per line)
-    "; printf "yes/no:";
-    read ANSWER
-done
-
-# create the cache file
-mkdir -p "$(dirname "$color_test_cache_location")"
-echo "$ANSWER" > "$color_test_cache_location"
-# NOTE: this^ doesn't cover the edgecase of one of the parent "folders"
-#       actually being a file, which would cause a failure
-#       in the future lets plan to do a corruption check on this structure
-
-# 
-# if colors don't work/look good
-# 
-if [ "$answer" = 'no' ]
-then
-    echo " :( Okay I'll disable color"
-    black      () { :; }
-    red        () { :; }
-    green      () { :; }
-    yellow     () { :; }
-    blue       () { :; }
-    magenta    () { :; }
-    cyan       () { :; }
-    white      () { :; }
-    color_reset() { :; }
-fi
-
+// 
+// if nix not installed
+// 
+if (!await hasCommand('nix')) {
+    console.log("|------------------------------------------------------|")
+    console.log("|                                                      |")
+    console.log("|    I'll try to install nix for you                   |")
+    console.log("|    (since I don't see nix yet)                       |")
+    console.log("|                                                      |")
+    console.log("|------------------------------------------------------|")
+    console.log("")
+    // check if root user
+    const username = await run`whoami ${Stdout(returnAsString)}`
+    if (username == "root") {
+        console.log("looks like you're logged in as root")
+        console.log("sadly nix can't install on the root user")
+        console.log("please use a regular user, then re-run this script")
+        Deno.exit()
+        // TODO: check the available users for whoever is trying to setup as root
+    }
+}
 
 # 
 # if nix doesnt exist
