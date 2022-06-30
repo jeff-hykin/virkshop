@@ -126,31 +126,111 @@ async function loadVirkshopData() {
     }
 }
 
-// todo
-    // make all commands executable
-    // create a trigger event function
-    // design combination method for mixins trying to request things from other mixins
-        // system dependencies (nix toml)
-        // adding to gitignore
-        // adding a pip module
-        // adding a git hook
-    // create injection tools
-        // home link folder
-        // external binary wrap+inject
-    // design "affect" methods (set env vars, add to path)
-        // design data storage for holding these (auto generate a folder of .zshrc_peice's that each get sourced)
-        // env variable export (add to path)
-        // zsh function defintion
-        // adding raw text that will later be sourced by zsh
+function linkMixinNamespace(path) {
+    const mixinName = `${virkshopFolder}/${FileSystem.basename(path)}`
+    const specialFolderNames     = virkshop.structure.mixins.linkedFolderNames
+    const specialVirkshopPaths   = specialFolderNames.map(each => `${virkshop.folder}/${each}`)
+    const specialPaths           = specialFolderNames.map(each => `${path}/${each}`)
+    for (const each of specialFolderNames) { // FIXME: home folder needs to be treated differently
+        const virkshopFolder = `${virkshop.folder}/${each}`
+        const mixinFolder    = `${path}/${each}`
+        const namespace      = `${virkshopFolder}/${mixinName}`
+
+        // 
+        // create the "namespaced" folder of the file first
+        // 
+        const namespaceCheck = await FileSystem.info(namespace)
+        let needToCreateNamespace = false
+        if (!namespaceCheck.exists) {
+            needToCreateNamespace = true
+        } else if (!namespaceCheck.isSymlink) {
+            await FileSystem.remove(namespace)
+            needToCreateNamespace = true
+        } else {
+            const target = FileSystem.makeAbsolutePath(namespaceCheck.target)
+            const thisFolder = FileSystem.makeAbsolutePath(mixinFolder)
+            if (target != thisFolder) {
+                await FileSystem.remove(namespace)
+                needToCreateNamespace = true
+            }
+        }
+        // create the namespace
+        if (needToCreateNamespace) {
+            await FileSystem.relativeLink({existingItem: mixinFolder, newItem: namespace})
+        }
+    }
+}
+
+function linkMixinShortcuts(path) {
+    // NOTE: linkMixinNamespace needs to be run for EVERY mixin before shortcuts can run. Otherwise there could be order of operations problems
+
+    const mixinName = `${virkshopFolder}/${FileSystem.basename(path)}`
+    const specialFolderNames     = virkshop.structure.mixins.linkedFolderNames
+    const specialVirkshopPaths   = specialFolderNames.map(each => `${virkshop.folder}/${each}`)
+    const specialPaths           = specialFolderNames.map(each => `${path}/${each}`)
+    for (const each of specialFolderNames) {
+        const virkshopFolder = `${virkshop.folder}/${each}`
+        const mixinFolder    = `${path}/${each}`
+        const namespace      = `${virkshopFolder}/${mixinName}`
+
+        // 
+        // add all the shortcut links
+        // 
+        for (const eachPath of await FileSystem.recursivelyListPathsIn(mixinFolder)) {
+            const relativePart = eachPath.slice(mixinFolder.length)
+            const targetLocation = await FileSystem.info(`${virkshopFolder}/${relativePart}`)
+            // if hardlink
+            if (targetLocation.isFile && !targetLocation.isSymlink) {
+                // assume the user put it there, or that its the plugin's ownership
+                continue
+            // if symlink
+            } else if (targetLocation.isFile) {
+                // remove broken things
+                if (targetLocation.isBrokenLink) {
+                    await FileSystem.remove(targetLocation.path)
+                } else {
+                    const target      = FileSystem.makeAbsolutePath(targetLocation.path)
+                    const currentItem = FileSystem.makeAbsolutePath(eachPath)
+                    if (target == currentItem) {
+                        // already linked
+                        continue
+                    } else {
+                        // linked but to the wrong thing
+                        // FIXME: add a warning about conflicting items here, and replace the symlink with the warning
+                        //        note its possible for one to be a file and the other a folder
+                        continue
+                    }
+                }
+            }
+            const mixinItem = await FileSystem.info(eachPath)
+            if (mixinItem.isFile) {
+                // FIXME: this could technically destroy a user-made file by having it as part of the parent path
+                
+                // make sure it exists by this point
+                await FileSystem.ensureIsFolder(FileSystem.parent)
+                // create the shortcut
+                await FileSystem.relativeLink({
+                    existingItem: mixinItem.path,
+                    newItem: targetLocation.path,
+                })
+            }
+            // TODO: consider another edgecase of mixin item being a file, but existing item being a folder
+        }
+    }
+}
 
 
 const virkshop = await loadVirkshopData()
+
 // 
 // 
 // Phase 0: link everything!
 // 
 //
-    // link-out stuff
+    // rule1: never overwrite non-symlink files (in commands/ settings/ etc)
+    //        hardlink files are presumably created by the user, not a mixin
+
+    // link virkshop folders up-and-out into the project folder
     const promises = Object.entries(virkshop.settings.link_to_project_root).map(async ([key, value])=>{
         const target = await FileSystem.info(`${virkshop.folder}/../${key}`)
         if (target.isBrokenLink) {
@@ -161,7 +241,7 @@ const virkshop = await loadVirkshopData()
             await FileSystem.relativeLink({existingItem: value, newItem: target.path})
         }
     })
-    
+
     // 
     // link mixins
     // 
@@ -170,17 +250,34 @@ const virkshop = await loadVirkshopData()
     //              instead of using a number priority, put all their stuff under a namespace
     //              then attempt to put it outside the namespace
     //                  if there is a conflict, make the command print out "there is a conflict, please specify if you want the command from __ or __"
-    for (const eachMixin of await FileSystem.listFolderItemsIn(`${virkshop.folder}/mixins`)) {
-        for (const eachFolderName of virkshop.structure.mixins.linkedFolderNames) {
-            await recursivelyFileLink({
-                existingFolder: `${eachMixin.path}/${eachFolderName}`,
-                targetFolder: `${virkshop.folder}/${eachFolderName}`,
-            })
-        }
+    //  new FIXME: the above solution doesnt work for the home folder.
+    //             maybe add a message any time a .profile or .rc file is added to the home and explain
+    //     possible solution: use the project extension to pick one, which can be a combination (concat or pick one or whatever)
+    const mixinPaths = await FileSystem.listFolderItemsIn(`${virkshop.folder}/mixins`)
+    // namespace
+    for (const eachMixin of mixinPaths) {
+        await linkMixinNamespace(eachMixin)
+    }
+    // TODO: purge broken system links more
+
+
+// 
+// Phase 1
+// 
+    // 
+    // let the mixins set themselves up
+    // 
+    "$path_to_virkshop_tools/actions/start_phase_1"
+    
+    // 
+    // once theyve created their peices, connect them to the larger outside system
+    // 
+    
+    // shortcuts 
+    for (const eachMixin of mixinPaths) {
+        await linkMixinShortcuts(eachMixin)
     }
     
-
-    // TODO: purge broken system links
 
     // 
     // link stuff into fake home

@@ -375,7 +375,7 @@ async function sourceNixSetup() {
 // 
 // 
 
-const entrypoint = `${projectFolder}/${virkshopName}/virkshop_core/commands/virkshop/enter`
+const entrypoint = `${projectFolder}/${virkshopName}/mixins/virkshop/commands/virkshop/enter`
 await run`chmod ugo+x ${entrypoint}` // make sure its executable
 await run`nix-shell --packages deno bash --run ${entrypoint} -I ${`nixpkgs=https://github.com/NixOS/nixpkgs/archive/c82b46413401efa740a0b994f52e9903a4f6dcd5.tar.gz`}`
 
