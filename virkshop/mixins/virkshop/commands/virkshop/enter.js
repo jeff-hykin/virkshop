@@ -126,7 +126,7 @@ async function loadVirkshopData() {
     }
 }
 
-function linkMixinNamespace(path) {
+async function linkMixinNamespace(path) {
     const mixinName = `${virkshopFolder}/${FileSystem.basename(path)}`
     const specialFolderNames     = virkshop.structure.mixins.linkedFolderNames
     const specialVirkshopPaths   = specialFolderNames.map(each => `${virkshop.folder}/${each}`)
@@ -158,10 +158,55 @@ function linkMixinNamespace(path) {
         if (needToCreateNamespace) {
             await FileSystem.relativeLink({existingItem: mixinFolder, newItem: namespace})
         }
+
+        // 
+        // create shortcuts within the namespace
+        // 
+        const nestedNamespace = `${virkshopFolder}/${mixinName}/${mixinName}`
+        for (const eachPath of await FileSystem.listPathsIn(nestedNamespace)) {
+            const relativePart = eachPath.slice(nestedNamespace.length)
+            const targetLocation = await FileSystem.info(`${namespace}/${relativePart}`)
+            // if hardlink
+            if (targetLocation.isFile && !targetLocation.isSymlink) {
+                // assume the user put it there, or that its the plugin's ownership
+                continue
+            // if symlink
+            } else if (targetLocation.isFile) {
+                // remove broken things
+                if (targetLocation.isBrokenLink) {
+                    await FileSystem.remove(targetLocation.path)
+                } else {
+                    const target      = FileSystem.makeAbsolutePath(targetLocation.path)
+                    const currentItem = FileSystem.makeAbsolutePath(eachPath)
+                    if (target == currentItem) {
+                        // already linked
+                        continue
+                    } else {
+                        // linked but to the wrong thing
+                        // FIXME: add a warning about conflicting items here, and replace the symlink with the warning
+                        //        note its possible for one to be a file and the other a folder
+                        continue
+                    }
+                }
+            }
+            const mixinItem = await FileSystem.info(eachPath)
+            if (mixinItem.isFile) {
+                // FIXME: this could technically destroy a user-made file by having it as part of the parent path
+                
+                // make sure it exists by this point
+                await FileSystem.ensureIsFolder(FileSystem.parent)
+                // create the shortcut
+                await FileSystem.relativeLink({
+                    existingItem: mixinItem.path,
+                    newItem: targetLocation.path,
+                })
+            }
+            // TODO: consider another edgecase of mixin item being a file, but existing item being a folder
+        }
     }
 }
 
-function linkMixinShortcuts(path) {
+async function linkMixinShortcuts(path) {
     // NOTE: linkMixinNamespace needs to be run for EVERY mixin before shortcuts can run. Otherwise there could be order of operations problems
 
     const mixinName = `${virkshopFolder}/${FileSystem.basename(path)}`
@@ -219,8 +264,23 @@ function linkMixinShortcuts(path) {
     }
 }
 
+async function trigger(eventPath) {
+    let promises = []
+    const eventPathInfo = await FileSystem.info(eventPath)
+    if (eventPathInfo.isFolder) {
+        const paths = await FileSystem.recursivelyListPathsIn(eventPath)
+        paths.sort()
+        // FIXME: sort them numerically
+        // FIXME: pad out the 0's to make the numbers equal lengths
+        for (const eachPath of paths) {
+            await run`${eachPath}`
+        }
+    }
+}
+
 
 const virkshop = await loadVirkshopData()
+let promises = []
 
 // 
 // 
@@ -229,9 +289,8 @@ const virkshop = await loadVirkshopData()
 //
     // rule1: never overwrite non-symlink files (in commands/ settings/ etc)
     //        hardlink files are presumably created by the user, not a mixin
-
     // link virkshop folders up-and-out into the project folder
-    const promises = Object.entries(virkshop.settings.link_to_project_root).map(async ([key, value])=>{
+    promises = promises.concat(Object.entries(virkshop.settings.link_to_project_root).map(async ([key, value])=>{
         const target = await FileSystem.info(`${virkshop.folder}/../${key}`)
         if (target.isBrokenLink) {
             await FileSystem.remove(target.path)
@@ -240,7 +299,7 @@ const virkshop = await loadVirkshopData()
         if (!target.exists)  {
             await FileSystem.relativeLink({existingItem: value, newItem: target.path})
         }
-    })
+    }))
 
     // 
     // link mixins
@@ -256,9 +315,12 @@ const virkshop = await loadVirkshopData()
     const mixinPaths = await FileSystem.listFolderItemsIn(`${virkshop.folder}/mixins`)
     // namespace
     for (const eachMixin of mixinPaths) {
-        await linkMixinNamespace(eachMixin)
+        promises.push(linkMixinNamespace(eachMixin) )
     }
     // TODO: purge broken system links more
+    
+    // let them finish in any order (efficient), but they need to be done before phase 1 starts
+    await Promise.all(promises)
 
 
 // 
@@ -267,7 +329,20 @@ const virkshop = await loadVirkshopData()
     // 
     // let the mixins set themselves up
     // 
-    "$path_to_virkshop_tools/actions/start_phase_1"
+    promises = []
+    for (const eachMixinPath of mixinPaths) {
+        promises.push(
+            FileSystem.recursivelyListPathsIn(`${eachMixinPath}/events/virkshop/phase_1`).then(
+                executables=>{
+                    executables.sort() // FIXME: this is javascript so of course it won't actually sort alpha-numerically
+                    for (const eachExecutable of executables) {
+                        await run`${eachExecutable}`
+                    }
+                }
+            )
+        )
+    }
+    await Promise.all(promises)
     
     // 
     // once theyve created their peices, connect them to the larger outside system
@@ -277,7 +352,6 @@ const virkshop = await loadVirkshopData()
     for (const eachMixin of mixinPaths) {
         await linkMixinShortcuts(eachMixin)
     }
-    
 
     // 
     // link stuff into fake home
@@ -287,49 +361,11 @@ const virkshop = await loadVirkshopData()
         targetFolder: virkshop.structure.fakeHome,
     })
 
-    
-// // 
-// // Phase 1
-// // 
-//     // 
-//     // let the mixins set themselves up
-//     // 
-//         "$path_to_virkshop_tools/actions/start_phase_1"
-    
-//     // 
-//     // once theyve created their peices, connect them to the larger outside system
-//     // 
-//         "$path_to_virkshop_tools/actions/setup_mixins"
-//         "$path_to_virkshop_tools/actions/ensure_all_commands_executable"
-//         # make all events executable
-//         chmod -R ugo+x "$path_to_commands" &>/dev/null || sudo chmod -R ugo+x "$path_to_commands" &>/dev/null
-//     // 
-//     // link all home files into the temp home
-//     // 
-//         rm -rf "$path_to_temp_home"
-//         mkdir -p "$path_to_temp_home"
-//         # this loop is so stupidly complicated because of many inherent-to-shell reasons, for example: https://stackoverflow.com/questions/13726764/while-loop-subshell-dilemma-in-bash
-//         for_each_item_in="$path_to_home"; [ -z "$__NESTED_WHILE_COUNTER" ] && __NESTED_WHILE_COUNTER=0;__NESTED_WHILE_COUNTER="$((__NESTED_WHILE_COUNTER + 1))"; trap 'rm -rf "$__temp_var__temp_folder"' EXIT; __temp_var__temp_folder="$(mktemp -d)"; mkfifo "$__temp_var__temp_folder/pipe_for_while_$__NESTED_WHILE_COUNTER"; (find "$for_each_item_in" -maxdepth 1 ! -path "$for_each_item_in" -print0 2>/dev/null | sort -z > "$__temp_var__temp_folder/pipe_for_while_$__NESTED_WHILE_COUNTER" &); while read -d $'\0' each
-//         do
-//             "$relative_link" "$path_to_home/$each" "$path_to_temp_home/$each"
-//         done < "$__temp_var__temp_folder/pipe_for_while_$__NESTED_WHILE_COUNTER";__NESTED_WHILE_COUNTER="$((__NESTED_WHILE_COUNTER - 1))"
-// // 
-// // Phase 2
-// // 
-//     . "$trigger" "$path_to_events/virkshop/phase_2"
-
-// // 
-// // let the .zshrc start phase 3
-// // 
-//     if [ "$VIRKSHOP_DEBUG" = "on" ]; then
-//         echo "Prepping for phase3"
-//         echo "    switching from Bash to Zsh"
-//         echo "    changing HOME to temp folder for nix-shell"
-//         echo "    (Tools/Commands mentioned in 'system_tools.toml' will become available)"
-//     fi
-//     HOME="$path_to_temp_home" nix-shell --pure --command "zsh" "$path_to_mixins/nix/internals/shell.nix"
-//     if [ "$VIRKSHOP_DEBUG" = "on" ]; then
-//         echo "    (Tools/Commands mentioned in 'system_tools.toml' are no longer available/installed)"
-//         echo "    switched from Zsh back to Bash"
-//         echo "end of phase 3"
-//     fi
+// 
+// let the .zshrc start Phase 2
+// 
+    Console.env.REAL_HOME = Console.env.HOME
+    Console.env.PROJECT   = FileSystem.normalize(`${virkshop.folder}/..`)
+    Console.env.HOME      = virkshop.structure.fakeHome
+    // FIXME: these env variables are not going to be passed through
+    await run`nix-shell --pure --command zsh`

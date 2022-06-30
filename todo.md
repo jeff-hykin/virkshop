@@ -5,6 +5,10 @@
     - then do mixin phase 1 (pre extension setup)
     - then do mixin phase 2 (post extension setup)
     - then do mixin phase 3 (post virkshop setup)
+- generate the home folder
+- create a standard way to pass phase_1 data into phase_2
+    - create a JSON file inside temporary/short_term 
+    - have zsh read the JSON file and create some env vars based on them
 - `addToGitignore` function
 - `triggerEvent` function
 - `wrapExecutable` function for sudo, vim, and the like
