@@ -13,469 +13,370 @@
     // 3. using nix to install the environment
     // 4. launching the environment as soon as possible
 
-import { OperatingSystem } from "https://deno.land/x/quickr@0.3.24/main/operating_system.js"
-import { FileSystem } from "https://deno.land/x/quickr@0.3.24/main/file_system.js"
-import { run, hasCommand, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.3.
-import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.3.24/main/console.js"
+import { OperatingSystem } from "https://deno.land/x/quickr@0.3.34/main/operating_system.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.3.34/main/file_system.js"
+import { run, hasCommand, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.3.34/main/run.js"
+import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.3.34/main/console.js"
+
+const curlString = async (url) => new TextDecoder().decode(
+    new Uint8Array(await (await fetch(url)).arrayBuffer())
+)
+
 const {move} = await import("https://deno.land/std@0.133.0/fs/mod.ts")
 
+let virkshopName  = FileSystem.basename(FileSystem.thisFolder)
 let projectFolder = FileSystem.makeAbsolutePath(`${FileSystem.thisFolder}/..`)
 const projectName = FileSystem.basename(projectFolder)
 
-if (OperatingSystem.commonChecks.isWindows) {
-    throw Error(`\n\nWindows isn't directly supported, but if you install WSL then it should work.\nHere's a tutorial link for installing WSL Ubuntu: https://www.youtube.com/watch?v=EwRVswCtmX4\n\n`)
-    // TODO: auto check for WSL and if it's available, try to automatically enter WSL and run this script again inside of it
-}
 
-// 
-// fix the windows WSL mkfifo problem
-// 
-const mountCInfo = await FileSystem.info('/mnt/c')
-if (mountCInfo.isFolder) {
-    // 
-    // check for mounting with metadata
-    // 
+await installNix()
+await sourceNixSetup()
 
-    // check if metadata not enabled
-    const result = await run("mount", "-l", Stdout(returnAsString))
-    if (!result.match(/C: on \/mnt\/c.*metadata/)) {
-        console.log('__________________________________________________________________________________')
-        console.log('|                                                                                |')
-        console.log('|  Howdy!                                                                        |')
-        console.log('|                                                                                |')
-        console.log('|  Looks like there`s a metadata hiccup/problem. It seems you`re using WSL       |')
-        console.log('|  Sadly, for some reason, WSL doesn`t (by default) support many features of the |')
-        console.log('|  linux file system. And For some reason, adding that support requires          |')
-        console.log('|  re-mounting the C drive (within WSL) with metadata enabled.                   |')
-        console.log('|                                                                                |')
-        console.log('|  I`ll run the command automatically, but if you don`t want to put              |')
-        console.log('|  your password in, cancel this (CTRL+C) and run the following yourself:        |')
-        console.log('|                                                                                |')
-        console.log('       cd                                                                         ')
-        console.log('       sudo umount /mnt/c && sudo mount -t drvfs C: /mnt/c -o metadata            ')
-        console.log('       cd -                                                                       ')
-        console.log('|                                                                                |')
-        console.log('|  Then re-run this script                                                       |')
-        console.log('|  You can read more about this problem here if you like:                        |')
-        console.log('|  https://devblogs.microsoft.com/commandline/chmod-chown-wsl-improvements/      |')
-        console.log('|                                                                                |')
-        console.log('----------------------------------------------------------------------------------')
-        console.log('')
-        await Console.askFor.confirmation('Continue?')
-        // this means we need to unmount and remount with metadata enabled
-        const originalDirectory = FileSystem.pwd
-        Deno.chdir(FileSystem.home)
-        var { success } = await run("sudo", "umount", "/mnt/c").outcome
-        var { success } = success ? await run("sudo", "mount", "-t", "drvfs", "C:", "/mnt/c", "-o", "metadata").outcome : { success }
-        // TODO: add a check for an error ^here
-        if (!success) {
-            console.error('\nOne of the commands didn`t work :/\ntry running the commands mentioned above manually\n')
-            await Console.askFor.confirmation('Continue anyways?')
+
+async function installNix() {
+    const nixScriptLocalCopy = `
+    #!/bin/sh
+
+        # This script installs the Nix package manager on your system by
+        # downloading a binary distribution and running its installer script
+        # (which in turn creates and populates /nix).
+
+        { # Prevent execution if this script was only partially downloaded
+        oops() {
+            echo "$0:" "$@" >&2
+            exit 1
         }
-        
-        // go back
-        Deno.chdir(originalDirectory)
+
+        umask 0022
+
+        tmpDir="$(mktemp -d -t nix-binary-tarball-unpack.XXXXXXXXXX || \
+                oops "Can't create temporary directory for downloading the Nix binary tarball")"
+        cleanup() {
+            rm -rf "$tmpDir"
+        }
+        trap cleanup EXIT INT QUIT TERM
+
+        require_util() {
+            command -v "$1" > /dev/null 2>&1 ||
+                oops "you do not have '$1' installed, which I need to $2"
+        }
+
+        case "$(uname -s).$(uname -m)" in
+            Linux.x86_64) system=x86_64-linux; hash=0c8a432993d06e4d882ad48cde81d9bef23842cf6d7432cd93ef1a99c8d4ef43;;
+            Linux.i?86) system=i686-linux; hash=b6e100a704065728ce10408df3ccb2b97c68e4aa033efe5ec9c6d3346f98f011;;
+            Linux.aarch64) system=aarch64-linux; hash=0b35f0d3b480e15ca4bf57ee0d90c5dd209f8bf6ab0c429a2e4aca6565b9d9a6;;
+            Darwin.x86_64) system=x86_64-darwin; hash=1da9492d6ea1d0ae470df5aed61897f4e3166360a510eb4b5755b1bfb5128177;;
+            *) oops "sorry, there is no binary distribution of Nix for your platform";;
+        esac
+
+        url="https://releases.nixos.org/nix/nix-2.3.8/nix-2.3.8-$system.tar.xz"
+
+        tarball="$tmpDir/$(basename "$tmpDir/nix-2.3.8-$system.tar.xz")"
+
+        require_util curl "download the binary tarball"
+        require_util tar "unpack the binary tarball"
+        if [ "$(uname -s)" != "Darwin" ]; then
+            require_util xz "unpack the binary tarball"
+        fi
+
+        echo "downloading Nix 2.3.8 binary tarball for $system from '$url' to '$tmpDir'..."
+        curl -L "$url" -o "$tarball" || oops "failed to download '$url'"
+
+        if command -v sha256sum > /dev/null 2>&1; then
+            hash2="$(sha256sum -b "$tarball" | cut -c1-64)"
+        elif command -v shasum > /dev/null 2>&1; then
+            hash2="$(shasum -a 256 -b "$tarball" | cut -c1-64)"
+        elif command -v openssl > /dev/null 2>&1; then
+            hash2="$(openssl dgst -r -sha256 "$tarball" | cut -c1-64)"
+        else
+            oops "cannot verify the SHA-256 hash of '$url'; you need one of 'shasum', 'sha256sum', or 'openssl'"
+        fi
+
+        if [ "$hash" != "$hash2" ]; then
+            oops "SHA-256 hash mismatch in '$url'; expected $hash, got $hash2"
+        fi
+
+        unpack=$tmpDir/unpack
+        mkdir -p "$unpack"
+        tar -xJf "$tarball" -C "$unpack" || oops "failed to unpack '$url'"
+
+        script=$(echo "$unpack"/*/install)
+
+        [ -e "$script" ] || oops "installation script is missing from the binary tarball!"
+        "$script" "$@"
+
+        } # End of wrapping
+
+    `
+
+    if (OperatingSystem.commonChecks.isWindows) {
+        throw Error(`\n\nWindows isn't directly supported, but if you install WSL then it should work.\nHere's a tutorial link for installing WSL Ubuntu: https://www.youtube.com/watch?v=EwRVswCtmX4\n\n`)
+        // TODO: auto check for WSL and if it's available, try to automatically enter WSL and run this script again inside of it
     }
-    
+
     // 
-    // check if project is inside the windows C drive
+    // fix the windows WSL mkfifo problem
     // 
-    if (FileSystem.thisFolder.match(/^\/mnt\/c/)) {
-        console.log('__________________________________________________________________________________')
-        console.log('|                                                                                |')
-        console.log('|  Howdy!                                                                        |')
-        console.log('|                                                                                |')
-        console.log('|  Looks like your project is saved in the windows file system                   |')
-        console.log('|  (instead of the Linux/WSL file system)                                        |')
-        console.log('|                                                                                |')
-        console.log('|  This is a bit of a problem since the file systems of                          |')
-        console.log('|  Linux/Mac/Android/ChromeBook/OpenBSD/etc have many features                   |')
-        console.log('|  that the windows file system does not have.                                   |')
-        console.log('|                                                                                |')
-        console.log('|  Would it be okay if I move this project?                                      |')
-        console.log('|      I`ll create a shortcut to it so you can still find it.                    |')
-        console.log('|      https://devblogs.microsoft.com/commandline/chmod-chown-wsl-improvements/  |')
-        console.log('|                                                                                |')
-        console.log('----------------------------------------------------------------------------------')
-        const answeredYes = await Console.askFor.yesNo("[y/n]")
-        if (!answeredYes) {
-            console.log()
-            console.log('okay, in that case just re-run this command whenever')
-            console.log('you have moved the project to the linux file system')
-            console.log('    ')
-            console.log('    if youre confused about what that^ means')
-            console.log('    take a look at the "documentation" folder (inside of this project folder)')
-            console.log()
-            Deno.exit()
-        } else {
-            // 
-            // where to move project
-            // 
-            let newProjectLocation, answeredYes
-            while (true) {
-                newProjectLocation = `${FileSystem.home}/repos/${projectName}`
-                answeredYes = await Console.askFor.yesNo(`Is it okay if I move the project to: ${yellow`${newProjectLocation}`}?`)
-                if (!answeredYes) {
-                    console.log()
-                    newProjectLocation = await Console.askFor.line("Okay where should I move it? ")
-                } else {
-                    break
-                }
+    const mountCInfo = await FileSystem.info('/mnt/c')
+    if (mountCInfo.isFolder) {
+        // 
+        // check for mounting with metadata
+        // 
+
+        // check if metadata not enabled
+        const result = await run("mount", "-l", Stdout(returnAsString))
+        if (!result.match(/C: on \/mnt\/c.*metadata/)) {
+            console.log('__________________________________________________________________________________')
+            console.log('|                                                                                |')
+            console.log('|  Howdy!                                                                        |')
+            console.log('|                                                                                |')
+            console.log('|  Looks like there`s a metadata hiccup/problem. It seems you`re using WSL       |')
+            console.log('|  Sadly, for some reason, WSL doesn`t (by default) support many features of the |')
+            console.log('|  linux file system. And For some reason, adding that support requires          |')
+            console.log('|  re-mounting the C drive (within WSL) with metadata enabled.                   |')
+            console.log('|                                                                                |')
+            console.log('|  I`ll run the command automatically, but if you don`t want to put              |')
+            console.log('|  your password in, cancel this (CTRL+C) and run the following yourself:        |')
+            console.log('|                                                                                |')
+            console.log('       cd                                                                         ')
+            console.log('       sudo umount /mnt/c && sudo mount -t drvfs C: /mnt/c -o metadata            ')
+            console.log('       cd -                                                                       ')
+            console.log('|                                                                                |')
+            console.log('|  Then re-run this script                                                       |')
+            console.log('|  You can read more about this problem here if you like:                        |')
+            console.log('|  https://devblogs.microsoft.com/commandline/chmod-chown-wsl-improvements/      |')
+            console.log('|                                                                                |')
+            console.log('----------------------------------------------------------------------------------')
+            console.log('')
+            await Console.askFor.confirmation('Continue?')
+            // this means we need to unmount and remount with metadata enabled
+            const originalDirectory = FileSystem.pwd
+            Deno.chdir(FileSystem.home)
+            var { success } = await run("sudo", "umount", "/mnt/c").outcome
+            var { success } = success ? await run("sudo", "mount", "-t", "drvfs", "C:", "/mnt/c", "-o", "metadata").outcome : { success }
+            // TODO: add a check for an error ^here
+            if (!success) {
+                console.error('\nOne of the commands didn`t work :/\ntry running the commands mentioned above manually\n')
+                await Console.askFor.confirmation('Continue anyways?')
             }
-            // 
-            // move the project
-            // 
-            await FileSystem.clearAPathFor(newProjectLocation)
-            await move(projectFolder, newProjectLocation)
-            // create a link from the old location to the new location so they can still access the project
-            await FileSystem.relativeLink({
-                existingItem: newProjectLocation,
-                newItem: projectFolder,
-            })
-            projectFolder = newProjectLocation
+            
+            // go back
+            Deno.chdir(originalDirectory)
+        }
+        
+        // 
+        // check if project is inside the windows C drive
+        // 
+        if (FileSystem.thisFolder.match(/^\/mnt\/c/)) {
+            console.log('__________________________________________________________________________________')
+            console.log('|                                                                                |')
+            console.log('|  Howdy!                                                                        |')
+            console.log('|                                                                                |')
+            console.log('|  Looks like your project is saved in the windows file system                   |')
+            console.log('|  (instead of the Linux/WSL file system)                                        |')
+            console.log('|                                                                                |')
+            console.log('|  This is a bit of a problem since the file systems of                          |')
+            console.log('|  Linux/Mac/Android/ChromeBook/OpenBSD/etc have many features                   |')
+            console.log('|  that the windows file system does not have.                                   |')
+            console.log('|                                                                                |')
+            console.log('|  Would it be okay if I move this project?                                      |')
+            console.log('|      I`ll create a shortcut to it so you can still find it.                    |')
+            console.log('|      https://devblogs.microsoft.com/commandline/chmod-chown-wsl-improvements/  |')
+            console.log('|                                                                                |')
+            console.log('----------------------------------------------------------------------------------')
+            const answeredYes = await Console.askFor.yesNo("[y/n]")
+            if (!answeredYes) {
+                console.log()
+                console.log('okay, in that case just re-run this command whenever')
+                console.log('you have moved the project to the linux file system')
+                console.log('    ')
+                console.log('    if youre confused about what that^ means')
+                console.log('    take a look at the "documentation" folder (inside of this project folder)')
+                console.log()
+                Deno.exit()
+            } else {
+                // 
+                // where to move project
+                // 
+                let newProjectLocation, answeredYes
+                while (true) {
+                    newProjectLocation = `${FileSystem.home}/repos/${projectName}`
+                    answeredYes = await Console.askFor.yesNo(`Is it okay if I move the project to: ${yellow`${newProjectLocation}`}?`)
+                    if (!answeredYes) {
+                        console.log()
+                        newProjectLocation = await Console.askFor.line("Okay where should I move it? ")
+                    } else {
+                        break
+                    }
+                }
+                // 
+                // move the project
+                // 
+                await FileSystem.clearAPathFor(newProjectLocation)
+                await move(projectFolder, newProjectLocation)
+                // create a link from the old location to the new location so they can still access the project
+                await FileSystem.relativeLink({
+                    existingItem: newProjectLocation,
+                    newItem: projectFolder,
+                })
+                projectFolder = newProjectLocation
+            }
         }
     }
-}
 
-// 
-// if nix not installed
-// 
-if (!await hasCommand('nix')) {
-    console.log("|------------------------------------------------------|")
-    console.log("|                                                      |")
-    console.log("|    I'll try to install nix for you                   |")
-    console.log("|    (since I don't see nix yet)                       |")
-    console.log("|                                                      |")
-    console.log("|------------------------------------------------------|")
-    console.log("")
-    // check if root user
-    const username = await run`whoami ${Stdout(returnAsString)}`
-    if (username == "root") {
-        console.log("looks like you're logged in as root")
-        console.log("sadly nix can't install on the root user")
-        console.log("please use a regular user, then re-run this script")
-        Deno.exit()
-        // TODO: check the available users for whoever is trying to setup as root
+    // 
+    // if nix not installed
+    // 
+    if (!await hasCommand('nix')) {
+        console.log("|------------------------------------------------------|")
+        console.log("|                                                      |")
+        console.log("|    I'll try to install nix for you                   |")
+        console.log("|    (since I don't see nix yet)                       |")
+        console.log("|                                                      |")
+        console.log("|------------------------------------------------------|")
+        console.log("")
+        // check if root user
+        const username = await run`whoami ${Stdout(returnAsString)}`
+        if (username == "root") {
+            console.log("looks like you're logged in as root")
+            console.log("Sadly nix can't install on the root user :/ ")
+            console.log("please use a regular user, then re-run this script")
+            Deno.exit()
+            // TODO: check the available users for whoever is trying to setup as root
+        }
+
+        if (OperatingSystem.commonChecks.isMac) {
+            const version = await run`sw_vers -productVersion ${Stdout(returnAsString)}`
+            const versionMatch = version.match(/([0-9]+)\.([0-9]+)\.([0-9]+)?/g)
+            let [majorVersion, minorVersion, patchVersion] = [ 12, 4, 0 ]
+            if (!versionMatch) {
+                console.log(red`There was a bit of a problem :/                                         `)
+                console.log(`---------------------------------------------------------------------------`)
+                console.log(`     I ran this command:  sw_vers -productVersion                          `)
+                console.log(`                                                                           `)
+                console.log(`     Which should return the MacOS version                                 `)
+                console.log(`     And it should be in the format [number].[number].[number]             `)
+                console.log(`     But it appears this is not the case, instead it returned this:        `)
+                console.log(`         ${version}                                                        `)
+                console.log(`     And this script doesn't know how to handle that                       `)
+                console.log(`     Report the issue to the virkshop github repo (google)                 `)
+                console.log(`     And I'll get it fixed ASAP                                            `)
+                console.log(`---------------------------------------------------------------------------`)
+                console.log(``)
+                await Console.askFor.confirmation(`Continue anyways? (I'll assume you have MacOS Monterey)`)
+            } else {
+                majorVersion = versionMatch[1]-0
+                minorVersion = versionMatch[2]-0
+                patchVersion = versionMatch[3]-0 || 0 // convert NaN to 0 if needed
+            }
+            
+            // Catalina, Big Sur, Monterey, and beyond
+            if (majorVersion > 10 || (majorVersion == 10 && minorVersion >= 15)) {
+                var { success } = await run`sh -c ${'sh <(curl -Lk https://releases.nixos.org/nix/nix-2.3.8/install) --darwin-use-unencrypted-nix-store-volume'}`
+            // Older than Catalina (Mojave, High Siera, Siera, Yosemite, Mavericks, etc)
+            } else {
+                var { success } = await run`curl -Lk https://releases.nixos.org/nix/nix-2.3.8/install | sh -s -- --daemon`
+            }
+
+        } else if (OperatingSystem.commonChecks.isLinux) {
+            var nixScript
+            try {
+                nixScript = await curlString`https://releases.nixos.org/nix/nix-2.3.8/install`
+            // if host is down, or fails for some other reason, use the locally stored copy (which may be out of date)
+            } catch (error) {
+                nixScript = nixScriptLocalCopy
+            }
+
+            // prefer single-user install (no groups/users, no systemd need, and seems to not need shell reload)
+            await run("sh", "-s", Stdin(nixScript))
+
+            // alternative multi-user install (encouraged by nixpkgs)
+            // check if systemd exists
+            // if pidof systemd
+            // then
+            //     # multi-user install if systemd exists
+            //     curl -Lk https://releases.nixos.org/nix/nix-2.3.8/install | sh -s -- --daemon
+            // else
+            //     # single-user install if systemd exists
+            //     curl -L https://releases.nixos.org/nix/nix-2.3.8/install | sh
+            // fi
+        }
+    }
+
+    const nixStoreFolderInfo = await FileSystem.info(`/nix/store`)
+    if (!nixStoreFolderInfo.isFolder) {
+        console.log(red`There was a bit of a problem :/                                         `)
+        console.log(`---------------------------------------------------------------------------`)
+        console.log(`     Something is wrong with the nix install since /nix/store              `)
+        console.log(`     is not a folder. It could be a simple fix, so checkout                `)
+        console.log(`     https://nixos.org/manual/nix/stable/#chap-installation                `)
+        console.log(`     and see if you can follow the normal instructions for installing nix  `)
+        console.log(`---------------------------------------------------------------------------`)
+        console.log(``)
+        await Console.askFor.confirmation('Continue without nix? (basically everything will break)')
     }
 }
 
-# 
-# if nix doesnt exist
-# 
-if [ -z "$(command -v "nix")" ]
-then
-    echo "|------------------------------------------------------|"
-    echo "|                                                      |"
-    echo "|    I'll try to install nix for you                   |"
-    echo "|    (since I don't see nix yet)                       |"
-    echo "|                                                      |"
-    echo "|------------------------------------------------------|"
-    echo ""
-    # check for root
-    if [ "$(whoami)" = "root" ]
-    then
-        echo "$(yellow)"
-        echo "looks like you're logged in as root"
-        echo "sadly nix can't install on the root user"
-        echo "please use a regular user, then re-run this script"
-        echo "$(color_reset)"
-        # if users exists
-        if [ -n "$(command -v "cut")" ]
-        then
-            users="$(grep '^sudo:.*$' /etc/group | cut -d: -f4)"
-            if [ -n "$users" ] && [ "$users" != "root" ] && [ "$users" != "root root" ]
-            then
-                echo "the available users are:"
-                grep '^sudo:.*$' /etc/group | cut -d: -f4
-                echo "you should be able to run $(cyan)su $(yellow)USER_NAME$(color_reset)"
-                echo "to login as one of those users"
-            else
-                echo ""
-                echo "it looks like this system doesn't have any regular users"
-                
-                # if useradd exists
-                if [ -n "$(command -v "useradd")" ]
-                then
-                    question="do you want me to make a regular user for you? [y/n]";answer=''
-                    while true; do
-                        echo "$question"; read response
-                        case "$response" in
-                            [Yy]* ) answer='yes'; break;;
-                            [Nn]* ) answer='no'; break;;
-                            * ) echo "Please answer yes or no.";;
-                        esac
-                    done
-                    
-                    if [ "$answer" = 'yes' ]; then
-                        echo "$(magenta)Enter a username:$(color_reset)"
-                        read username
-                        if sudo useradd --create-home "$username" --password "password" --groups sudo
-                        then
-                            echo ""
-                            echo "user created successfully"
-                            echo "run:"
-                            echo "    $(cyan)sudo passwd "$username"$(color_reset)"
-                            echo "to set the password"
-                        else
-                            echo ""
-                            echo "Sorry, there was an error when creating the user"
-                            echo "I used this command: $(cyan)sudo useradd --create-home "'"'"$username"'"'" --password 'password' --groups sudo$(color_reset)"
-                        fi
-                    else
-                        echo "Okay"
-                    fi
-                fi
-                
-            fi
-        fi
-        echo ""
-        echo "login as the non-root user ($(cyan)su USERNAME$(color_reset))"
-        echo "then re-run this command"
-        exit
-    fi
-    #       
-    # MacOS 
-    #
-    if [ "$(uname)" = "Darwin" ]
-    then
-        debugging_info="$debugging_info$newline""I think you have a Mac because "'"$OSTYPE" = "darwin"*'" came back true"
-        full_version="$(sw_vers -productVersion)"
-        major_version="$(echo "$full_version" | sed -E 's/([0-9]+)\.[0-9]+\.[0-9]+/\1/g')"
-        minor_version="$(echo "$full_version" | sed -E 's/[0-9]+\.([0-9]+)\.[0-9]+/\1/g')"
-        #                  
-        # Big Sur or Newer
-        #                 
-        if [ "$major_version" = "11" ]; then
-            sh <(curl -Lk https://releases.nixos.org/nix/nix-2.3.8/install) --darwin-use-unencrypted-nix-store-volume
-        #                  
-        # Older than Big Sur (Catalina, Mojave, High Siera, Siera, etc)
-        #                 
-        elif [ "$major_version" -eq "10" ]; then
-            # Catalina
-            if [ "$minor_version" = "15" ]; then
-                sh <(curl -Lk https://releases.nixos.org/nix/nix-2.3.8/install) --darwin-use-unencrypted-nix-store-volume
-            # Mojave, High Siera, Siera, and might work on even older versions (Yosemite, Mavericks)
-            else
-                curl -Lk https://releases.nixos.org/nix/nix-2.3.8/install | sh -s -- --daemon
-            fi
-        else
-            echo 'We tried to get you MacOS version by running `sw_vers -productVersion`'
-            echo '(which returns '"$full_version"')'
-            echo "Either 1. that value is empty 2. You're on an insanely old version 3. You're on a version way way in the future from when this script was made"
-        fi
-    # assuming Linux/POSIX if not on MacOS
-    else
-        # if curl doesnt exist, try to make it exist
-        if [ -z "$(command -v "curl")" ]
-        then
-            # if apt-get exists
-            if [ -n "$(command -v "apt-get")" ]
-            then
-                sudo apt-get update && sudo apt-get install curl
-            else
-                echo "it looks like you don't have curl, please install curl then re-run this script" 1>&2
-                echo "alternatively, to get nix, manually run the commands inside https://releases.nixos.org/nix/nix-2.3.8/install" 1>&2
-            fi
-        fi
+async function sourceNixSetup() {
+    // 
+    // add nix certificate file
+    // 
+        // make sure MacOS has cert files
+        const certFilePath = "/etc/ssl/certs/ca-certificates.crt"
+        const certParentFolder = FileSystem.parentPath(certFilePath)
+        const certFileInfo = await FileSystem.info(certFilePath)
+        if (!certFileInfo.isFile) {
+            const certParentFolderInfo = await FileSystem.info(certFilePath)
+            if (!certParentFolderInfo.isFolder) {
+                console.log("")
+                console.log("Creating folder for web certificates because MacOS doesn't follow other OS's")
+                console.log("")
+                await run`sudo mkdir -p ${FileSystem.parentPath(certFilePath)}`
+            }
+            console.log("")
+            console.log("Creating certificate file because MacOS doesn't follow other OS's")
+            console.log("")
+            await run`sudo security export -t certs -f pemseq -k /System/Library/Keychains/SystemRootCertificates.keychain -o /etc/ssl/certs/ca-certificates.crt`
+            // TODO: add a check encase /System/Library/Keychains/SystemRootCertificates.keychain doesnt exist
+        }
         
-        # if now curl exists
-        if [ -n "$(command -v "curl")" ]
-        then
-            # prefer single-user (no shell reload)
-            curl -L https://releases.nixos.org/nix/nix-2.3.8/install | sh -s
-            # # check if systemd exists
-            # if pidof systemd
-            # then
-            #     # multi-user install if systemd exists
-            #     curl -Lk https://releases.nixos.org/nix/nix-2.3.8/install | sh -s -- --daemon
-            # else
-            #     # single-user install if systemd exists
-            #     curl -L https://releases.nixos.org/nix/nix-2.3.8/install | sh
-            #     # curl -Lk https://releases.nixos.org/nix/nix-2.3.8/install | sh -s
-            # fi
-        fi
-    fi
-fi
+        // 
+        // test and check
+        // 
+        const possibleCertificateLocations = [
+            "/etc/ssl/certs/ca-certificates.crt", // NixOS, Ubuntu, Debian, Gentoo, Arch
+            "/etc/ssl/ca-bundle.pem",             // openSUSE Tumbleweed
+            "/etc/ssl/certs/ca-bundle.crt",       // Old NixOS
+            "/etc/pki/tls/certs/ca-bundle.crt",   // Fedora, CentOS
+        ]
+        for (const eachCertificatePath of possibleCertificateLocations) {
+            const file = await FileSystem.info(eachCertificatePath)
+            if (file.isFile) {
+                Console.env.NIX_SSL_CERT_FILE = eachCertificatePath
+            }
+        }
+    // 
+    // nix profiles
+    // 
+        Console.env.NIX_PROFILES = `/nix/var/nix/profiles/default ${OperatingSystem.home}/.nix-profile`
+    // 
+    // nix path
+    // 
+        Console.env.NIX_PATH = "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixpkgs:/nix/var/nix/profiles/per-user/root/channels"
+    // 
+    // add nix commands
+    // 
+        Console.env.PATH = `${Console.env.PATH}:${OperatingSystem.home}/.nix-profile/bin/:/nix/var/nix/profiles/default/bin/`
+}
 
-# 
-# if nix was not installed
-# 
-if ! [ -d "/nix/store" ]
-then
-    echo "$(yellow)"
-    echo "|-- Problem ------------------------------------------------------------------------------------| $(color_reset)" 1>&2
-    echo "|                                                                                               |" 1>&2
-    echo "|    Looks like there was a problem installing nix :/                                           |" 1>&2
-    echo "|    Hopefully there are error messages above                                                   |" 1>&2
-    echo "|    If you want additional information about installing nix see:                               |" 1>&2
-    echo "|         https://nixos.org/manual/nix/stable/#chap-installation                                |" 1>&2
-    echo "|                                                                                               |" 1>&2
-    echo "|-----------------------------------------------------------------------------------------------|" 1>&2
-    echo ""
-    exit
-# if nix was installed (hopefully successfully)
-else
-    # 
-    # manually update the shell environment 
-    # 
-    if [ -f "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh" ]
-    then
-        . "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
-    fi
-    if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]
-    then
-        . "$HOME/.nix-profile/etc/profile.d/nix.sh"
-    fi
-    export PATH="$PATH:/nix/var/nix/profiles/default/bin/"
-    
-    # if nix-env doesnt exist
-    if [ -z "$(command -v "nix-env")" ] || [ -z "$(command -v "nix-shell")" ]
-    then
-        echo "$(yellow)"
-        echo "|-- Action Needed ------------------------------------------------------------------------------| $(color_reset)" 1>&2
-        echo "|                                                                                               |" 1>&2
-        echo "|    - Try closing/reopening your terminal and running this command again                       |" 1>&2
-        echo "|      (I dont see the nix-env and nix-shell command)                                           |" 1>&2
-        echo "|                                                                                               |" 1>&2
-        echo "|    - If you already did that, and you're still getting this message                           |" 1>&2
-        echo "|      then you might need to uninstall and reinstall nix                                       |" 1>&2
-        echo "|      instructions here:                                                                       |" 1>&2
-        echo "|         https://nixos.org/manual/nix/stable/#sect-single-user-installation                    |" 1>&2
-        echo "|                                                                                               |" 1>&2
-        echo "|-----------------------------------------------------------------------------------------------|" 1>&2
-        echo ""
-        exit
-    fi
-fi
+// 
+// 
+// Nix should now be installed => Enter the virkshop!
+// 
+// 
 
-# 
-# 
-# Nix should now be installed => Enter the virkshop!
-# 
-# 
+const entrypoint = `${projectFolder}/${virkshopName}/virkshop_core/commands/virkshop/enter`
+await run`chmod ugo+x ${entrypoint}` // make sure its executable
+await run`nix-shell --packages deno bash --run ${entrypoint} -I ${`nixpkgs=https://github.com/NixOS/nixpkgs/archive/c82b46413401efa740a0b994f52e9903a4f6dcd5.tar.gz`}`
 
-# 
-# Find our virkshop config
-# 
-path_to_virkshop_config=""
-file_name="virkshop/mixins/#core/settings/virkshop/"
-folder_to_look_in="$PWD"
-while :
-do
-    # check if file exists
-    if [ -e "$folder_to_look_in/$file_name" ]
-    then
-        path_to_virkshop_config="$folder_to_look_in/$file_name"
-        break
-    else
-        if [ "$folder_to_look_in" = "/" ]
-        then
-            break
-        else
-            folder_to_look_in="$(dirname "$folder_to_look_in")"
-        fi
-    fi
-done
-if [ -z "$path_to_virkshop_config" ]
-then
-    #
-    # what to do if file never found
-    #
-    echo "$(yellow)"
-    echo "|-- Problem -------------------------------------------------------------------| $(color_reset)" 1>&2
-    echo "|                                                                              |" 1>&2
-    echo "|    Looks like you have nix installed (that's good)                           |" 1>&2
-    echo "|                                                                              |" 1>&2
-    echo "|    However, I can't find the virkshop/mixins/#core/settings/virkshop/ folder |" 1>&2
-    echo "|    I started looking in your current folder                                  |" 1>&2
-    echo "|         current directory is: '$PWD'                                         " 1>&2
-    echo "|    I also looked in all the parent folders, but couldn't find it             |" 1>&2
-    echo "|                                                                              |" 1>&2
-    echo "|    todo:                                                                     |" 1>&2
-    echo "|      - make sure you're in the right folder (likely to be the problem)       |" 1>&2
-    echo "|      - make sure the virkshop folder isn't corrupted (re-download)           |" 1>&2
-    echo "|                                                                              |" 1>&2
-    echo "|------------------------------------------------------------------------------|" 1>&2
-    echo ""
-    # TODO: in the future, offer to redownload (encase the script is being run directly from curl)
-    # TODO: in the future, check if already inside of a virkshop (accidentally doing virkshop inception)
-    exit
-fi
-
-# 
-# find virkshop entrypoint
-# 
-export VIRKSHOP_FOLDER="$path_to_virkshop_config/../../../.."
-path_to_virkshop_entry="$VIRKSHOP_FOLDER/$(cat "$path_to_virkshop_config/path_to/entry_point")"
-# TODO: add a check to make sure the config isn't corrupt
-
-# 
-# check if entry_point exists
-# 
-if ! [ -f "$path_to_virkshop_entry" ]
-then
-    echo "$(yellow)"
-    echo "|-- Problem ------------------------------------------------------------------| $(color_reset)" 1>&2
-    echo "|                                                                             |" 1>&2
-    echo "|    I was looking for the virkshop entry_point but I couldnt find it         |" 1>&2
-    echo "|                                                                             |" 1>&2
-    echo "|    The config (virkshop/mixins/#core/settings/virkshop/path_to/entry_point) |" 1>&2
-    echo "|    says that the file is at: '$path_to_virkshop_entry'                       " 1>&2
-    echo "|    But that doesn't seem to be a file                                       |" 1>&2
-    echo "|                                                                             |" 1>&2
-    echo "|    todo:                                                                    |" 1>&2
-    echo "|      - make sure the virkshop folder isn't corrupted (re-download)          |" 1>&2
-    echo "|                                                                             |" 1>&2
-    echo "|-----------------------------------------------------------------------------|" 1>&2
-    exit
-fi
-
-# make sure the file is executable
-if [ -n "$(command -v "chmod")" ]
-then
-    # if sudo exists
-    if [ -n "$(command -v "sudo")" ]
-    then
-        chmod ugo+x "$path_to_virkshop_entry" 2>/dev/null || sudo chmod ugo+x "$path_to_virkshop_entry"
-    # if doas exists
-    elif [ -n "$(command -v "doas")" ]
-    then
-        chmod ugo+x "$path_to_virkshop_entry" 2>/dev/null || doas chmod ugo+x "$path_to_virkshop_entry"
-    # if neither exist
-    else
-        chmod ugo+x "$path_to_virkshop_entry" 2>/dev/null
-    fi
-fi
-
-# 
-# parse and escape the arguments
-# 
-arguments_for_start_script="" # futureproofing encase this script needs args (verbose/debugging/alternatives to nix etc)
-found_the_arg_switch=""
-escaped_arguments_for_entry_file="'$(printf '%s' "$path_to_virkshop_entry" | sed 's/'"'"'/'"'"'"'"'"'"'"'"'/g')'"
-for arg in "$@"; do
-    # if the -- has not been found
-    if [ -z "$found_the_arg_switch" ]
-    then
-        # if it is found
-        if [ "$arg" = "--" ]
-        then
-            found_the_arg_switch="true"
-        else
-            # if in the future this script needs args this is where they would be parsed
-            # for now there arent any
-            true
-        fi
-    # once the -- has been found, the args go to the deno script
-    else
-        # need to escape the single quotes of each argument
-        escaped_arguments_for_entry_file="$escaped_arguments_for_entry_file '$(printf '%s' "$arg" | sed 's/'"'"'/'"'"'"'"'"'"'"'"'/g')'"
-    fi
-done
-
-# 
-# execute enter_virkshop with a specific version of deno and pass along the arguments
-# 
-nix-shell --packages deno bash --run "$escaped_arguments_for_entry_file" -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/c82b46413401efa740a0b994f52e9903a4f6dcd5.tar.gz
-
-} # end: <- Prevent execution if this script was only partially downloaded
+// TODO: add an error message for the possibility that the entrypoint doesnt exist
