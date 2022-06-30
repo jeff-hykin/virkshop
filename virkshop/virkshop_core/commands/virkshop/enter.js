@@ -166,10 +166,10 @@ const virkshop = await loadVirkshopData()
     // link mixins
     // 
     // FIXME: problem here with priority, what happens if two extensions write to the same location
-    //    probably just fix this by making extensions have a number in front of them, then using deno
-    //    to rename them as needed with leading 0's
-    //    then load extensions in that order
-    //    extensions can have two phases if needed, where it lists itself twice under different values
+    //    SOLUTION! this is just like traits/mixins
+    //              instead of using a number priority, put all their stuff under a namespace
+    //              then attempt to put it outside the namespace
+    //                  if there is a conflict, make the command print out "there is a conflict, please specify if you want the command from __ or __"
     for (const eachMixin of await FileSystem.listFolderItemsIn(`${virkshop.folder}/mixins`)) {
         for (const eachFolderName of virkshop.structure.mixins.linkedFolderNames) {
             await recursivelyFileLink({
