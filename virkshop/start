@@ -8,735 +8,692 @@
 // What is this file doing?
 // 
 // 
-    // 1. validating the folder structure
-    // 2. trying to install nix
-    // 3. using nix to install the environment
-    // 4. launching the environment as soon as possible
+    // 1. trying to install nix
+    // 2. using nix to install the environment
+    // 3. launching the environment as soon as possible
 
 import { OperatingSystem } from "https://deno.land/x/quickr@0.3.34/main/operating_system.js"
 import { FileSystem } from "https://deno.land/x/quickr@0.3.34/main/file_system.js"
 import { run, hasCommand, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.3.34/main/run.js"
 import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.3.34/main/console.js"
+const {move} = await import("https://deno.land/std@0.133.0/fs/mod.ts")
 
 const curlString = async (url) => new TextDecoder().decode(
     new Uint8Array(await (await fetch(url)).arrayBuffer())
 )
 
-const {move} = await import("https://deno.land/std@0.133.0/fs/mod.ts")
-
 let virkshopName  = FileSystem.basename(FileSystem.thisFolder)
 let projectFolder = FileSystem.makeAbsolutePath(`${FileSystem.thisFolder}/..`)
 const projectName = FileSystem.basename(projectFolder)
 
+// 
+// main
+// 
+    await installNix()
+    await sourceNixSetup()
+    await enterVirkshop()
 
-await installNix()
-await sourceNixSetup()
-await enterVirkshop()
+// 
+// 
+// details
+// 
+// 
+    async function installNix() {
+        const nixScriptLocalCopy = `
+        #!/bin/sh
 
-async function installNix() {
-    const nixScriptLocalCopy = `
-    #!/bin/sh
+            # This script installs the Nix package manager on your system by
+            # downloading a binary distribution and running its installer script
+            # (which in turn creates and populates /nix).
 
-        # This script installs the Nix package manager on your system by
-        # downloading a binary distribution and running its installer script
-        # (which in turn creates and populates /nix).
+            { # Prevent execution if this script was only partially downloaded
+            oops() {
+                echo "$0:" "$@" >&2
+                exit 1
+            }
 
-        { # Prevent execution if this script was only partially downloaded
-        oops() {
-            echo "$0:" "$@" >&2
-            exit 1
+            umask 0022
+
+            tmpDir="$(mktemp -d -t nix-binary-tarball-unpack.XXXXXXXXXX || \
+                    oops "Can't create temporary directory for downloading the Nix binary tarball")"
+            cleanup() {
+                rm -rf "$tmpDir"
+            }
+            trap cleanup EXIT INT QUIT TERM
+
+            require_util() {
+                command -v "$1" > /dev/null 2>&1 ||
+                    oops "you do not have '$1' installed, which I need to $2"
+            }
+
+            case "$(uname -s).$(uname -m)" in
+                Linux.x86_64) system=x86_64-linux; hash=0c8a432993d06e4d882ad48cde81d9bef23842cf6d7432cd93ef1a99c8d4ef43;;
+                Linux.i?86) system=i686-linux; hash=b6e100a704065728ce10408df3ccb2b97c68e4aa033efe5ec9c6d3346f98f011;;
+                Linux.aarch64) system=aarch64-linux; hash=0b35f0d3b480e15ca4bf57ee0d90c5dd209f8bf6ab0c429a2e4aca6565b9d9a6;;
+                Darwin.x86_64) system=x86_64-darwin; hash=1da9492d6ea1d0ae470df5aed61897f4e3166360a510eb4b5755b1bfb5128177;;
+                *) oops "sorry, there is no binary distribution of Nix for your platform";;
+            esac
+
+            url="https://releases.nixos.org/nix/nix-2.3.8/nix-2.3.8-$system.tar.xz"
+
+            tarball="$tmpDir/$(basename "$tmpDir/nix-2.3.8-$system.tar.xz")"
+
+            require_util curl "download the binary tarball"
+            require_util tar "unpack the binary tarball"
+            if [ "$(uname -s)" != "Darwin" ]; then
+                require_util xz "unpack the binary tarball"
+            fi
+
+            echo "downloading Nix 2.3.8 binary tarball for $system from '$url' to '$tmpDir'..."
+            curl -L "$url" -o "$tarball" || oops "failed to download '$url'"
+
+            if command -v sha256sum > /dev/null 2>&1; then
+                hash2="$(sha256sum -b "$tarball" | cut -c1-64)"
+            elif command -v shasum > /dev/null 2>&1; then
+                hash2="$(shasum -a 256 -b "$tarball" | cut -c1-64)"
+            elif command -v openssl > /dev/null 2>&1; then
+                hash2="$(openssl dgst -r -sha256 "$tarball" | cut -c1-64)"
+            else
+                oops "cannot verify the SHA-256 hash of '$url'; you need one of 'shasum', 'sha256sum', or 'openssl'"
+            fi
+
+            if [ "$hash" != "$hash2" ]; then
+                oops "SHA-256 hash mismatch in '$url'; expected $hash, got $hash2"
+            fi
+
+            unpack=$tmpDir/unpack
+            mkdir -p "$unpack"
+            tar -xJf "$tarball" -C "$unpack" || oops "failed to unpack '$url'"
+
+            script=$(echo "$unpack"/*/install)
+
+            [ -e "$script" ] || oops "installation script is missing from the binary tarball!"
+            "$script" "$@"
+
+            } # End of wrapping
+
+        `
+
+        if (OperatingSystem.commonChecks.isWindows) {
+            throw Error(`\n\nWindows isn't directly supported, but if you install WSL then it should work.\nHere's a tutorial link for installing WSL Ubuntu: https://www.youtube.com/watch?v=EwRVswCtmX4\n\n`)
+            // TODO: auto check for WSL and if it's available, try to automatically enter WSL and run this script again inside of it
         }
 
-        umask 0022
-
-        tmpDir="$(mktemp -d -t nix-binary-tarball-unpack.XXXXXXXXXX || \
-                oops "Can't create temporary directory for downloading the Nix binary tarball")"
-        cleanup() {
-            rm -rf "$tmpDir"
-        }
-        trap cleanup EXIT INT QUIT TERM
-
-        require_util() {
-            command -v "$1" > /dev/null 2>&1 ||
-                oops "you do not have '$1' installed, which I need to $2"
-        }
-
-        case "$(uname -s).$(uname -m)" in
-            Linux.x86_64) system=x86_64-linux; hash=0c8a432993d06e4d882ad48cde81d9bef23842cf6d7432cd93ef1a99c8d4ef43;;
-            Linux.i?86) system=i686-linux; hash=b6e100a704065728ce10408df3ccb2b97c68e4aa033efe5ec9c6d3346f98f011;;
-            Linux.aarch64) system=aarch64-linux; hash=0b35f0d3b480e15ca4bf57ee0d90c5dd209f8bf6ab0c429a2e4aca6565b9d9a6;;
-            Darwin.x86_64) system=x86_64-darwin; hash=1da9492d6ea1d0ae470df5aed61897f4e3166360a510eb4b5755b1bfb5128177;;
-            *) oops "sorry, there is no binary distribution of Nix for your platform";;
-        esac
-
-        url="https://releases.nixos.org/nix/nix-2.3.8/nix-2.3.8-$system.tar.xz"
-
-        tarball="$tmpDir/$(basename "$tmpDir/nix-2.3.8-$system.tar.xz")"
-
-        require_util curl "download the binary tarball"
-        require_util tar "unpack the binary tarball"
-        if [ "$(uname -s)" != "Darwin" ]; then
-            require_util xz "unpack the binary tarball"
-        fi
-
-        echo "downloading Nix 2.3.8 binary tarball for $system from '$url' to '$tmpDir'..."
-        curl -L "$url" -o "$tarball" || oops "failed to download '$url'"
-
-        if command -v sha256sum > /dev/null 2>&1; then
-            hash2="$(sha256sum -b "$tarball" | cut -c1-64)"
-        elif command -v shasum > /dev/null 2>&1; then
-            hash2="$(shasum -a 256 -b "$tarball" | cut -c1-64)"
-        elif command -v openssl > /dev/null 2>&1; then
-            hash2="$(openssl dgst -r -sha256 "$tarball" | cut -c1-64)"
-        else
-            oops "cannot verify the SHA-256 hash of '$url'; you need one of 'shasum', 'sha256sum', or 'openssl'"
-        fi
-
-        if [ "$hash" != "$hash2" ]; then
-            oops "SHA-256 hash mismatch in '$url'; expected $hash, got $hash2"
-        fi
-
-        unpack=$tmpDir/unpack
-        mkdir -p "$unpack"
-        tar -xJf "$tarball" -C "$unpack" || oops "failed to unpack '$url'"
-
-        script=$(echo "$unpack"/*/install)
-
-        [ -e "$script" ] || oops "installation script is missing from the binary tarball!"
-        "$script" "$@"
-
-        } # End of wrapping
-
-    `
-
-    if (OperatingSystem.commonChecks.isWindows) {
-        throw Error(`\n\nWindows isn't directly supported, but if you install WSL then it should work.\nHere's a tutorial link for installing WSL Ubuntu: https://www.youtube.com/watch?v=EwRVswCtmX4\n\n`)
-        // TODO: auto check for WSL and if it's available, try to automatically enter WSL and run this script again inside of it
-    }
-
-    // 
-    // fix the windows WSL mkfifo problem
-    // 
-    const mountCInfo = await FileSystem.info('/mnt/c')
-    if (mountCInfo.isFolder) {
         // 
-        // check for mounting with metadata
+        // fix the windows WSL mkfifo problem
         // 
+        const mountCInfo = await FileSystem.info('/mnt/c')
+        if (mountCInfo.isFolder) {
+            // 
+            // check for mounting with metadata
+            // 
 
-        // check if metadata not enabled
-        const result = await run("mount", "-l", Stdout(returnAsString))
-        if (!result.match(/C: on \/mnt\/c.*metadata/)) {
-            console.log('__________________________________________________________________________________')
-            console.log('|                                                                                |')
-            console.log('|  Howdy!                                                                        |')
-            console.log('|                                                                                |')
-            console.log('|  Looks like there`s a metadata hiccup/problem. It seems you`re using WSL       |')
-            console.log('|  Sadly, for some reason, WSL doesn`t (by default) support many features of the |')
-            console.log('|  linux file system. And For some reason, adding that support requires          |')
-            console.log('|  re-mounting the C drive (within WSL) with metadata enabled.                   |')
-            console.log('|                                                                                |')
-            console.log('|  I`ll run the command automatically, but if you don`t want to put              |')
-            console.log('|  your password in, cancel this (CTRL+C) and run the following yourself:        |')
-            console.log('|                                                                                |')
-            console.log('       cd                                                                         ')
-            console.log('       sudo umount /mnt/c && sudo mount -t drvfs C: /mnt/c -o metadata            ')
-            console.log('       cd -                                                                       ')
-            console.log('|                                                                                |')
-            console.log('|  Then re-run this script                                                       |')
-            console.log('|  You can read more about this problem here if you like:                        |')
-            console.log('|  https://devblogs.microsoft.com/commandline/chmod-chown-wsl-improvements/      |')
-            console.log('|                                                                                |')
-            console.log('----------------------------------------------------------------------------------')
-            console.log('')
-            await Console.askFor.confirmation('Continue?')
-            // this means we need to unmount and remount with metadata enabled
-            const originalDirectory = FileSystem.pwd
-            Deno.chdir(FileSystem.home)
-            var { success } = await run("sudo", "umount", "/mnt/c").outcome
-            var { success } = success ? await run("sudo", "mount", "-t", "drvfs", "C:", "/mnt/c", "-o", "metadata").outcome : { success }
-            // TODO: add a check for an error ^here
-            if (!success) {
-                console.error('\nOne of the commands didn`t work :/\ntry running the commands mentioned above manually\n')
-                await Console.askFor.confirmation('Continue anyways?')
+            // check if metadata not enabled
+            const result = await run("mount", "-l", Stdout(returnAsString))
+            if (!result.match(/C: on \/mnt\/c.*metadata/)) {
+                console.log('__________________________________________________________________________________')
+                console.log('|                                                                                |')
+                console.log('|  Howdy!                                                                        |')
+                console.log('|                                                                                |')
+                console.log('|  Looks like there`s a metadata hiccup/problem. It seems you`re using WSL       |')
+                console.log('|  Sadly, for some reason, WSL doesn`t (by default) support many features of the |')
+                console.log('|  linux file system. And For some reason, adding that support requires          |')
+                console.log('|  re-mounting the C drive (within WSL) with metadata enabled.                   |')
+                console.log('|                                                                                |')
+                console.log('|  I`ll run the command automatically, but if you don`t want to put              |')
+                console.log('|  your password in, cancel this (CTRL+C) and run the following yourself:        |')
+                console.log('|                                                                                |')
+                console.log('       cd                                                                         ')
+                console.log('       sudo umount /mnt/c && sudo mount -t drvfs C: /mnt/c -o metadata            ')
+                console.log('       cd -                                                                       ')
+                console.log('|                                                                                |')
+                console.log('|  Then re-run this script                                                       |')
+                console.log('|  You can read more about this problem here if you like:                        |')
+                console.log('|  https://devblogs.microsoft.com/commandline/chmod-chown-wsl-improvements/      |')
+                console.log('|                                                                                |')
+                console.log('----------------------------------------------------------------------------------')
+                console.log('')
+                await Console.askFor.confirmation('Continue?')
+                // this means we need to unmount and remount with metadata enabled
+                const originalDirectory = FileSystem.pwd
+                Deno.chdir(FileSystem.home)
+                var { success } = await run("sudo", "umount", "/mnt/c").outcome
+                var { success } = success ? await run("sudo", "mount", "-t", "drvfs", "C:", "/mnt/c", "-o", "metadata").outcome : { success }
+                // TODO: add a check for an error ^here
+                if (!success) {
+                    console.error('\nOne of the commands didn`t work :/\ntry running the commands mentioned above manually\n')
+                    await Console.askFor.confirmation('Continue anyways?')
+                }
+                
+                // go back
+                Deno.chdir(originalDirectory)
             }
             
-            // go back
-            Deno.chdir(originalDirectory)
-        }
-        
-        // 
-        // check if project is inside the windows C drive
-        // 
-        if (FileSystem.thisFolder.match(/^\/mnt\/c/)) {
-            console.log('__________________________________________________________________________________')
-            console.log('|                                                                                |')
-            console.log('|  Howdy!                                                                        |')
-            console.log('|                                                                                |')
-            console.log('|  Looks like your project is saved in the windows file system                   |')
-            console.log('|  (instead of the Linux/WSL file system)                                        |')
-            console.log('|                                                                                |')
-            console.log('|  This is a bit of a problem since the file systems of                          |')
-            console.log('|  Linux/Mac/Android/ChromeBook/OpenBSD/etc have many features                   |')
-            console.log('|  that the windows file system does not have.                                   |')
-            console.log('|                                                                                |')
-            console.log('|  Would it be okay if I move this project?                                      |')
-            console.log('|      I`ll create a shortcut to it so you can still find it.                    |')
-            console.log('|      https://devblogs.microsoft.com/commandline/chmod-chown-wsl-improvements/  |')
-            console.log('|                                                                                |')
-            console.log('----------------------------------------------------------------------------------')
-            const answeredYes = await Console.askFor.yesNo("[y/n]")
-            if (!answeredYes) {
-                console.log()
-                console.log('okay, in that case just re-run this command whenever')
-                console.log('you have moved the project to the linux file system')
-                console.log('    ')
-                console.log('    if youre confused about what that^ means')
-                console.log('    take a look at the "documentation" folder (inside of this project folder)')
-                console.log()
-                Deno.exit()
-            } else {
-                // 
-                // where to move project
-                // 
-                let newProjectLocation, answeredYes
-                while (true) {
-                    newProjectLocation = `${FileSystem.home}/repos/${projectName}`
-                    answeredYes = await Console.askFor.yesNo(`Is it okay if I move the project to: ${yellow`${newProjectLocation}`}?`)
-                    if (!answeredYes) {
-                        console.log()
-                        newProjectLocation = await Console.askFor.line("Okay where should I move it? ")
-                    } else {
-                        break
+            // 
+            // check if project is inside the windows C drive
+            // 
+            if (FileSystem.thisFolder.match(/^\/mnt\/c/)) {
+                console.log('__________________________________________________________________________________')
+                console.log('|                                                                                |')
+                console.log('|  Howdy!                                                                        |')
+                console.log('|                                                                                |')
+                console.log('|  Looks like your project is saved in the windows file system                   |')
+                console.log('|  (instead of the Linux/WSL file system)                                        |')
+                console.log('|                                                                                |')
+                console.log('|  This is a bit of a problem since the file systems of                          |')
+                console.log('|  Linux/Mac/Android/ChromeBook/OpenBSD/etc have many features                   |')
+                console.log('|  that the windows file system does not have.                                   |')
+                console.log('|                                                                                |')
+                console.log('|  Would it be okay if I move this project?                                      |')
+                console.log('|      I`ll create a shortcut to it so you can still find it.                    |')
+                console.log('|      https://devblogs.microsoft.com/commandline/chmod-chown-wsl-improvements/  |')
+                console.log('|                                                                                |')
+                console.log('----------------------------------------------------------------------------------')
+                const answeredYes = await Console.askFor.yesNo("[y/n]")
+                if (!answeredYes) {
+                    console.log()
+                    console.log('okay, in that case just re-run this command whenever')
+                    console.log('you have moved the project to the linux file system')
+                    console.log('    ')
+                    console.log('    if youre confused about what that^ means')
+                    console.log('    take a look at the "documentation" folder (inside of this project folder)')
+                    console.log()
+                    Deno.exit()
+                } else {
+                    // 
+                    // where to move project
+                    // 
+                    let newProjectLocation, answeredYes
+                    while (true) {
+                        newProjectLocation = `${FileSystem.home}/repos/${projectName}`
+                        answeredYes = await Console.askFor.yesNo(`Is it okay if I move the project to: ${yellow`${newProjectLocation}`}?`)
+                        if (!answeredYes) {
+                            console.log()
+                            newProjectLocation = await Console.askFor.line("Okay where should I move it? ")
+                        } else {
+                            break
+                        }
                     }
+                    // 
+                    // move the project
+                    // 
+                    await FileSystem.clearAPathFor(newProjectLocation)
+                    await move(projectFolder, newProjectLocation)
+                    // create a link from the old location to the new location so they can still access the project
+                    await FileSystem.relativeLink({
+                        existingItem: newProjectLocation,
+                        newItem: projectFolder,
+                    })
+                    projectFolder = newProjectLocation
                 }
-                // 
-                // move the project
-                // 
-                await FileSystem.clearAPathFor(newProjectLocation)
-                await move(projectFolder, newProjectLocation)
-                // create a link from the old location to the new location so they can still access the project
-                await FileSystem.relativeLink({
-                    existingItem: newProjectLocation,
-                    newItem: projectFolder,
-                })
-                projectFolder = newProjectLocation
             }
+        }
+
+        // 
+        // if nix not installed
+        // 
+        if (!await hasCommand('nix')) {
+            console.log("|------------------------------------------------------|")
+            console.log("|                                                      |")
+            console.log("|    I'll try to install nix for you                   |")
+            console.log("|    (since I don't see nix yet)                       |")
+            console.log("|                                                      |")
+            console.log("|------------------------------------------------------|")
+            console.log("")
+            // check if root user
+            const username = await run`whoami ${Stdout(returnAsString)}`
+            if (username == "root") {
+                console.log("looks like you're logged in as root")
+                console.log("Sadly nix can't install on the root user :/ ")
+                console.log("please use a regular user, then re-run this script")
+                Deno.exit()
+                // TODO: check the available users for whoever is trying to setup as root
+            }
+
+            if (OperatingSystem.commonChecks.isMac) {
+                const version = await run`sw_vers -productVersion ${Stdout(returnAsString)}`
+                const versionMatch = version.match(/([0-9]+)\.([0-9]+)\.([0-9]+)?/g)
+                let [majorVersion, minorVersion, patchVersion] = [ 12, 4, 0 ]
+                if (!versionMatch) {
+                    console.log(red`There was a bit of a problem :/                                         `)
+                    console.log(`---------------------------------------------------------------------------`)
+                    console.log(`     I ran this command:  sw_vers -productVersion                          `)
+                    console.log(`                                                                           `)
+                    console.log(`     Which should return the MacOS version                                 `)
+                    console.log(`     And it should be in the format [number].[number].[number]             `)
+                    console.log(`     But it appears this is not the case, instead it returned this:        `)
+                    console.log(`         ${version}                                                        `)
+                    console.log(`     And this script doesn't know how to handle that                       `)
+                    console.log(`     Report the issue to the virkshop github repo (google)                 `)
+                    console.log(`     And I'll get it fixed ASAP                                            `)
+                    console.log(`---------------------------------------------------------------------------`)
+                    console.log(``)
+                    await Console.askFor.confirmation(`Continue anyways? (I'll assume you have MacOS Monterey)`)
+                } else {
+                    majorVersion = versionMatch[1]-0
+                    minorVersion = versionMatch[2]-0
+                    patchVersion = versionMatch[3]-0 || 0 // convert NaN to 0 if needed
+                }
+                
+                // Catalina, Big Sur, Monterey, and beyond
+                if (majorVersion > 10 || (majorVersion == 10 && minorVersion >= 15)) {
+                    var { success } = await run`sh -c ${'sh <(curl -Lk https://releases.nixos.org/nix/nix-2.3.8/install) --darwin-use-unencrypted-nix-store-volume'}`
+                // Older than Catalina (Mojave, High Siera, Siera, Yosemite, Mavericks, etc)
+                } else {
+                    var { success } = await run`curl -Lk https://releases.nixos.org/nix/nix-2.3.8/install | sh -s -- --daemon`
+                }
+
+            } else if (OperatingSystem.commonChecks.isLinux) {
+                var nixScript
+                try {
+                    nixScript = await curlString`https://releases.nixos.org/nix/nix-2.3.8/install`
+                // if host is down, or fails for some other reason, use the locally stored copy (which may be out of date)
+                } catch (error) {
+                    nixScript = nixScriptLocalCopy
+                }
+
+                // prefer single-user install (no groups/users, no systemd need, and seems to not need shell reload)
+                await run("sh", "-s", Stdin(nixScript))
+
+                // alternative multi-user install (encouraged by nixpkgs)
+                // check if systemd exists
+                // if pidof systemd
+                // then
+                //     # multi-user install if systemd exists
+                //     curl -Lk https://releases.nixos.org/nix/nix-2.3.8/install | sh -s -- --daemon
+                // else
+                //     # single-user install if systemd exists
+                //     curl -L https://releases.nixos.org/nix/nix-2.3.8/install | sh
+                // fi
+            }
+        }
+
+        const nixStoreFolderInfo = await FileSystem.info(`/nix/store`)
+        if (!nixStoreFolderInfo.isFolder) {
+            console.log(red`There was a bit of a problem :/                                         `)
+            console.log(`---------------------------------------------------------------------------`)
+            console.log(`     Something is wrong with the nix install since /nix/store              `)
+            console.log(`     is not a folder. It could be a simple fix, so checkout                `)
+            console.log(`     https://nixos.org/manual/nix/stable/#chap-installation                `)
+            console.log(`     and see if you can follow the normal instructions for installing nix  `)
+            console.log(`---------------------------------------------------------------------------`)
+            console.log(``)
+            await Console.askFor.confirmation('Continue without nix? (basically everything will break)')
         }
     }
 
-    // 
-    // if nix not installed
-    // 
-    if (!await hasCommand('nix')) {
-        console.log("|------------------------------------------------------|")
-        console.log("|                                                      |")
-        console.log("|    I'll try to install nix for you                   |")
-        console.log("|    (since I don't see nix yet)                       |")
-        console.log("|                                                      |")
-        console.log("|------------------------------------------------------|")
-        console.log("")
-        // check if root user
-        const username = await run`whoami ${Stdout(returnAsString)}`
-        if (username == "root") {
-            console.log("looks like you're logged in as root")
-            console.log("Sadly nix can't install on the root user :/ ")
-            console.log("please use a regular user, then re-run this script")
-            Deno.exit()
-            // TODO: check the available users for whoever is trying to setup as root
-        }
-
-        if (OperatingSystem.commonChecks.isMac) {
-            const version = await run`sw_vers -productVersion ${Stdout(returnAsString)}`
-            const versionMatch = version.match(/([0-9]+)\.([0-9]+)\.([0-9]+)?/g)
-            let [majorVersion, minorVersion, patchVersion] = [ 12, 4, 0 ]
-            if (!versionMatch) {
-                console.log(red`There was a bit of a problem :/                                         `)
-                console.log(`---------------------------------------------------------------------------`)
-                console.log(`     I ran this command:  sw_vers -productVersion                          `)
-                console.log(`                                                                           `)
-                console.log(`     Which should return the MacOS version                                 `)
-                console.log(`     And it should be in the format [number].[number].[number]             `)
-                console.log(`     But it appears this is not the case, instead it returned this:        `)
-                console.log(`         ${version}                                                        `)
-                console.log(`     And this script doesn't know how to handle that                       `)
-                console.log(`     Report the issue to the virkshop github repo (google)                 `)
-                console.log(`     And I'll get it fixed ASAP                                            `)
-                console.log(`---------------------------------------------------------------------------`)
-                console.log(``)
-                await Console.askFor.confirmation(`Continue anyways? (I'll assume you have MacOS Monterey)`)
-            } else {
-                majorVersion = versionMatch[1]-0
-                minorVersion = versionMatch[2]-0
-                patchVersion = versionMatch[3]-0 || 0 // convert NaN to 0 if needed
+    async function sourceNixSetup() {
+        // 
+        // add nix certificate file
+        // 
+            // make sure MacOS has cert files
+            const certFilePath = "/etc/ssl/certs/ca-certificates.crt"
+            const certParentFolder = FileSystem.parentPath(certFilePath)
+            const certFileInfo = await FileSystem.info(certFilePath)
+            if (!certFileInfo.isFile) {
+                const certParentFolderInfo = await FileSystem.info(certFilePath)
+                if (!certParentFolderInfo.isFolder) {
+                    console.log("")
+                    console.log("Creating folder for web certificates because MacOS doesn't follow other OS's")
+                    console.log("")
+                    await run`sudo mkdir -p ${FileSystem.parentPath(certFilePath)}`
+                }
+                console.log("")
+                console.log("Creating certificate file because MacOS doesn't follow other OS's")
+                console.log("")
+                await run`sudo security export -t certs -f pemseq -k /System/Library/Keychains/SystemRootCertificates.keychain -o /etc/ssl/certs/ca-certificates.crt`
+                // TODO: add a check encase /System/Library/Keychains/SystemRootCertificates.keychain doesnt exist
             }
             
-            // Catalina, Big Sur, Monterey, and beyond
-            if (majorVersion > 10 || (majorVersion == 10 && minorVersion >= 15)) {
-                var { success } = await run`sh -c ${'sh <(curl -Lk https://releases.nixos.org/nix/nix-2.3.8/install) --darwin-use-unencrypted-nix-store-volume'}`
-            // Older than Catalina (Mojave, High Siera, Siera, Yosemite, Mavericks, etc)
-            } else {
-                var { success } = await run`curl -Lk https://releases.nixos.org/nix/nix-2.3.8/install | sh -s -- --daemon`
-            }
-
-        } else if (OperatingSystem.commonChecks.isLinux) {
-            var nixScript
-            try {
-                nixScript = await curlString`https://releases.nixos.org/nix/nix-2.3.8/install`
-            // if host is down, or fails for some other reason, use the locally stored copy (which may be out of date)
-            } catch (error) {
-                nixScript = nixScriptLocalCopy
-            }
-
-            // prefer single-user install (no groups/users, no systemd need, and seems to not need shell reload)
-            await run("sh", "-s", Stdin(nixScript))
-
-            // alternative multi-user install (encouraged by nixpkgs)
-            // check if systemd exists
-            // if pidof systemd
-            // then
-            //     # multi-user install if systemd exists
-            //     curl -Lk https://releases.nixos.org/nix/nix-2.3.8/install | sh -s -- --daemon
-            // else
-            //     # single-user install if systemd exists
-            //     curl -L https://releases.nixos.org/nix/nix-2.3.8/install | sh
-            // fi
-        }
-    }
-
-    const nixStoreFolderInfo = await FileSystem.info(`/nix/store`)
-    if (!nixStoreFolderInfo.isFolder) {
-        console.log(red`There was a bit of a problem :/                                         `)
-        console.log(`---------------------------------------------------------------------------`)
-        console.log(`     Something is wrong with the nix install since /nix/store              `)
-        console.log(`     is not a folder. It could be a simple fix, so checkout                `)
-        console.log(`     https://nixos.org/manual/nix/stable/#chap-installation                `)
-        console.log(`     and see if you can follow the normal instructions for installing nix  `)
-        console.log(`---------------------------------------------------------------------------`)
-        console.log(``)
-        await Console.askFor.confirmation('Continue without nix? (basically everything will break)')
-    }
-}
-
-async function sourceNixSetup() {
-    // 
-    // add nix certificate file
-    // 
-        // make sure MacOS has cert files
-        const certFilePath = "/etc/ssl/certs/ca-certificates.crt"
-        const certParentFolder = FileSystem.parentPath(certFilePath)
-        const certFileInfo = await FileSystem.info(certFilePath)
-        if (!certFileInfo.isFile) {
-            const certParentFolderInfo = await FileSystem.info(certFilePath)
-            if (!certParentFolderInfo.isFolder) {
-                console.log("")
-                console.log("Creating folder for web certificates because MacOS doesn't follow other OS's")
-                console.log("")
-                await run`sudo mkdir -p ${FileSystem.parentPath(certFilePath)}`
-            }
-            console.log("")
-            console.log("Creating certificate file because MacOS doesn't follow other OS's")
-            console.log("")
-            await run`sudo security export -t certs -f pemseq -k /System/Library/Keychains/SystemRootCertificates.keychain -o /etc/ssl/certs/ca-certificates.crt`
-            // TODO: add a check encase /System/Library/Keychains/SystemRootCertificates.keychain doesnt exist
-        }
-        
-        // 
-        // test and check
-        // 
-        const possibleCertificateLocations = [
-            "/etc/ssl/certs/ca-certificates.crt", // NixOS, Ubuntu, Debian, Gentoo, Arch
-            "/etc/ssl/ca-bundle.pem",             // openSUSE Tumbleweed
-            "/etc/ssl/certs/ca-bundle.crt",       // Old NixOS
-            "/etc/pki/tls/certs/ca-bundle.crt",   // Fedora, CentOS
-        ]
-        for (const eachCertificatePath of possibleCertificateLocations) {
-            const file = await FileSystem.info(eachCertificatePath)
-            if (file.isFile) {
-                Console.env.NIX_SSL_CERT_FILE = eachCertificatePath
-            }
-        }
-    // 
-    // nix profiles
-    // 
-        Console.env.NIX_PROFILES = `/nix/var/nix/profiles/default ${OperatingSystem.home}/.nix-profile`
-    // 
-    // nix path
-    // 
-        Console.env.NIX_PATH = "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixpkgs:/nix/var/nix/profiles/per-user/root/channels"
-    // 
-    // add nix commands
-    // 
-        Console.env.PATH = `${Console.env.PATH}:${OperatingSystem.home}/.nix-profile/bin/:/nix/var/nix/profiles/default/bin/`
-}
-
-// 
-// 
-// Nix should now be installed => Enter the virkshop!
-// 
-// 
-async function enterVirkshop() {
-    // summary
-        // unlike the start command, this one has access to a standardized version of deno and bash
-        // similar to the previous command, it has access to external environment variables
-    // what this script does:
-        // phase 0: create folder structure (establish linked files/folders, clean broken links)
-        // phase 1: import all the .js files of mixins (they can access external ENV vars, and dont have the full env)
-        // phase 2: start shell/virkshop, which will run all the zsh scripts
-
-    function camelCase(str) {
-        const addedSeperator = str.replace(/([a-z0-9])([A-Z])/g, "$1_$2").replace(/[^a-zA-Z0-9 _.-]/,"_").toLowerCase()
-        const words = addedSeperator.split(/[ _.-]+/g)
-        const capatalizedWords = words.map(each=>each.replace(/^\w/, (group0)=>group0.toUpperCase()))
-        // make the first one lowercase
-        capatalizedWords[0] = capatalizedWords[0].toLowerCase()
-        return capatalizedWords.join('')
-    }
-
-    const varnamePattern = /^[a-zA-Z_][a-zA-Z0-9_]*$/
-    async function objectifyFolder(folder) {
-        const object = {}
-        for (const each of await FileSystem.listItemsIn(folder)) {
-            // ignore many file names for future compatibility
-            if (!each.basename.match(varnamePattern)) {
-                continue
-            }
-            // if file, just read it
-            if (each.isFile) {
-                object[each.name] = await FileSystem.read(each.path)
-            // if its a folder convert it to an object
-            } else if () {
-                object[each.name] = await objectifyFolder(each.path)
-            }
-        }
-    }
-
-    async function recursivelyFileLink({targetFolder, existingFolder}) {
-        const target = await FileSystem.info(targetFolder)
-        const existing = await FileSystem.info(existingFolder)
-        
-        const existingItems = await FileSystem.recursivelyListItemsIn(existing)
-        for (const existingItem of existingItems) {
-            const relativePart = await FileSystem.makeRelativePath({
-                from: existing.path,
-                to: existingItem.path 
-            })
-            // link the file (creating any folders necessary in the process)
-            await FileSystem.relativeLink({
-                existingItem: existingItem.path,
-                newItem: `${target.path}/${relativePart}`,
-            })
-        }
-    }
-
-    async function loadVirkshopData() {
-        // 
-        // if the env var doesn't exist something is wrong
-        // 
-        const VIRKSHOP_FOLDER = Console.env.VIRKSHOP_FOLDER
-        if (!VIRKSHOP_FOLDER) {
-            Console.explain.error({
-                title: `Hmm there doesnt seem to be a VIRKSHOP_FOLDER env variable`,
-                body: `
-                    This is the entry point script of the virkshop speaking (just FYI)
-
-                    So I started but there wasn't a VIRKSHOP_FOLDER variable.
-                    Normally the ${vibrance.cyan("virkshop/start")} command is what calls 
-                    this entry point and it sets up a VIRKSHOP_FOLDER among other things.
-                    So probably don't try running this directly unless you really know 
-                    what you're doing.
-                `.replace(/\n            /g, "\n"),
-                suggestions: [
-                    "first try virkshop/start",
-                    "if you get this message after running virkshop/start that probably means \n"+
-                    "something is really broken/corrupted. Re-downloading/installing virkshop \n"+
-                    "might be the best option there",
-                ],
-            })
-            Deno.exit()
-        }
-
-        // 
-        // if its not a folder something is wrong
-        // 
-        if (!(await FileSystem.info(VIRKSHOP_FOLDER)).isDirectory) {
-            Console.explain.error({
-                title: `Hmm the VIRKSHOP_FOLDER doesnt seem to exist O.O`,
-                body: `
-                    This is the entry point script of the virkshop speaking (just FYI)
-
-                    I used the VIRKSHOP_FOLDER env variable, which should be auto-created
-                    By ${vibrance.cyan("virkshop/start")} and that variable contained:
-                    ${vibrance.cyan(VIRKSHOP_FOLDER)}
-                    
-                    But that^ path doesn't seem to lead to a folder
-                    Its possible something is really broken.
-                `.replace(/\n            /g, "\n"),
-                suggestions: [
-                    "if you get this message after running virkshop/start that probably means \n"+
-                    "something is really broken/corrupted. Re-downloading/installing virkshop \n"+
-                    "might be the best option there",
-                ],
-            })
-            Deno.exit()
-        }
-
-        // 
-        // try to load all the settings
-        // 
-        const settings = await objectifyFolder(`${VIRKSHOP_FOLDER}/mixins/#virkshop/settings/#virkshop`)
-        return {
-            folder,
-            settings,
-            structure: {
-                fakeHome: `${VIRKSHOP_FOLDER}/temporary/virkshop/home`,
-                mixins: {
-                    linkedFolderNames: ['commands', 'documentation', 'events', 'home', 'settings'],
+            // 
+            // test and check
+            // 
+            const possibleCertificateLocations = [
+                "/etc/ssl/certs/ca-certificates.crt", // NixOS, Ubuntu, Debian, Gentoo, Arch
+                "/etc/ssl/ca-bundle.pem",             // openSUSE Tumbleweed
+                "/etc/ssl/certs/ca-bundle.crt",       // Old NixOS
+                "/etc/pki/tls/certs/ca-bundle.crt",   // Fedora, CentOS
+            ]
+            for (const eachCertificatePath of possibleCertificateLocations) {
+                const file = await FileSystem.info(eachCertificatePath)
+                if (file.isFile) {
+                    Console.env.NIX_SSL_CERT_FILE = eachCertificatePath
                 }
-            },
-        }
+            }
+        // 
+        // nix profiles
+        // 
+            Console.env.NIX_PROFILES = `/nix/var/nix/profiles/default ${OperatingSystem.home}/.nix-profile`
+        // 
+        // nix path
+        // 
+            Console.env.NIX_PATH = "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixpkgs:/nix/var/nix/profiles/per-user/root/channels"
+        // 
+        // add nix commands
+        // 
+            Console.env.PATH = `${Console.env.PATH}:${OperatingSystem.home}/.nix-profile/bin/:/nix/var/nix/profiles/default/bin/`
     }
 
-    async function linkMixinNamespace(path) {
-        const mixinName = `${virkshopFolder}/${FileSystem.basename(path)}`
-        const specialFolderNames     = virkshop.structure.mixins.linkedFolderNames
-        const specialVirkshopPaths   = specialFolderNames.map(each => `${virkshop.folder}/${each}`)
-        const specialPaths           = specialFolderNames.map(each => `${path}/${each}`)
-        for (const each of specialFolderNames) { // FIXME: home folder needs to be treated differently
-            const virkshopFolder = `${virkshop.folder}/${each}`
-            const mixinFolder    = `${path}/${each}`
-            const namespace      = `${virkshopFolder}/${mixinName}`
+    // 
+    // 
+    // Nix should now be installed => Enter the virkshop!
+    // 
+    // 
+    async function enterVirkshop() {
+        // summary
+            // unlike the start command, this one has access to a standardized version of deno and bash
+            // similar to the previous command, it has access to external environment variables
+        // what this script does:
+            // phase 0: create folder structure (establish linked files/folders, clean broken links)
+            // phase 1: import all the .js files of mixins (they can access external ENV vars, and dont have the full env)
+            // phase 2: start shell/virkshop, which will run all the zsh scripts
+        
+        // setup the env
+        Console.env.VIRKSHOP_FOLDER = projectFolder
 
+        function camelCase(str) {
+            const addedSeperator = str.replace(/([a-z0-9])([A-Z])/g, "$1_$2").replace(/[^a-zA-Z0-9 _.-]/,"_").toLowerCase()
+            const words = addedSeperator.split(/[ _.-]+/g)
+            const capatalizedWords = words.map(each=>each.replace(/^\w/, (group0)=>group0.toUpperCase()))
+            // make the first one lowercase
+            capatalizedWords[0] = capatalizedWords[0].toLowerCase()
+            return capatalizedWords.join('')
+        }
+
+        const varnamePattern = /^[a-zA-Z_][a-zA-Z0-9_]*$/
+        async function objectifyFolder(folder) {
+            const object = {}
+            for (const each of await FileSystem.listItemsIn(folder)) {
+                // ignore many file names for future compatibility
+                if (!each.basename.match(varnamePattern)) {
+                    continue
+                }
+                // if file, just read it
+                if (each.isFile) {
+                    object[each.name] = await FileSystem.read(each.path)
+                // if its a folder convert it to an object
+                } else {
+                    object[each.name] = await objectifyFolder(each.path)
+                }
+            }
+        }
+
+        async function recursivelyFileLink({targetFolder, existingFolder}) {
+            const target = await FileSystem.info(targetFolder)
+            const existing = await FileSystem.info(existingFolder)
+            
+            const existingItems = await FileSystem.recursivelyListItemsIn(existing)
+            for (const existingItem of existingItems) {
+                const relativePart = await FileSystem.makeRelativePath({
+                    from: existing.path,
+                    to: existingItem.path 
+                })
+                // link the file (creating any folders necessary in the process)
+                await FileSystem.relativeLink({
+                    existingItem: existingItem.path,
+                    newItem: `${target.path}/${relativePart}`,
+                })
+            }
+        }
+
+        async function loadVirkshopData() {
             // 
-            // create the "namespaced" folder of the file first
+            // try to load all the settings
             // 
-            const namespaceCheck = await FileSystem.info(namespace)
-            let needToCreateNamespace = false
-            if (!namespaceCheck.exists) {
-                needToCreateNamespace = true
-            } else if (!namespaceCheck.isSymlink) {
-                await FileSystem.remove(namespace)
-                needToCreateNamespace = true
-            } else {
-                const target = FileSystem.makeAbsolutePath(namespaceCheck.target)
-                const thisFolder = FileSystem.makeAbsolutePath(mixinFolder)
-                if (target != thisFolder) {
+            const settings = await objectifyFolder(`${projectFolder}/mixins/#virkshop/settings/#virkshop`)
+            return {
+                folder,
+                settings,
+                structure: {
+                    fakeHome: `${projectFolder}/temporary/virkshop/home`,
+                    mixins: {
+                        linkedFolderNames: ['commands', 'documentation', 'events', 'home', 'settings'],
+                    }
+                },
+            }
+        }
+
+        async function linkMixinNamespace(path) {
+            const mixinName = `${virkshopFolder}/${FileSystem.basename(path)}`
+            const specialFolderNames     = virkshop.structure.mixins.linkedFolderNames
+            const specialVirkshopPaths   = specialFolderNames.map(each => `${virkshop.folder}/${each}`)
+            const specialPaths           = specialFolderNames.map(each => `${path}/${each}`)
+            for (const each of specialFolderNames) { // FIXME: home folder needs to be treated differently
+                const virkshopFolder = `${virkshop.folder}/${each}`
+                const mixinFolder    = `${path}/${each}`
+                const namespace      = `${virkshopFolder}/${mixinName}`
+
+                // 
+                // create the "namespaced" folder of the file first
+                // 
+                const namespaceCheck = await FileSystem.info(namespace)
+                let needToCreateNamespace = false
+                if (!namespaceCheck.exists) {
+                    needToCreateNamespace = true
+                } else if (!namespaceCheck.isSymlink) {
                     await FileSystem.remove(namespace)
                     needToCreateNamespace = true
-                }
-            }
-            // create the namespace
-            if (needToCreateNamespace) {
-                await FileSystem.relativeLink({existingItem: mixinFolder, newItem: namespace})
-            }
-
-            // 
-            // create shortcuts within the namespace
-            // 
-            const nestedNamespace = `${virkshopFolder}/${mixinName}/${mixinName}`
-            for (const eachPath of await FileSystem.listPathsIn(nestedNamespace)) {
-                const relativePart = eachPath.slice(nestedNamespace.length)
-                const targetLocation = await FileSystem.info(`${namespace}/${relativePart}`)
-                // if hardlink
-                if (targetLocation.isFile && !targetLocation.isSymlink) {
-                    // assume the user put it there, or that its the plugin's ownership
-                    continue
-                // if symlink
-                } else if (targetLocation.isFile) {
-                    // remove broken things
-                    if (targetLocation.isBrokenLink) {
-                        await FileSystem.remove(targetLocation.path)
-                    } else {
-                        const target      = FileSystem.makeAbsolutePath(targetLocation.path)
-                        const currentItem = FileSystem.makeAbsolutePath(eachPath)
-                        if (target == currentItem) {
-                            // already linked
-                            continue
-                        } else {
-                            // linked but to the wrong thing
-                            // FIXME: add a warning about conflicting items here, and replace the symlink with the warning
-                            //        note its possible for one to be a file and the other a folder
-                            continue
-                        }
+                } else {
+                    const target = FileSystem.makeAbsolutePath(namespaceCheck.target)
+                    const thisFolder = FileSystem.makeAbsolutePath(mixinFolder)
+                    if (target != thisFolder) {
+                        await FileSystem.remove(namespace)
+                        needToCreateNamespace = true
                     }
                 }
-                const mixinItem = await FileSystem.info(eachPath)
-                if (mixinItem.isFile) {
-                    // FIXME: this could technically destroy a user-made file by having it as part of the parent path
-                    
-                    // make sure it exists by this point
-                    await FileSystem.ensureIsFolder(FileSystem.parent)
-                    // create the shortcut
-                    await FileSystem.relativeLink({
-                        existingItem: mixinItem.path,
-                        newItem: targetLocation.path,
-                    })
+                // create the namespace
+                if (needToCreateNamespace) {
+                    await FileSystem.relativeLink({existingItem: mixinFolder, newItem: namespace})
                 }
-                // TODO: consider another edgecase of mixin item being a file, but existing item being a folder
-            }
-        }
-    }
 
-    async function linkMixinShortcuts(path) {
-        // NOTE: linkMixinNamespace needs to be run for EVERY mixin before shortcuts can run. Otherwise there could be order of operations problems
-
-        const mixinName = `${virkshopFolder}/${FileSystem.basename(path)}`
-        const specialFolderNames     = virkshop.structure.mixins.linkedFolderNames
-        const specialVirkshopPaths   = specialFolderNames.map(each => `${virkshop.folder}/${each}`)
-        const specialPaths           = specialFolderNames.map(each => `${path}/${each}`)
-        for (const each of specialFolderNames) {
-            const virkshopFolder = `${virkshop.folder}/${each}`
-            const mixinFolder    = `${path}/${each}`
-            const namespace      = `${virkshopFolder}/${mixinName}`
-
-            // 
-            // add all the shortcut links
-            // 
-            for (const eachPath of await FileSystem.recursivelyListPathsIn(mixinFolder)) {
-                const relativePart = eachPath.slice(mixinFolder.length)
-                const targetLocation = await FileSystem.info(`${virkshopFolder}/${relativePart}`)
-                // if hardlink
-                if (targetLocation.isFile && !targetLocation.isSymlink) {
-                    // assume the user put it there, or that its the plugin's ownership
-                    continue
-                // if symlink
-                } else if (targetLocation.isFile) {
-                    // remove broken things
-                    if (targetLocation.isBrokenLink) {
-                        await FileSystem.remove(targetLocation.path)
-                    } else {
-                        const target      = FileSystem.makeAbsolutePath(targetLocation.path)
-                        const currentItem = FileSystem.makeAbsolutePath(eachPath)
-                        if (target == currentItem) {
-                            // already linked
-                            continue
+                // 
+                // create shortcuts within the namespace
+                // 
+                const nestedNamespace = `${virkshopFolder}/${mixinName}/${mixinName}`
+                for (const eachPath of await FileSystem.listPathsIn(nestedNamespace)) {
+                    const relativePart = eachPath.slice(nestedNamespace.length)
+                    const targetLocation = await FileSystem.info(`${namespace}/${relativePart}`)
+                    // if hardlink
+                    if (targetLocation.isFile && !targetLocation.isSymlink) {
+                        // assume the user put it there, or that its the plugin's ownership
+                        continue
+                    // if symlink
+                    } else if (targetLocation.isFile) {
+                        // remove broken things
+                        if (targetLocation.isBrokenLink) {
+                            await FileSystem.remove(targetLocation.path)
                         } else {
-                            // linked but to the wrong thing
-                            // FIXME: add a warning about conflicting items here, and replace the symlink with the warning
-                            //        note its possible for one to be a file and the other a folder
-                            continue
+                            const target      = FileSystem.makeAbsolutePath(targetLocation.path)
+                            const currentItem = FileSystem.makeAbsolutePath(eachPath)
+                            if (target == currentItem) {
+                                // already linked
+                                continue
+                            } else {
+                                // linked but to the wrong thing
+                                // FIXME: add a warning about conflicting items here, and replace the symlink with the warning
+                                //        note its possible for one to be a file and the other a folder
+                                continue
+                            }
                         }
                     }
+                    const mixinItem = await FileSystem.info(eachPath)
+                    if (mixinItem.isFile) {
+                        // FIXME: this could technically destroy a user-made file by having it as part of the parent path
+                        
+                        // make sure it exists by this point
+                        await FileSystem.ensureIsFolder(FileSystem.parent)
+                        // create the shortcut
+                        await FileSystem.relativeLink({
+                            existingItem: mixinItem.path,
+                            newItem: targetLocation.path,
+                        })
+                    }
+                    // TODO: consider another edgecase of mixin item being a file, but existing item being a folder
                 }
-                const mixinItem = await FileSystem.info(eachPath)
-                if (mixinItem.isFile) {
-                    // FIXME: this could technically destroy a user-made file by having it as part of the parent path
-                    
-                    // make sure it exists by this point
-                    await FileSystem.ensureIsFolder(FileSystem.parent)
-                    // create the shortcut
-                    await FileSystem.relativeLink({
-                        existingItem: mixinItem.path,
-                        newItem: targetLocation.path,
-                    })
-                }
-                // TODO: consider another edgecase of mixin item being a file, but existing item being a folder
             }
         }
-    }
 
-    async function trigger(eventPath) {
+        async function linkMixinShortcuts(path) {
+            // NOTE: linkMixinNamespace needs to be run for EVERY mixin before shortcuts can run. Otherwise there could be order of operations problems
+
+            const mixinName = `${virkshopFolder}/${FileSystem.basename(path)}`
+            const specialFolderNames     = virkshop.structure.mixins.linkedFolderNames
+            const specialVirkshopPaths   = specialFolderNames.map(each => `${virkshop.folder}/${each}`)
+            const specialPaths           = specialFolderNames.map(each => `${path}/${each}`)
+            for (const each of specialFolderNames) {
+                const virkshopFolder = `${virkshop.folder}/${each}`
+                const mixinFolder    = `${path}/${each}`
+                const namespace      = `${virkshopFolder}/${mixinName}`
+
+                // 
+                // add all the shortcut links
+                // 
+                for (const eachPath of await FileSystem.recursivelyListPathsIn(mixinFolder)) {
+                    const relativePart = eachPath.slice(mixinFolder.length)
+                    const targetLocation = await FileSystem.info(`${virkshopFolder}/${relativePart}`)
+                    // if hardlink
+                    if (targetLocation.isFile && !targetLocation.isSymlink) {
+                        // assume the user put it there, or that its the plugin's ownership
+                        continue
+                    // if symlink
+                    } else if (targetLocation.isFile) {
+                        // remove broken things
+                        if (targetLocation.isBrokenLink) {
+                            await FileSystem.remove(targetLocation.path)
+                        } else {
+                            const target      = FileSystem.makeAbsolutePath(targetLocation.path)
+                            const currentItem = FileSystem.makeAbsolutePath(eachPath)
+                            if (target == currentItem) {
+                                // already linked
+                                continue
+                            } else {
+                                // linked but to the wrong thing
+                                // FIXME: add a warning about conflicting items here, and replace the symlink with the warning
+                                //        note its possible for one to be a file and the other a folder
+                                continue
+                            }
+                        }
+                    }
+                    const mixinItem = await FileSystem.info(eachPath)
+                    if (mixinItem.isFile) {
+                        // FIXME: this could technically destroy a user-made file by having it as part of the parent path
+                        
+                        // make sure it exists by this point
+                        await FileSystem.ensureIsFolder(FileSystem.parent)
+                        // create the shortcut
+                        await FileSystem.relativeLink({
+                            existingItem: mixinItem.path,
+                            newItem: targetLocation.path,
+                        })
+                    }
+                    // TODO: consider another edgecase of mixin item being a file, but existing item being a folder
+                }
+            }
+        }
+
+        async function trigger(eventPath) {
+            let promises = []
+            const eventPathInfo = await FileSystem.info(eventPath)
+            if (eventPathInfo.isFolder) {
+                const paths = await FileSystem.recursivelyListPathsIn(eventPath)
+                paths.sort()
+                // FIXME: sort them numerically
+                // FIXME: pad out the 0's to make the numbers equal lengths
+                for (const eachPath of paths) {
+                    await run`${eachPath}`
+                }
+            }
+        }
+
+
+        const virkshop = await loadVirkshopData()
         let promises = []
-        const eventPathInfo = await FileSystem.info(eventPath)
-        if (eventPathInfo.isFolder) {
-            const paths = await FileSystem.recursivelyListPathsIn(eventPath)
-            paths.sort()
-            // FIXME: sort them numerically
-            // FIXME: pad out the 0's to make the numbers equal lengths
-            for (const eachPath of paths) {
-                await run`${eachPath}`
+
+        // 
+        // 
+        // Phase 0: link everything!
+        // 
+        //
+            // rule1: never overwrite non-symlink files (in commands/ settings/ etc)
+            //        hardlink files are presumably created by the user, not a mixin
+            // link virkshop folders up-and-out into the project folder
+            promises = promises.concat(Object.entries(virkshop.settings.link_to_project_root).map(async ([key, value])=>{
+                const target = await FileSystem.info(`${virkshop.folder}/../${key}`)
+                if (target.isBrokenLink) {
+                    await FileSystem.remove(target.path)
+                }
+                // create it, but dont destroy an existing folder (unless its a broken link)
+                if (!target.exists)  {
+                    await FileSystem.relativeLink({existingItem: value, newItem: target.path})
+                }
+            }))
+
+            // 
+            // link mixins
+            // 
+            // FIXME: problem here with priority, what happens if two extensions write to the same location
+            //    SOLUTION! this is just like traits/mixins
+            //              instead of using a number priority, put all their stuff under a namespace
+            //              then attempt to put it outside the namespace
+            //                  if there is a conflict, make the command print out "there is a conflict, please specify if you want the command from __ or __"
+            //  new FIXME: the above solution doesnt work for the home folder.
+            //             maybe add a message any time a .profile or .rc file is added to the home and explain
+            //     possible solution: use the project extension to pick one, which can be a combination (concat or pick one or whatever)
+            const mixinPaths = await FileSystem.listFolderItemsIn(`${virkshop.folder}/mixins`)
+            // namespace
+            for (const eachMixin of mixinPaths) {
+                promises.push(linkMixinNamespace(eachMixin) )
             }
-        }
-    }
+            // TODO: purge broken system links more
+            
+            // let them finish in any order (efficient), but they need to be done before phase 1 starts
+            await Promise.all(promises)
 
-
-    const virkshop = await loadVirkshopData()
-    let promises = []
-
-    // 
-    // 
-    // Phase 0: link everything!
-    // 
-    //
-        // rule1: never overwrite non-symlink files (in commands/ settings/ etc)
-        //        hardlink files are presumably created by the user, not a mixin
-        // link virkshop folders up-and-out into the project folder
-        promises = promises.concat(Object.entries(virkshop.settings.link_to_project_root).map(async ([key, value])=>{
-            const target = await FileSystem.info(`${virkshop.folder}/../${key}`)
-            if (target.isBrokenLink) {
-                await FileSystem.remove(target.path)
-            }
-            // create it, but dont destroy an existing folder (unless its a broken link)
-            if (!target.exists)  {
-                await FileSystem.relativeLink({existingItem: value, newItem: target.path})
-            }
-        }))
 
         // 
-        // link mixins
+        // Phase 1
         // 
-        // FIXME: problem here with priority, what happens if two extensions write to the same location
-        //    SOLUTION! this is just like traits/mixins
-        //              instead of using a number priority, put all their stuff under a namespace
-        //              then attempt to put it outside the namespace
-        //                  if there is a conflict, make the command print out "there is a conflict, please specify if you want the command from __ or __"
-        //  new FIXME: the above solution doesnt work for the home folder.
-        //             maybe add a message any time a .profile or .rc file is added to the home and explain
-        //     possible solution: use the project extension to pick one, which can be a combination (concat or pick one or whatever)
-        const mixinPaths = await FileSystem.listFolderItemsIn(`${virkshop.folder}/mixins`)
-        // namespace
-        for (const eachMixin of mixinPaths) {
-            promises.push(linkMixinNamespace(eachMixin) )
-        }
-        // TODO: purge broken system links more
-        
-        // let them finish in any order (efficient), but they need to be done before phase 1 starts
-        await Promise.all(promises)
-
-
-    // 
-    // Phase 1
-    // 
-        // 
-        // let the mixins set themselves up
-        // 
-        promises = []
-        for (const eachMixinPath of mixinPaths) {
-            promises.push(
-                FileSystem.recursivelyListPathsIn(`${eachMixinPath}/events/virkshop/phase_1`).then(
-                    executables=>{
-                        executables.sort() // FIXME: this is javascript so of course it won't actually sort alpha-numerically
-                        for (const eachExecutable of executables) {
-                            await run`${eachExecutable}`
+            // 
+            // let the mixins set themselves up
+            // 
+            promises = []
+            for (const eachMixinPath of mixinPaths) {
+                promises.push(
+                    FileSystem.recursivelyListPathsIn(`${eachMixinPath}/events/virkshop/phase_1`).then(
+                        async (executables)=>{
+                            executables.sort() // FIXME: this is javascript so of course it won't actually sort alpha-numerically
+                            for (const eachExecutable of executables) {
+                                await run`${eachExecutable}`
+                            }
                         }
-                    }
+                    )
                 )
-            )
-        }
-        await Promise.all(promises)
-        
-        // 
-        // once theyve created their peices, connect them to the larger outside system
-        // 
-        
-        // shortcuts 
-        for (const eachMixin of mixinPaths) {
-            await linkMixinShortcuts(eachMixin)
-        }
+            }
+            await Promise.all(promises)
+            
+            // 
+            // once theyve created their peices, connect them to the larger outside system
+            // 
+            
+            // shortcuts 
+            for (const eachMixin of mixinPaths) {
+                await linkMixinShortcuts(eachMixin)
+            }
+
+            // 
+            // link stuff into fake home
+            // 
+            await recursivelyFileLink({
+                existingFolder: `${virkshop.folder}/home`,
+                targetFolder: virkshop.structure.fakeHome,
+            })
 
         // 
-        // link stuff into fake home
+        // let the .zshrc start Phase 2
         // 
-        await recursivelyFileLink({
-            existingFolder: `${virkshop.folder}/home`,
-            targetFolder: virkshop.structure.fakeHome,
-        })
-
-    // 
-    // let the .zshrc start Phase 2
-    // 
-        Console.env.REAL_HOME = Console.env.HOME
-        Console.env.PROJECT   = FileSystem.normalize(`${virkshop.folder}/..`)
-        Console.env.HOME      = virkshop.structure.fakeHome
-        // FIXME: these env variables are not going to be passed through
-        await run`nix-shell --pure --command zsh`
-}
+            Console.env.REAL_HOME = Console.env.HOME
+            Console.env.PROJECT   = FileSystem.normalize(`${virkshop.folder}/..`)
+            Console.env.HOME      = virkshop.structure.fakeHome
+            // FIXME: these env variables are not going to be passed through
+            await run`nix-shell --pure --command zsh`
+    }
