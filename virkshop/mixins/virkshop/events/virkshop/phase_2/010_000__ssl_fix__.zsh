@@ -1,0 +1,1 @@
+../../../mixins/nix_tools/events/virkshop/phase_2/010_000__ssl_fix__.zsh
