@@ -502,7 +502,10 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
                 }
                 // create the commonFolderReservedForThisMixin
                 if (needToCreateNamespace) {
-                    await FileSystem.relativeLink({existingItem: mixinFolder, newItem: commonFolderReservedForThisMixin})
+                    await FileSystem.relativeLink({
+                        existingItem: mixinFolder,
+                        newItem: commonFolderReservedForThisMixin
+                    })
                 }
 
                 
@@ -733,14 +736,37 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
             new Uint8Array(await (await fetch(url)).arrayBuffer())
         )
     }
-
+    
+    import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
     async function move({ item, newParentFolder, newName, overwrite=false, force=true }) {
         // force     => will MOVE other things out of the way until the job is done
         // overwrite => will DELETE things out of the way until the job is done
-        const oldName = FileSystem.basename(item.path || item)
-        const targetPath = `${newParentFolder}/${newName || oldName}`
-        if (force || overwrite) {
-            await FileSystem.clearAPathFor(targetPath, { overwrite })
+        
+        const oldPath = item.path || item
+        const itemInfo = item instanceof Object || await FileSystem.info(oldPath)
+        
+        // if its a relative-linked item the the relative link will need to be adjusted after the move
+        let adjustedSymlinkOriginalTarget = null
+        if (itemInfo.isSymlink && !Path.isAbsolute(itemInfo.nextTarget)) {
+            adjustedSymlinkOriginalTarget = `${itemInfo.path}/${itemInfo.nextTarget}`
         }
-        await moveAndRename(item, targetPath)
+
+        const oldName = FileSystem.basename(oldPath)
+        const newPath = `${newParentFolder}/${newName || oldName}`
+        // normal case, just move
+        if (!adjustedSymlinkOriginalTarget) {
+            if (force || overwrite) {
+                await FileSystem.clearAPathFor(newPath, { overwrite })
+            }
+            await moveAndRename(item, newPath)
+        // relative link case, create a new relative link and delete the old one
+        } else {
+            await FileSystem.relativeLink({
+                existingItem: newProjectLocation,
+                newItem: virkshop.pathTo.project,
+                force,
+            })
+        }
+
+        // FIXME: this doesn't handle the case of symlinks pointing at the file that was just moved (they will just break without warning)
     }
