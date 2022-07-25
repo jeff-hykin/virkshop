@@ -32,7 +32,7 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
                 {
                     virkshop: { get() { return `${virkshop.pathTo.project}/${virkshop.name}/` }},
                     settings: { get() { return `${virkshop.pathTo.virkshop}/settings` }},
-                    fakeHome: { get() { return `${virkshop.pathTo.project}/temporary/long_term/home` }},
+                    fakeHome: { get() { return `${virkshop.pathTo.virkshop}/temporary/long_term/home` }},
                     virkshopOptions: { get() { return `${virkshop.pathTo.settings}/virkshop/options.json` }},
                 }
             ),
@@ -681,15 +681,18 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
             promises = []
             for (const eachMixinPath of mixinPaths) {
                 promises.push(
-                    FileSystem.recursivelyListPathsIn(`${eachMixinPath}/events/virkshop/phase_1`).then(
-                        async (executables)=>{
-                            executables.sort() // FIXME: this is javascript so of course it won't actually sort alpha-numerically
-                            for (const eachExecutable of executables) {
-                                await FileSystem.addPermissions({path: eachExecutable, permissions: { owner: {canExecute: true} }})
-                                try {
-                                    console.debug(`eachExecutable is:`,eachExecutable)
-                                    await run`${eachExecutable}`
-                                } catch (error) {
+                    FileSystem.recursivelyListItemsIn(`${eachMixinPath}/events/virkshop/phase_1`).then(
+                        async (phase1Items)=>{
+                            phase1Items.sort() // FIXME: this is javascript so of course it won't actually sort alpha-numerically
+                            for (const eachItem of phase1Items) {
+                                // if its not a folder
+                                if (!eachItem.isFolder && eachItem.exists) {
+                                    await FileSystem.addPermissions({path: eachItem.path, permissions: { owner: {canExecute: true} }})
+                                    try {
+                                        await run`${eachItem.path}`
+                                    } catch (error) {
+                                        console.debug(`\n\nWARNING: error while executing phase_1 of ${FileSystem.basename(eachMixinPath)}`,)
+                                    }
                                 }
                             }
                         }
