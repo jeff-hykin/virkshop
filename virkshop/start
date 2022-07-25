@@ -597,7 +597,7 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
                         // FIXME: this could technically destroy a user-made file by having it as part of the parent path
                         
                         // make sure it exists by this point
-                        await FileSystem.ensureIsFolder(FileSystem.parent)
+                        await FileSystem.ensureIsFolder(FileSystem.parentPath(mixinItem.path))
                         // create the shortcut
                         await FileSystem.relativeLink({
                             existingItem: mixinItem.path,
@@ -685,7 +685,12 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
                         async (executables)=>{
                             executables.sort() // FIXME: this is javascript so of course it won't actually sort alpha-numerically
                             for (const eachExecutable of executables) {
-                                await run`${eachExecutable}`
+                                await FileSystem.addPermissions({path: eachExecutable, permissions: { owner: {canExecute: true} }})
+                                try {
+                                    console.debug(`eachExecutable is:`,eachExecutable)
+                                    await run`${eachExecutable}`
+                                } catch (error) {
+                                }
                             }
                         }
                     )

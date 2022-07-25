@@ -1,7 +1,7 @@
 {
     "debuggingMode": false,
     "linkToProject": {
-        "./commands":      "$virkshop/commands/project",
+        "./commands":      "$virkshop/commands",
         "./documentation": "$virkshop/documentation",
         "./events":        "$virkshop/events",
         "./settings":      "$virkshop/settings"
