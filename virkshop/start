@@ -735,7 +735,7 @@ import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
         // let the .zshrc start Phase 2
         // 
             Console.env.REAL_HOME = Console.env.HOME
-            Console.env.PROJECT   = FileSystem.normalize(`${virkshop.folder}/..`)
+            Console.env.PROJECT   = FileSystem.parentPath(virkshop.folder)
             Console.env.HOME      = virkshop.pathTo.fakeHome
             // FIXME: these env variables are not going to be passed through
             await run`nix-shell --pure --command zsh`
