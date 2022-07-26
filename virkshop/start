@@ -12,10 +12,10 @@
     // 2. using nix to install the environment
     // 3. launching the environment as soon as possible
 
-import { OperatingSystem } from "https://deno.land/x/quickr@0.3.34/main/operating_system.js"
-import { FileSystem } from "https://deno.land/x/quickr@0.3.34/main/file_system.js"
-import { run, hasCommand, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.3.34/main/run.js"
-import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.3.34/main/console.js"
+import { OperatingSystem } from "https://deno.land/x/quickr@0.3.36/main/operating_system.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.3.36/main/file_system.js"
+import { run, hasCommand, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.3.36/main/run.js"
+import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.3.36/main/console.js"
 import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
 
 // 
@@ -26,7 +26,7 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
             name: FileSystem.basename(FileSystem.thisFolder),
             pathTo: Object.defineProperties(
                 {
-                    project: FileSystem.makeAbsolutePath(`${FileSystem.thisFolder}/..`), // subject to change within this file
+                    project: FileSystem.makeAbsolutePath(FileSystem.parentPath(FileSystem.thisFolder)), // subject to change within this file
                     realHome: Console.env.HOME,
                 },
                 {
@@ -251,7 +251,7 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
                         newParentFolder: newProjectLocation,
                     })
                     // create a link from the old location to the new location so they can still access the project
-                    await FileSystem.relativeLink({
+                    await relativeLink({
                         existingItem: newProjectLocation,
                         newItem: virkshop.pathTo.project,
                     })
@@ -460,7 +460,7 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
                     to: existingItem.path 
                 })
                 // link the file (creating any folders necessary in the process)
-                await FileSystem.relativeLink({
+                await relativeLink({
                     existingItem: existingItem.path,
                     newItem: `${target.path}/${relativePart}`,
                 })
@@ -472,6 +472,11 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
             for (const eachSpecialFolder of virkshop.structure.specialMixinFolders) { // FIXME: home folder needs to be treated differently
                 const mixinFolder                      = `${path}/${eachSpecialFolder}/${mixinName}`
                 const commonFolderReservedForThisMixin = `${virkshop.folder}/${eachSpecialFolder}/${mixinName}`
+
+                if (eachSpecialFolder == 'events') {
+                    console.debug(`mixinFolder is:`,mixinFolder)
+                    console.debug(`commonFolderReservedForThisMixin is:`,commonFolderReservedForThisMixin)
+                }
                 
                 await FileSystem.ensureIsFolder(mixinFolder)
                 
@@ -486,8 +491,12 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
                     if (namespaceCheck.isFolder) {
                         const paths = await FileSystem.listPathsIn(namespaceCheck.path)
                         for (const eachExisting of paths) {
-                            move({ item, newParentFolder })
-                            await moveAndRename(eachExisting, newProjectLocation)
+                            console.debug(`eachExisting is:`,eachExisting)
+                            await move({
+                                item: eachExisting,
+                                newParentFolder: mixinFolder,
+                                overwrite: true,
+                            })
                         }
                     }
                     await FileSystem.remove(commonFolderReservedForThisMixin)
@@ -502,7 +511,7 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
                 }
                 // create the commonFolderReservedForThisMixin
                 if (needToCreateNamespace) {
-                    await FileSystem.relativeLink({
+                    await relativeLink({
                         existingItem: mixinFolder,
                         newItem: commonFolderReservedForThisMixin
                     })
@@ -548,7 +557,7 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
                 //         // make sure it exists by this point
                 //         await FileSystem.ensureIsFolder(FileSystem.parent)
                 //         // create the shortcut
-                //         await FileSystem.relativeLink({
+                //         await relativeLink({
                 //             existingItem: mixinItem.path,
                 //             newItem: targetLocation.path,
                 //         })
@@ -602,7 +611,7 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
                         // make sure it exists by this point
                         await FileSystem.ensureIsFolder(FileSystem.parentPath(mixinItem.path))
                         // create the shortcut
-                        await FileSystem.relativeLink({
+                        await relativeLink({
                             existingItem: mixinItem.path,
                             newItem: targetLocation.path,
                         })
@@ -667,7 +676,7 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
                 }
                 // create it, but dont destroy an existing folder (unless its a broken link)
                 if (target.isBrokenLink || !target.exists)  {
-                    await FileSystem.relativeLink({
+                    await relativeLink({
                         existingItem: sourcePath,
                         newItem: target.path,
                     })
@@ -743,30 +752,117 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
         // overwrite => will DELETE things out of the way until the job is done
         
         const oldPath = item.path || item
+        const oldName = FileSystem.basename(oldPath)
         const itemInfo = item instanceof Object || await FileSystem.info(oldPath)
+        const newPath = `${newParentFolder}/${newName || oldName}`
+
+        console.debug(`oldPath is:`,oldPath)
+        console.debug(`newPath is:`,newPath)
         
         // if its a relative-linked item the the relative link will need to be adjusted after the move
-        let adjustedSymlinkOriginalTarget = null
         if (itemInfo.isSymlink && !Path.isAbsolute(itemInfo.nextTarget)) {
-            adjustedSymlinkOriginalTarget = `${itemInfo.path}/${itemInfo.nextTarget}`
-        }
-
-        const oldName = FileSystem.basename(oldPath)
-        const newPath = `${newParentFolder}/${newName || oldName}`
+            const adjustedSymlinkOriginalTarget = `${itemInfo.path}/${itemInfo.nextTarget}`
+            await relativeLink({
+                existingItem: adjustedSymlinkOriginalTarget,
+                newItem: newPath,
+                force,
+            })
         // normal case, just move
-        if (!adjustedSymlinkOriginalTarget) {
+        } else {
             if (force || overwrite) {
                 await FileSystem.clearAPathFor(newPath, { overwrite })
             }
             await moveAndRename(item, newPath)
-        // relative link case, create a new relative link and delete the old one
-        } else {
-            await FileSystem.relativeLink({
-                existingItem: newProjectLocation,
-                newItem: virkshop.pathTo.project,
-                force,
-            })
         }
 
         // FIXME: this doesn't handle the case of symlinks pointing at the file that was just moved (they will just break without warning)
+    }
+
+    async function relativeLink({existingItem, newItem, force=true, overwrite=false}) {
+        existingItem = (existingItem.path || existingItem).replace(/\/+$/, "") // the replace is to remove trailing slashes, which will cause painful nonsensical errors if not done
+        newItem = (newItem.path || newItem).replace(/\/+$/, "") // if given ItemInfo object
+
+        console.debug(`existingItem is:`,existingItem)
+        console.debug(`newItem is:`,newItem)
+        
+        const existingItemDoesntExist = (await Deno.lstat(existingItem).catch(()=>({doesntExist: true}))).doesntExist
+        // if the item doesnt exists
+        if (existingItemDoesntExist) {
+            throw Error(`\nTried to create a relativeLink between existingItem:${existingItem}, newItem:${newItem}\nbut existingItem didn't actually exist`)
+        } else {
+            if (force || overwrite) {
+                await FileSystem.clearAPathFor(newItem, {overwrite})
+            }
+            const [ folders, name, extension ] = FileSystem.pathPieces(FileSystem.makeAbsolutePath(newItem))
+            console.debug(`name is:`,name)
+            console.debug(`folders is:`,folders)
+            let topDownPath = ``
+            for (let eachFolderName of folders) {
+                eachFolderName = FileSystem.basename(eachFolderName)
+                topDownPath += `/${eachFolderName}`
+                console.debug(`topDownPath is:`,topDownPath)
+                const info = await FileSystem.info(topDownPath)
+                if (info.isSymlink) {
+                    // finalTargetPathOf must exist (outside of a targeted race-condition attack) because FileSystem.clearAPathFor ensures each folder exists
+                    const absolutePathToIntermediate = await finalTargetOf(info)
+                    // remove the path to the syslink folder
+                    topDownPath = topDownPath.slice(0, -(eachFolderName.length+1))
+
+                    const relativePath = FileSystem.makeRelativePath({
+                        from: topDownPath,
+                        to: absolutePathToIntermediate,
+                    })
+                    console.debug(`relativePath is:`,relativePath)
+                    console.debug(`   topDownPath is:`,topDownPath)
+                    console.debug(`   absolutePathToIntermediate is:`,absolutePathToIntermediate)
+                    // replace it with the real intermediate path
+                    topDownPath += `/`+FileSystem.makeRelativePath({
+                        from: topDownPath,
+                        to: absolutePathToIntermediate,
+                    })
+                }
+            }
+            const finalTargetPath = `${topDownPath}/${name}${extension}`
+            const pathFromNewToExisting = Path.relative(finalTargetPath, existingItem).replace(/^\.\.\//,"") // all paths should have the "../" at the begining
+            console.debug(`finalTargetPath is:`,finalTargetPath)
+            console.debug(`pathFromNewToExisting is:`,pathFromNewToExisting)
+            return Deno.symlink(
+                pathFromNewToExisting,
+                finalTargetPath,
+            )
+        }
+    }
+
+    async function finalTargetOf(path) {
+        path = (path.path || path) // if given ItemInfo object
+        let result = await Deno.lstat(path).catch(()=>({doesntExist: true}))
+        if (result.doesntExist) {
+            return null
+        }
+        const pathChain = [ FileSystem.makeAbsolutePath(path) ]
+        while (result.isSymlink) {
+            console.debug(`pathChain is:`,pathChain)
+            // get the path to the target
+            const relativeOrAbsolutePath = await Deno.readLink(path)
+            if (Path.isAbsolute(relativeOrAbsolutePath)) {
+                path = relativeOrAbsolutePath
+            } else {
+                path = `${FileSystem.parentPath(path)}/${relativeOrAbsolutePath}`
+            }
+            result = await Deno.lstat(path).catch(()=>({doesntExist: true}))
+            // check if target exists
+            if (result.doesntExist) {
+                return null
+            }
+            // check for infinite loops (normalizes and makes absolute)
+            const absolutePath = FileSystem.makeAbsolutePath(path)
+            if (pathChain.includes(absolutePath)) {
+                // circular loop of links
+                return null
+            }
+            pathChain.push(absolutePath)
+        }
+        console.debug(`pathChain is:`,pathChain)
+        
+        return path
     }
