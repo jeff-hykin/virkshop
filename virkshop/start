@@ -12,11 +12,12 @@
     // 2. using nix to install the environment
     // 3. launching the environment as soon as possible
 
-import { OperatingSystem } from "https://deno.land/x/quickr@0.3.36/main/operating_system.js"
-import { FileSystem } from "https://deno.land/x/quickr@0.3.36/main/file_system.js"
-import { run, hasCommand, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.3.36/main/run.js"
-import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.3.36/main/console.js"
+import { OperatingSystem } from "https://deno.land/x/quickr@0.3.38/main/operating_system.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.3.38/main/file_system.js"
+import { run, hasCommand, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.3.38/main/run.js"
+import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.3.38/main/console.js"
 import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
+import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
 
 // 
 // virkshop object
@@ -246,12 +247,12 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
                     // 
                     // move the project
                     // 
-                    await move({
+                    await FileSystem.move({
                         item: virkshop.pathTo.project,
                         newParentFolder: newProjectLocation,
                     })
                     // create a link from the old location to the new location so they can still access the project
-                    await relativeLink({
+                    await FileSystem.relativeLink({
                         existingItem: newProjectLocation,
                         newItem: virkshop.pathTo.project,
                     })
@@ -460,7 +461,7 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
                     to: existingItem.path 
                 })
                 // link the file (creating any folders necessary in the process)
-                await relativeLink({
+                await FileSystem.relativeLink({
                     existingItem: existingItem.path,
                     newItem: `${target.path}/${relativePart}`,
                 })
@@ -492,7 +493,7 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
                         const paths = await FileSystem.listPathsIn(namespaceCheck.path)
                         for (const eachExisting of paths) {
                             console.debug(`eachExisting is:`,eachExisting)
-                            await move({
+                            await FileSystem.move({
                                 item: eachExisting,
                                 newParentFolder: mixinFolder,
                                 overwrite: true,
@@ -511,7 +512,7 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
                 }
                 // create the commonFolderReservedForThisMixin
                 if (needToCreateNamespace) {
-                    await relativeLink({
+                    await FileSystem.relativeLink({
                         existingItem: mixinFolder,
                         newItem: commonFolderReservedForThisMixin
                     })
@@ -557,7 +558,7 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
                 //         // make sure it exists by this point
                 //         await FileSystem.ensureIsFolder(FileSystem.parent)
                 //         // create the shortcut
-                //         await relativeLink({
+                //         await FileSystem.relativeLink({
                 //             existingItem: mixinItem.path,
                 //             newItem: targetLocation.path,
                 //         })
@@ -611,7 +612,7 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
                         // make sure it exists by this point
                         await FileSystem.ensureIsFolder(FileSystem.parentPath(mixinItem.path))
                         // create the shortcut
-                        await relativeLink({
+                        await FileSystem.relativeLink({
                             existingItem: mixinItem.path,
                             newItem: targetLocation.path,
                         })
@@ -676,7 +677,7 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
                 }
                 // create it, but dont destroy an existing folder (unless its a broken link)
                 if (target.isBrokenLink || !target.exists)  {
-                    await relativeLink({
+                    await FileSystem.relativeLink({
                         existingItem: sourcePath,
                         newItem: target.path,
                     })
@@ -744,137 +745,4 @@ import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
         return  new TextDecoder().decode(
             new Uint8Array(await (await fetch(url)).arrayBuffer())
         )
-    }
-    
-    import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
-    async function move({ item, newParentFolder, newName, overwrite=false, force=true }) {
-        // force     => will MOVE other things out of the way until the job is done
-        // overwrite => will DELETE things out of the way until the job is done
-        
-        const oldPath = item.path || item
-        const oldName = FileSystem.basename(oldPath)
-        const itemInfo = item instanceof Object || await FileSystem.info(oldPath)
-        const newPath = `${newParentFolder}/${newName || oldName}`
-
-        // if its a relative-linked item the the relative link will need to be adjusted after the move
-        // todo: consider more about the broken link case (current .relativeLink() only works with linking to things that exist)
-        if (itemInfo.isSymlink && !item.isBrokenLink) {
-            const link = Deno.readLinkSync(itemInfo.path)
-            if (!Path.isAbsolute(link)) {
-                const linkTargetBeforeMove = `${FileSystem.parentPath(itemInfo.path)}/${link}`
-                await FileSystem.relativeLink({
-                    existingItem: linkTargetBeforeMove,
-                    newItem: newPath,
-                    force,
-                    overwrite,
-                })
-                // remove the original since it was "moved"
-                await FileSystem.remove(itemInfo)
-            }
-        }
-        
-        if (force || overwrite) {
-            await FileSystem.clearAPathFor(newPath, { overwrite })
-        }
-        // FIXME: this needs to recursively check for realtive symlinks!
-        //          if there is a relative symlink to something OUTSIDE the folder being moved, it needs to be adjusted in order to not break
-        //          if there is a relative symlink to something INSIDE the folder being moved, then it doesn't need to be adjusted
-        //          however "inside" and "outside" are difficult because folders can be symlinks.
-        //              So find the absolute path to the target, check if that hard path is external or internal
-        //          another edgecase is what if the folder contains a symlink with an absolute path of the folder being moved (or something inside of the folder being moved)
-        await moveAndRename(item, newPath)
-
-    }
-
-    async function relativeLink({existingItem, newItem, force=true, overwrite=false}) {
-        const existingItemPath = (existingItem.path || existingItem).replace(/\/+$/, "") // the replace is to remove trailing slashes, which will cause painful nonsensical errors if not done
-        const newItemPath = (newItem.path || newItem).replace(/\/+$/, "") // if given ItemInfo object
-        
-        const existingItemDoesntExist = (await Deno.lstat(existingItemPath).catch(()=>({doesntExist: true}))).doesntExist
-        // if the item doesnt exists
-        if (existingItemDoesntExist) {
-            throw Error(`\nTried to create a relativeLink between existingItem:${existingItemPath}, newItem:${newItemPath}\nbut existingItem didn't actually exist`)
-        } else {
-            if (force || overwrite) {
-                await FileSystem.clearAPathFor(newItemPath, {overwrite})
-            }
-            const hardPathToNewItem = await makeHardPath(newItemPath)
-            const hardPathToExistingItem = await makeHardPath(existingItemPath)
-            const pathFromNewToExisting = Path.relative(hardPathToNewItem, hardPathToExistingItem).replace(/^\.\.\//,"") // all paths should have the "../" at the begining
-            return Deno.symlink(
-                pathFromNewToExisting,
-                hardPathToNewItem,
-            )
-        }
-    }
-    
-    async function makeHardPath(path) {
-        // on hardpaths, there are no symbolically linked parent folders, and the path is (must be) absolute
-        const [ folders, name, extension ] = FileSystem.pathPieces(FileSystem.makeAbsolutePath(path))
-        let topDownPath = ``
-        for (const eachFolderName of folders) {
-            topDownPath += `/${eachFolderName}`
-            const info = await FileSystem.info(topDownPath)
-            if (info.isSymlink) {
-                const absolutePathToIntermediate = await finalTargetOf(info, {_parentsHaveBeenChecked: true})
-                // shouldn't be true/possible outside of a race condition, but good to handle it anyways
-                if (absolutePathToIntermediate == null) {
-                    return null
-                }
-                // remove the path to the syslink parent folder + the slash
-                topDownPath = topDownPath.slice(0, -(eachFolderName.length+1))
-
-                const relativePath = FileSystem.makeRelativePath({
-                    from: topDownPath,
-                    to: absolutePathToIntermediate,
-                })
-                // replace it with the real intermediate path
-                topDownPath += `/${relativePath}`
-            }
-        }
-
-        // now all parents are verified as real folders 
-        return `${topDownPath}/${name}${extension}`
-    }
-
-    async function finalTargetOf(path, options={}) {
-        const { _parentsHaveBeenChecked } = { _parentsHaveBeenChecked: false , ...options }
-        path = (path.path || path) // if given ItemInfo object
-        let result = await Deno.lstat(path).catch(()=>({doesntExist: true}))
-        if (result.doesntExist) {
-            return null
-        }
-        
-        // 
-        // naively follow the path chain to build up a full chain
-        // 
-        const pathChain = [ FileSystem.makeAbsolutePath(path) ]
-        while (result.isSymlink) {
-            // get the path to the target
-            const relativeOrAbsolutePath = await Deno.readLink(path)
-            if (Path.isAbsolute(relativeOrAbsolutePath)) {
-                path = relativeOrAbsolutePath
-            } else {
-                path = `${FileSystem.parentPath(path)}/${relativeOrAbsolutePath}`
-            }
-            result = await Deno.lstat(path).catch(()=>({doesntExist: true}))
-            // check if target exists
-            if (result.doesntExist) {
-                return null
-            }
-            // check for infinite loops (normalizes and makes absolute)
-            const absolutePath = FileSystem.makeAbsolutePath(path)
-            if (pathChain.includes(absolutePath)) {
-                // circular loop of links
-                return null
-            }
-            pathChain.push(absolutePath)
-        }
-        
-        if (_parentsHaveBeenChecked) {
-            return path
-        } else {
-            // this is shallow recursive 
-            return FileSystem.makeHardPath(path)
-        }
     }
