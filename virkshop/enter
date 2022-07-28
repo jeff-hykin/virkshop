@@ -18,43 +18,7 @@ import { run, hasCommand, throwIfFails, zipInto, mergeInto, returnAsString, Time
 import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.3.38/main/console.js"
 import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
 import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
-
-// 
-// virkshop object
-// 
-    const virkshop = Object.defineProperties(
-        {
-            name: FileSystem.basename(FileSystem.thisFolder),
-            pathTo: Object.defineProperties(
-                {
-                    project: FileSystem.makeAbsolutePath(FileSystem.parentPath(FileSystem.thisFolder)), // subject to change within this file
-                    realHome: Console.env.HOME,
-                },
-                {
-                    virkshop: { get() { return `${virkshop.pathTo.project}/${virkshop.name}/` }},
-                    settings: { get() { return `${virkshop.pathTo.virkshop}/settings` }},
-                    fakeHome: { get() { return `${virkshop.pathTo.virkshop}/temporary/long_term/home` }},
-                    virkshopOptions: { get() { return `${virkshop.pathTo.settings}/virkshop/options.json` }},
-                }
-            ),
-            structure: {
-                specialMixinFolders: [
-                    'commands',
-                    'documentation',
-                    'events',
-                    'home',
-                    'settings'
-                ],
-            }
-        },
-        {
-            folder:      { get() { return virkshop.pathTo.virkshop } }, // alias
-            projectName: { get() { return FileSystem.basename(virkshop.pathTo.project)   } },
-            options: { get() {
-                return JSON.parse(Deno.readTextFileSync(virkshop.pathTo.virkshopOptions))
-            }}
-        },
-    )
+import { virkshop } from "./core.js"
 
 // 
 // main
@@ -423,33 +387,6 @@ import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
         // setup the env
         Console.env.VIRKSHOP_FOLDER = virkshop.pathTo.project
 
-        function camelCase(str) {
-            const addedSeperator = str.replace(/([a-z0-9])([A-Z])/g, "$1_$2").replace(/[^a-zA-Z0-9 _.-]/,"_").toLowerCase()
-            const words = addedSeperator.split(/[ _.-]+/g)
-            const capatalizedWords = words.map(each=>each.replace(/^\w/, (group0)=>group0.toUpperCase()))
-            // make the first one lowercase
-            capatalizedWords[0] = capatalizedWords[0].toLowerCase()
-            return capatalizedWords.join('')
-        }
-
-        const varnamePattern = /^[a-zA-Z_][a-zA-Z0-9_]*$/
-        async function objectifyFolder(folder) {
-            const object = {}
-            for (const each of await FileSystem.listItemsIn(folder)) {
-                // ignore many file names for future compatibility
-                if (!each.basename.match(varnamePattern)) {
-                    continue
-                }
-                // if file, just read it
-                if (each.isFile) {
-                    object[each.name] = await FileSystem.read(each.path)
-                // if its a folder convert it to an object
-                } else {
-                    object[each.name] = await objectifyFolder(each.path)
-                }
-            }
-        }
-
         async function recursivelyFileLink({targetFolder, existingFolder}) {
             const target = await FileSystem.info(targetFolder)
             const existing = await FileSystem.info(existingFolder)
@@ -472,13 +409,8 @@ import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
             const mixinName = FileSystem.basename(path)
             for (const eachSpecialFolder of virkshop.structure.specialMixinFolders) { // FIXME: home folder needs to be treated differently
                 const mixinFolder                      = `${path}/${eachSpecialFolder}/${mixinName}`
-                const commonFolderReservedForThisMixin = `${virkshop.folder}/${eachSpecialFolder}/${mixinName}`
+                const commonFolderReservedForThisMixin = `${virkshop.pathTo.mixture}/${eachSpecialFolder}/${mixinName}`
 
-                if (eachSpecialFolder == 'events') {
-                    console.debug(`mixinFolder is:`,mixinFolder)
-                    console.debug(`commonFolderReservedForThisMixin is:`,commonFolderReservedForThisMixin)
-                }
-                
                 await FileSystem.ensureIsFolder(mixinFolder)
                 
                 // 
@@ -492,7 +424,6 @@ import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
                     if (namespaceCheck.isFolder) {
                         const paths = await FileSystem.listPathsIn(namespaceCheck.path)
                         for (const eachExisting of paths) {
-                            console.debug(`eachExisting is:`,eachExisting)
                             await FileSystem.move({
                                 item: eachExisting,
                                 newParentFolder: mixinFolder,
@@ -573,7 +504,7 @@ import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
 
             const mixinName = FileSystem.basename(path)
             for (const eachSpecialFolder of virkshop.structure.specialMixinFolders) {
-                const commonFolder = `${virkshop.folder}/${eachSpecialFolder}`
+                const commonFolder = `${virkshop.pathTo.mixture}/${eachSpecialFolder}`
                 const mixinFolder  = `${path}/${eachSpecialFolder}`
 
                 // 
@@ -622,21 +553,6 @@ import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
             }
         }
 
-        async function trigger(eventPath) {
-            let promises = []
-            const eventPathInfo = await FileSystem.info(eventPath)
-            if (eventPathInfo.isFolder) {
-                const paths = await FileSystem.recursivelyListPathsIn(eventPath)
-                paths.sort()
-                // FIXME: sort them numerically
-                // FIXME: pad out the 0's to make the numbers equal lengths
-                for (const eachPath of paths) {
-                    await run`${eachPath}`
-                }
-            }
-        }
-
-
         let promises = []
 
         // 
@@ -655,7 +571,7 @@ import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
             //  new FIXME: the above solution doesnt work for the home folder.
             //             maybe add a message any time a .profile or .rc file is added to the home and explain
             //     possible solution: use the project extension to pick one, which can be a combination (concat or pick one or whatever)
-            const mixinPaths = await FileSystem.listPathsIn(`${virkshop.folder}/mixins`)
+            const mixinPaths = await FileSystem.listPathsIn(virkshop.pathTo.mixins)
             // namespace
             for (const eachMixin of mixinPaths) {
                 promises.push(linkMixinNamespace(eachMixin) )
@@ -737,6 +653,7 @@ import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
             Console.env.REAL_HOME = Console.env.HOME
             Console.env.PROJECT   = FileSystem.parentPath(virkshop.folder)
             Console.env.HOME      = virkshop.pathTo.fakeHome
+            FileSystem.cwd        = virkshop.pathTo.fakeHome
             // FIXME: these env variables are not going to be passed through
             await run`nix-shell --pure --command zsh`
     }
