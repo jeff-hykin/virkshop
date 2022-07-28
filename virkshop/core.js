@@ -27,10 +27,10 @@ export const virkshop = Object.defineProperties(
             },
             {
                 virkshop: { get() { return `${virkshop.pathTo.project}/${virkshop.name}/` }},
-                settings: { get() { return `${virkshop.pathTo.virkshop}/settings` }},
-                fakeHome: { get() { return `${virkshop.pathTo.virkshop}/temporary/long_term/home` }},
-                mixins:   { get() { return `${virkshop.pathTo.virkshop}/mixins` }},
-                mixture:  { get() { return `${virkshop.pathTo.virkshop}/` }},
+                settings: { get() { return `${virkshop.pathTo.mixture}/settings` }},
+                fakeHome: { get() { return `${virkshop.pathTo.mixture}/temporary/long_term/home` }},
+                mixins:   { get() { return `${virkshop.pathTo.virkshop}/#mixins` }},
+                mixture:  { get() { return `${virkshop.pathTo.virkshop}/#mixture` }},
                 virkshopOptions: { get() { return `${virkshop.pathTo.settings}/virkshop/options.json` }},
             }
         ),

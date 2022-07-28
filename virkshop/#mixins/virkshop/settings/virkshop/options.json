@@ -1,0 +1,9 @@
+{
+    "debuggingMode": false,
+    "linkToProject": {
+        "./commands":      "$virkshop/#mixture/commands",
+        "./documentation": "$virkshop/#mixture/documentation",
+        "./events":        "$virkshop/#mixture/events",
+        "./settings":      "$virkshop/#mixture/settings"
+    }
+}

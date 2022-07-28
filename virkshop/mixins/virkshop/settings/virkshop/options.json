@@ -1,9 +1,0 @@
-{
-    "debuggingMode": false,
-    "linkToProject": {
-        "./commands":      "$virkshop/commands",
-        "./documentation": "$virkshop/documentation",
-        "./events":        "$virkshop/events",
-        "./settings":      "$virkshop/settings"
-    }
-}
