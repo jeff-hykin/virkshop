@@ -1,5 +1,8 @@
 - have `virkshop.trigger` run/execute all the files without `.deno.js`, and async import all the files that DO have `.deno.js`
     - fix the order (sort) of the trigger function
+- add a `zsh_tools` mixin with events for enter/exit
+    - rename `phase_1` to `before_entering`
+    - use `zsh_tools/events/zsh_tools/during_start` as a replacement for `phase_2`
 - create `virkshop.appendToEnvVar`
     - will need a way to save/seralize data
         - add a hidden getter that maps to a json file inside of short term temp
@@ -16,7 +19,6 @@
 - do custom work for the home mixin
     - notify user about potential conflicts
     - notify mixins if they attempt to use something like `.bashrc`
-    - add a `zsh_tools` mixin with events for enter/exit
 - create `addToGitignore()` function
 - mixin tools
     - redo the startup message
