@@ -3,9 +3,15 @@ import { run, hasCommand, throwIfFails, zipInto, mergeInto, returnAsString, Time
 import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.3.41/main/console.js"
 import { findAll } from "https://deno.land/x/good@0.5.1/string.js"
 
+const escapeShellArgument = (string) => string.replace(`'`, `'"'"'`)
+
 const virkshopIdentifierPath = `#mixins/virkshop/settings/virkshop/`
 const createVirkshop = async (arg)=>{
     var { virkshopPath, projectPath } = {...arg}
+    virkshopPath = virkshopPath || Console.env.VIRKSHOP_FOLDER // env var is used when already inside of the virkshop
+
+    const realHome = Console.env.REAL_HOME || Console.env.HOME
+    
     // 
     // auto-detect a virkshop path
     // 
@@ -54,16 +60,19 @@ const createVirkshop = async (arg)=>{
         {
             pathTo: Object.defineProperties(
                 {
-                    realHome: Console.env.HOME,
+                    realHome,
                     virkshop: virkshopPath,
                     project: FileSystem.makeAbsolutePath(projectPath || FileSystem.parentPath(virkshopPath)),
                 },
                 {
-                    mixins:   { get() { return `${virkshop.pathTo.virkshop}/#mixins` }},
-                    mixture:  { get() { return `${virkshop.pathTo.virkshop}/#mixture` }},
-                    settings: { get() { return `${virkshop.pathTo.mixture}/settings` }},
-                    fakeHome: { get() { return `${virkshop.pathTo.mixture}/temporary/long_term/home` }},
-                    virkshopOptions: { get() { return `${virkshop.pathTo.settings}/virkshop/options.json` }},
+                    mixins:           { get() { return `${virkshop.pathTo.virkshop}/#mixins` }},
+                    mixture:          { get() { return `${virkshop.pathTo.virkshop}/#mixture` }},
+                    settings:         { get() { return `${virkshop.pathTo.mixture}/settings` }},
+                    temporary:        { get() { return `${virkshop.pathTo.mixture}/temporary` }},
+                    fakeHome:         { get() { return `${virkshop.pathTo.temporary}/long_term/home` }},
+                    realHome:         { get() { return `${virkshop.pathTo.temporary}/long_term/home` }},
+                    virkshopOptions:  { get() { return `${virkshop.pathTo.settings}/virkshop/options.json` }},
+                    _passthroughData: { get() { return `${virkshop.pathTo.temporary}/short_term/virkshop/_passthroughData.json` }},
                 }
             ),
             structure: {
@@ -74,6 +83,54 @@ const createVirkshop = async (arg)=>{
                     'home',
                     'settings'
                 ],
+            },
+            injectUsersCommand(commandName) {
+                // FIXME: implement
+                    // check if command exists
+                    // create a new command, absolute path it to the old command, give it the users home as HOME
+            },
+            useRealHomeFor(path) {
+                // FIXME: implement
+                    // create path in real home folder if it doesn't exist
+                    // FIXME: need to specify if folder or file
+                    // create an absolute-path link from the fake home version to the real home version
+            },
+            _passthroughData: {
+                environmentVariables: {},
+            },
+            _events: {
+                beforeNixShell: async ()=>{
+                    // save all the data
+                    await FileSystem.write({
+                        path: virkshop.pathTo._passthroughData,
+                        data: JSON.stringify(virkshop._passthroughData, 0, 4),
+                        force=true,
+                    })
+                    // 
+                    // create the zshenv file
+                    // 
+                        let envVars = ""
+                        for (const [key, value] of Object.entries(virkshop._passthroughData.environmentVariables)) {
+                            envVars += `export ${key}='${escapeShellArgument(value)}'\n`
+                        }
+                        const zshenvString = `
+                            # don't let zsh update itself without telling all the other packages 
+                            # instead use nix to update zsh
+                            DISABLE_AUTO_UPDATE="true"
+                            DISABLE_UPDATE_PROMPT="true"
+                            
+                            ${envVars}
+                            
+                            export VIRKSHOP_FOLDER='${escapeShellArgument(virkshop.pathTo.virkshop)}'
+                            export VIRKSHOP_FAKE_HOME='${escapeShellArgument(virkshop.pathTo.fakeHome)}'
+                            export VIRKSHOP_REAL_HOME='${escapeShellArgument(virkshop.pathTo.realHome)}'
+                            export VIRKSHOP_PROJECT_FOLDER='${escapeShellArgument(virkshop.pathTo.project)}'
+                        `
+                    // 
+                    // TODO: combine all the zsh_tools/before_login into one big string 
+                    // 
+                        // TODO: make sure this .zshenv only runs once per login rather than per shell
+                },
             },
             async trigger(eventPath) {
                 let promises = []
