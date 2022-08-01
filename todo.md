@@ -1,3 +1,10 @@
+- have virkshop/enter do the basics of
+    - generate the #mixture
+    - generate the .zshenv file
+    - run the nix-shell command with all the correct system dependencies
+    - load all the env vars
+
+- create virkshop/after_entering
 - have `virkshop.trigger` run/execute all the files without `.deno.js`, and async import all the files that DO have `.deno.js`
     - fix the order (sort) of the trigger function
 - add a `zsh_tools` mixin with events for enter/exit
@@ -33,3 +40,5 @@
 - standardize and publish a deno Virkshop lib
 - consider having a background deno task for faster execution times of scripts
 - consider verifying the structure (broken links) as a background task after the shell starts
+- make the nix install check faster
+- make enter rewrite itself (and ignore changes) after a user successfully runs it once. Have the rewrite change the hashbang

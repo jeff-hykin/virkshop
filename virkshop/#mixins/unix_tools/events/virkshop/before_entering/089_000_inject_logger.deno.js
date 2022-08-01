@@ -1,3 +1,3 @@
-import { virkshop } from "./core.js"
+import { virkshop } from "../../../../../core.js"
 
 virkshop.injectUsersCommand(`logger`)
