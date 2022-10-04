@@ -1,7 +1,21 @@
 - have virkshop/enter do the basics of
     - DONE: generate the #mixture
-    - DONE: generate the .zshenv file
-    - run the nix-shell command with all the correct system dependencies
+    - DONE: generate the .zshrc file
+    - convert the system_tools.yaml into a nix file using deno
+        - convert the warehouses using the template, and concat
+        - convert the packages using the template, and concat
+        - create a javascript value to nix value converter
+            - figure out how to escape js string into a nix string
+            - recusrive method for converting objects into nix-attribute sets
+        - figure out how to escape the attribute paths for packages
+        - keep track of packages that are native build inputs or regular build inputs
+        - generate the mkshell at the end
+    - run the nix-shell command with the generated nix.shell
+    - create a proxy-object representing the ENV
+        - allow for getting and setting 
+        - import a deno.js file and watch for changes to the proxy
+        - write a temp file deno.js.sh that translates all the env changes to zsh
+        - run the zsh file
     - load all the env vars
 
 - create virkshop/after_entering
@@ -20,7 +34,7 @@
     - create `prependToEnvVar()`
     - make those functions give an error if they're executed inside the Virkshop itself (or come up with a complex system of writing to another file and having zsh source that file after every execution)
 - inline all the startup scripts
-    - generate a single .zshenv file
+    - generate a single .zshrc file
     - for each .zsh file, inline it
     - for all other files, just try running them
 - do custom work for the home mixin

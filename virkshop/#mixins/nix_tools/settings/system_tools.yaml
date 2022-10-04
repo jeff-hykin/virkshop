@@ -1,0 +1,631 @@
+# 
+# 
+# warehouses (packages come from warehouses)
+# 
+#
+- (defaultWarehouse):
+    saveAs: "!!var defaultWarehouse"
+    createWarehouseFrom:
+        tarFileUrl: &defaultWarehouseAnchor "https://github.com/NixOS/nixpkgs/archive/c82b46413401efa740a0b994f52e9903a4f6dcd5.tar.gz"
+    config: &defaultWarehouseConfig
+        allowUnfree: true
+        cudaSupport: true
+        permittedInsecurePackages: [ "openssl-1.0.2u" ]
+
+- (warehouse):
+    - config: {}
+      createWarehouseFrom: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/141439f6f11537ee349a58aaf97a5a5fc072365c.tar.gz" }
+      saveAs: "!!var warehouseWithTorch_1_8_1"
+    
+- (warehouse):
+    - config: {}
+      createWarehouseFrom: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/2cdd608fab0af07647da29634627a42852a8c97f.tar.gz" }
+      saveAs: "!!var warehouseWithNcclCudaToolkit_11_2"
+        
+- (warehouse):
+    - config: {}
+      createWarehouseFrom: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/c82b46413401efa740a0b994f52e9903a4f6dcd5.tar.gz" }
+      saveAs: "!!var warehouseForCuda"
+
+
+# 
+# 
+# compute values
+# 
+#
+# isLinux
+- (compute):
+   -  runCommand: [ "nix-shell", "--pure", "--packages", "deno", "deno eval 'console.log(JSON.stringify(Deno.build.os==\'linux\'))'", "-I", *defaultWarehouseAnchor ]
+      saveAs: "!!var isLinux"
+
+- (compute):
+   -  runCommand: [ "nix-shell", "--pure", "--packages", "deno", "deno eval 'console.log(JSON.stringify(Deno.build.os==\'darwin\'))'", "-I", *defaultWarehouseAnchor ]
+      saveAs: "!!var isMac"
+
+
+# 
+# 
+# 
+# packages
+# 
+# 
+# 
+- (package):
+    from: !!var warehouseForCuda
+    load: [ "python38",]
+    saveAs: "!!var python"
+    asBuildInput: true
+
+- (package):
+    from: !!var warehouseForCuda
+    load: [ "python38Packages",]
+    saveAs: "!!var pythonPackages"
+    asBuildInput: true
+
+- (package):
+    from: !!var pythonPackages
+    load: [ "black",]
+    asBuildInput: true
+
+- (package):
+    from: !!var pythonPackages
+    load: [ "poetry",]
+    asBuildInput: true
+
+- (package):
+    from: !!var pythonPackages
+    load: [ "setuptools",]
+    asBuildInput: true
+
+- (package):
+    from: !!var pythonPackages
+    load: [ "pybullet",]
+    onlyIf: !!var isLinux
+    asBuildInput: true
+
+- (package):
+    from: !!var pythonPackages
+    load: [ "pyopengl",]
+    onlyIf: !!var isLinux
+    asBuildInput: true
+
+- (package):
+    from: !!var pythonPackages
+    load: [ "pip",]
+    asBuildInput: true
+
+- (package):
+    from: !!var pythonPackages
+    load: [ "virtualenv",]
+    asBuildInput: true
+
+- (package):
+    from: !!var pythonPackages
+    load: [ "wheel",]
+    asBuildInput: true
+
+
+# the newer version of shap is broken for some reason so this links to an older one
+- (package):
+    from: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/3f50332bc4913a56ad216ca01f5d0bd24277a6b2.tar.gz" }
+    load: [ "python38Packages", "shap",]
+    asBuildInput: true
+
+# 
+# pytorch needs cuda, so its got a lot of extra work
+# 
+- (package):
+    onlyIf: !!var isLinux
+    from: !!var warehouseForCuda
+    load: [ "cudaPackages", "cudatoolkit_11_2" ]
+    saveAs: "!!var cudatoolkit"
+    asBuildInput: true
+
+- (package):
+    onlyIf: !!var isLinux
+    from: !!var warehouseWithNcclCudaToolkit_11_2
+    load: [ "nccl_cudatoolkit_11" ]
+    saveAs: "!!var nccl"
+
+- (package):
+    onlyIf: !!var isLinux
+    from: !!var warehouseForCuda
+    load: [ "cudnn_cudatoolkit_11_2" ]
+    saveAs: "!!var cudnn"
+    asBuildInput: true
+
+- (package):
+    onlyIf: !!var isLinux
+    from: !!var warehouseForCuda
+    load: [ "magma" ]
+    override: { "cudatoolkit": !!var cudatoolkit }
+    saveAs: "!!var magma"
+
+- (package):
+    onlyIf: !!var isLinux
+    from: !!var warehouseForCuda
+    load: [ "linuxPackages", "nvidia_x11" ]
+    override: {
+        "cudaSupport": true,
+        "cudatoolkit": !!var cudatoolkit,
+        "cudnn": !!var cudnn,
+        "nccl": !!var nccl,
+        "magma": !!var magma
+    }
+    saveAs: "!!var nvidiaX11"
+    asBuildInput: true
+
+- (package):
+    onlyIf: !!var isLinux
+    from: !!var pythonPackages
+    load: [ "pytorchWithCuda" ]
+    override: {
+        "cudaSupport": true,
+        "cudatoolkit": !!var cudatoolkit,
+        "cudnn": !!var cudnn,
+        "nccl": !!var nccl,
+        "magma": !!var magma
+    }
+    saveAs: "!!var pytorch"
+    asBuildInput: true
+
+# 
+# project system packages
+# 
+- (package):
+    onlyIf: !!var isLinux
+    saveAs: "!!var nvidiaDocker"
+    load: [ "nvidia-docker",]
+    from: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/860b56be91fb874d48e23a950815969a7b832fbc.tar.gz" }
+    asBuildInput: true
+
+- (package):
+    load: [ "geos",] # for carla_env
+    asNativeBuildInput: true
+
+- (package):
+    load: [ "zellij",]
+    asBuildInput: true
+
+- (package):
+    load: [ "git-subrepo",]
+    asBuildInput: true
+
+- (package):
+    load: [ "llvmPackages","openmp",]
+    asBuildInput: true # for carla
+
+- (package):
+    load: [ "xdg-user-dirs",]
+    asBuildInput: true # for carla
+
+- (package):
+    load: [ "xdg-utils",]
+    asBuildInput: true # for carla
+
+- (package):
+    load: [ "xorg", "xhost",]
+    asBuildInput: true # for carla
+
+- (package):
+    load: [ "freetype",]
+    asBuildInput: true
+
+- (package):
+    load: [ "swig",]
+    asBuildInput: true
+
+- (package):
+    load: [ "mpi",] # for the spinningup AI repo 
+    asBuildInput: true
+
+- (package):
+    load: [ "curl",]
+    asBuildInput: true
+
+# 
+# Nvidia
+# 
+- (package):
+    onlyIf: !!var isLinux
+    from: { tarFileUrl: "https://github.com/guibou/nixGL/archive/17658df1e17a64bc23ee5c93cfa9e8b663a4ac81.tar.gz" }
+    load: [ "auto", "nixGLNvidia", ]
+    asBuildInput: true
+
+# 
+# for .so errors on linux with opencv+ffmpeg
+# 
+
+- (package):
+    onlyIf: !!var isLinux
+    from: !!var warehouseForCuda
+    load: [ "glib",]
+    asNativeBuildInput: true
+    asBuildInput: true
+
+- (package):
+    onlyIf: !!var isLinux
+    load: [ "libglvnd",]
+    from: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/559cf76fa3642106d9f23c9e845baf4d354be682.tar.gz" }
+    asNativeBuildInput: true
+
+# 
+# 
+# 
+# Need-to-build-from-source tools
+#
+# 
+# 
+# Note: most projects need these, 
+# and if you need them for one project nix has a shared-memory across projects
+# comment these out in a situation such as deploying a project to a minimal server
+
+# 
+# Linux
+# 
+- (package):
+    onlyIf: !!var isLinux
+    load: [ "pkgconfig",]
+    asNativeBuildInput: true
+
+- (package):
+    onlyIf: !!var isLinux
+    load: [ "libconfig",]
+    asNativeBuildInput: true
+
+- (package):
+    onlyIf: !!var isLinux
+    load: [ "cmake",]
+    asNativeBuildInput: true
+
+- (package):
+    onlyIf: !!var isLinux
+    load: [ "stdenv", "cc",]
+    asBuildInput: true
+
+# 
+# Mac
+# 
+- (package):
+    onlyIf: !!var isMac
+    load: [ "xcbuild",]
+    asNativeBuildInput: true
+
+- (package):
+    onlyIf: !!var isMac
+    load: [ "xcodebuild",]
+    asNativeBuildInput: true
+
+- (package):
+    onlyIf: !!var isMac
+    load: [ "darwin", "libobjc", ]
+    asNativeBuildInput: true
+
+- (package):
+    onlyIf: !!var isMac
+    load: [ "darwin", "apple_sdk", "frameworks", "CoreServices" ]
+    asNativeBuildInput: true
+
+- (package):
+    onlyIf: !!var isMac
+    load: [ "darwin", "apple_sdk", "frameworks", "CoreFoundation" ]
+    asNativeBuildInput: true
+
+- (package):
+    onlyIf: !!var isMac
+    load: [ "darwin", "apple_sdk", "frameworks", "Foundation" ]
+    asNativeBuildInput: true
+
+- (package):
+    onlyIf: !!var isMac
+    load: [ "darwin", "apple_sdk", "frameworks", "AVKit" ]
+    asNativeBuildInput: true
+
+- (package):
+    onlyIf: !!var isMac
+    load: [ "darwin", "apple_sdk", "frameworks", "AppKit" ]
+    asNativeBuildInput: true
+
+- (package):
+    onlyIf: !!var isMac
+    load: [ "darwin", "apple_sdk", "frameworks", "WebKit" ]
+    asNativeBuildInput: true
+
+- (package):
+    onlyIf: !!var isMac
+    load: [ "darwin", "apple_sdk", "frameworks", "Accounts" ]
+    asNativeBuildInput: true
+
+- (package):
+    onlyIf: !!var isMac
+    load: [ "darwin", "apple_sdk", "frameworks", "Security" ]
+    asNativeBuildInput: true
+
+# 
+# both often need
+# 
+- (package):
+    load: [ "gcc",]
+    asBuildInput: true
+
+- (package):
+    load: [ "libkrb5",]
+    asBuildInput: true
+
+# 
+# 
+# common dependencies
+# 
+# 
+- (package):
+    load: [ "fd",]
+    asBuildInput: true
+
+- (package):
+    load: [ "ncurses5",]
+    asBuildInput: true
+
+- (package):
+    load: [ "openssh",]
+    asBuildInput: true
+
+- (package):
+    load: [ "sd",]
+    asBuildInput: true
+
+- (package):
+    load: [ "dua",]
+    asBuildInput: true
+
+- (package):
+    load: [ "tealdeer",]
+    asBuildInput: true
+
+- (package):
+    load: [ "bottom",]
+    asBuildInput: true
+
+- (package):
+    load: [ "exa",]
+    asBuildInput: true
+
+- (package):
+    load: [ "zsh",]
+    asBuildInput: true
+
+- (package):
+    load: [ "zsh-syntax-highlighting",]
+    asBuildInput: true
+
+- (package):
+    load: [ "oh-my-zsh",]
+    asBuildInput: true
+
+- (package):
+    load: [ "zsh-autosuggestions",]
+    asBuildInput: true
+
+- (package):
+    load: [ "spaceship-prompt",]
+    asBuildInput: true
+
+- (package):
+    load: [ "nnn",]
+    asBuildInput: true
+
+- (package):
+    onlyIf: !!var isLinux
+    load: [ "pkgconfig",]
+    asNativeBuildInput: true
+
+- (package):
+    onlyIf: !!var isLinux
+    load: [ "libconfig",]
+    asNativeBuildInput: true
+
+- (package):
+    onlyIf: !!var isLinux
+    load: [ "cmake",]
+    asNativeBuildInput: true
+
+- (package):
+    onlyIf: !!var isLinux
+    load: [ "libGLU",]
+    asBuildInput: true
+
+- (package):
+    onlyIf: !!var isLinux
+    load: [ "xvfb-run",]
+    asBuildInput: true
+
+- (package):
+    onlyIf: !!var isLinux
+    load: [ "stdenv", "cc",]
+    asBuildInput: true
+
+#
+#
+# Basic Commandline tools
+#
+#
+
+- (package):
+    load: [ "man",]
+    asBuildInput: true
+
+- (package):
+    load: [ "coreutils",]
+    asBuildInput: true
+
+- (package):
+    load: [ "ripgrep",]
+    asBuildInput: true
+
+- (package):
+    load: [ "which",]
+    asBuildInput: true
+
+- (package):
+    load: [ "git",]
+    asBuildInput: true
+
+- (package):
+    load: [ "colorls",]
+    asBuildInput: true
+
+- (package):
+    load: [ "tree",]
+    asBuildInput: true
+
+- (package):
+    load: [ "less",]
+    asBuildInput: true
+
+- (package):
+    load: [ "nano",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unzip",]
+    asBuildInput: true
+
+- (package):
+    load: [ "zip",]
+    asBuildInput: true
+
+- (package):
+    load: [ "findutils",]
+    asBuildInput: true
+
+- (package):
+    load: [ "wget",]
+    asBuildInput: true
+
+- (package):
+    load: [ "curl",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "arp",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "ifconfig",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "netstat",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "ping",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "route",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "col",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "column",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "fdisk",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "fsck",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "getconf",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "getent",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "getopt",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "hexdump",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "hostname",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "killall",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "locale",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "more",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "mount",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "ps",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "quota",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "script",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "sysctl",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "top",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "umount",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "whereis",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "write",]
+    asBuildInput: true
+
+- (package):
+    load: [ "unixtools", "xxd",]
+    asBuildInput: true
+
+# 
+# inner core
+# 
+- (package):
+    # keep deno pinned even if the main warehouse changes
+    from: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/c82b46413401efa740a0b994f52e9903a4f6dcd5.tar.gz" }
+    load: [ "deno",]
+    asBuildInput: true
+
+- (package):
+    load: [ "jq",]
+    asBuildInput: true
+
+- (package):
+    load: [ "nix",]
+    asBuildInput: true

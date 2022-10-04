@@ -385,7 +385,7 @@ export const createVirkshop = async (arg)=>{
                         ),
 
                         // 
-                        // create the zshenv file
+                        // create the zshrc file
                         // 
                         ((async ()=>{
                             let envVars = ""
@@ -393,10 +393,10 @@ export const createVirkshop = async (arg)=>{
                                 envVars += `export ${key}='${escapeShellArgument(value)}'\n`
                             }
                             
-                            // TODO: make sure this .zshenv only runs once per login rather than per shell
+                            // TODO: make sure this .zshrc only runs once per login rather than per shell
                             // TODO: add dynamic per-shell hooks
 
-                            let zshenvString = `
+                            let zshrcString = `
                                 # don't let zsh update itself without telling all the other packages 
                                 # instead use nix to update zsh
                                 DISABLE_AUTO_UPDATE="true"
@@ -415,13 +415,13 @@ export const createVirkshop = async (arg)=>{
                             const fileNames = Object.keys(virkshop._internal.zshSourceFiles)
                             fileNames.sort() // FIXME: should be alpha numeric, but might not be because javascript
                             for (const eachFileName of fileNames) {
-                                zshenvString += `\n${virkshop._internal.zshSourceFiles[eachFileName]}\n`
+                                zshrcString += `\n${virkshop._internal.zshSourceFiles[eachFileName]}\n`
                             }
 
-                            // write the new .zshenv file
+                            // write the new .zshrc file
                             await FileSystem.write({
-                                path: `${virkshop.pathTo.fakeHome}/.zshenv`,
-                                data: zshenvString,
+                                path: `${virkshop.pathTo.fakeHome}/.zshrc`,
+                                data: zshrcString,
                                 force: true,
                             })
                         })())
@@ -430,8 +430,10 @@ export const createVirkshop = async (arg)=>{
                     Console.env.VIRKSHOP_REAL_HOME = virkshop.pathTo.realHome
                     Console.env.HOME               = virkshop.pathTo.fakeHome
                     FileSystem.cwd                 = virkshop.pathTo.fakeHome
+
+                    // TODO: read the toml file to get the default nix hash then use -I arg in nix-shell
                     
-                    await run`nix-shell --pure --command zsh`
+                    await run`nix-shell --pure --command zsh --keep VIRKSHOP_FOLDER --keep VIRKSHOP_FAKE_HOME --keep VIRKSHOP_REAL_HOME --keep VIRKSHOP_PROJECT_FOLDER`
 
                     // TODO: call all the on_quit scripts
                 },
