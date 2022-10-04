@@ -1,6 +1,6 @@
 - have virkshop/enter do the basics of
-    - generate the #mixture
-    - generate the .zshenv file
+    - DONE: generate the #mixture
+    - DONE: generate the .zshenv file
     - run the nix-shell command with all the correct system dependencies
     - load all the env vars
 
