@@ -1,7 +1,7 @@
 import { FileSystem } from "https://deno.land/x/quickr@0.3.42/main/file_system.js"
 import { run, hasCommand, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.3.42/main/run.js"
 import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.3.42/main/console.js"
-import { findAll } from "https://deno.land/x/good@0.5.1/string.js"
+import { indent, findAll } from "https://deno.land/x/good@0.5.1/string.js"
 
 
 const escapeShellArgument = (string) => string.replace(`'`, `'"'"'`)
@@ -485,4 +485,204 @@ function pathOfCaller() {
     }
     // if in an interpreter
     return Deno.cwd()
+}
+
+
+import { Type } from "https://deno.land/std@0.82.0/encoding/_yaml/type.ts"
+import * as yaml from "https://deno.land/std@0.82.0/encoding/yaml.ts";
+
+class NixVar {
+    name = null
+}
+
+const nixVarSupport = new Type("tag:yaml.org,2002:var", {
+    kind: "scalar",
+    predicate: function javascriptValueisNixVar(object) {
+        return object instanceof NixVar
+    },
+    resolve: function yamlNodeIsValidNixVar(data) {
+        if (typeof data !== 'string') return false
+        if (data.length === 0) return false
+        
+        data = data.trim()
+        // if its a variable name
+        if (data.match(/^ *\b[a-zA-Z_][a-zA-Z_0-9]*\b *$/)) {
+            return true
+        } else {
+            return false
+        }
+    },
+    construct: function createJavasriptValueFromYamlString(data) {
+        const nixVar = new NixVar()
+        nixVar.name = data.trim()
+        return nixVar
+    },
+    represent: function nixVarValueToYamlString(object /*, style*/) {
+        return object.name
+    },
+})
+
+// hack it into the default schema (cause .extend() isnt available)
+yaml.DEFAULT_SCHEMA.explicit.push(nixVarSupport)
+yaml.DEFAULT_SCHEMA.compiledTypeMap.fallback["tag:yaml.org,2002:var"] = nixVarSupport
+yaml.DEFAULT_SCHEMA.compiledTypeMap.scalar["tag:yaml.org,2002:var"] = nixVarSupport
+
+export const escapeNixString = (string)=>{
+    return `"${string.replace(/\$\{|[\\"]/g, '\\$&').replace(/\u0000/g, '\\0')}"`
+}
+
+export const escapeNixObject = (obj)=> {
+    const objectType = typeof obj
+    if (obj == null) {
+        return `null`
+    } else if (objectType == 'boolean') {
+        return `${obj}`
+    } else if (objectType == 'number') {
+        // Infinity or Nan
+        if (obj !== obj || obj+1 === obj) {
+            return `"${obj}"`
+        // floats and decimals
+        } else {
+            return `${obj}`
+        }
+    } else if (objectType == 'string') {
+        return escapeNixString(obj)
+    } else if (obj instanceof Object) {
+        // 
+        // Variable
+        // 
+        if (obj instanceof NixVar) {
+            return obj.name
+        // 
+        // Array
+        // 
+        } else if (obj instanceof Array) {
+            if (obj.length == 0) {
+                return `[]`
+            } else {
+                return `[\n${
+                    obj.map(
+                        each=>indent({string:escapeNixObject(each)})
+                    ).join("\n")
+                }]`
+            }
+        // 
+        // Plain Object
+        // 
+        } else {
+            const entries = Object.entries(obj)
+            if (entries.length == 0) {
+                return `{}`
+            } else {
+                let string = "{\n"
+                for (const [key, value] of entries) {
+                    const valueAsString = escapeNixObject(value)
+                    const valueIsSingleLine = !valueAsString.match(/\n/)
+                    if (valueIsSingleLine) {
+                        string += indent({
+                            string: `${escapeNixObject(key)} = ${escapeNixObject(value)};`
+                        }) + "\n"
+                    } else {
+                        string += indent({
+                            string: `${escapeNixObject(key)} = (\n${
+                                indent({
+                                    string: escapeNixObject(value)
+                                })
+                            });`
+                        })+"\n"
+                    }
+                }
+                string += "}"
+                return string
+            }
+        }
+    // } else { // TODO: add regex support (hard because of escaping)
+    } else {
+        throw Error(`Unable to convert this value to a Nix representation: ${obj}`)
+    }
+}
+
+export const yamlToNix = function(yamlString) {
+    const dataStructure = yaml.parse(yamlString, {schema: yaml.DEFAULT_SCHEMA,},)
+    let indentLevel = 3
+    let nixCode = ``
+    const varNames = []
+    const buildInputs = []
+    const nativeBuildInputs = []
+    for (const eachEntry of dataStructure) {
+        const kind = Object.keys(eachEntry)[0]
+        if (kind == "(defaultWarehouse)") {
+            const values = eachEntry[kind]
+            // saveAs: "!!var defaultWarehouse"
+            // createWarehouseFrom:
+            //     tarFileUrl: &defaultWarehouseAnchor "https://github.com/NixOS/nixpkgs/archive/c82b46413401efa740a0b994f52e9903a4f6dcd5.tar.gz"
+            // config: &defaultWarehouseConfig
+            //     allowUnfree: true
+            //     cudaSupport: true
+            //     permittedInsecurePackages: [ "openssl-1.0.2u" ]
+
+            const varName = values.saveAs.replace(/!!var +/,"")
+            const nixCommitHash = values.createWarehouseFrom.nixCommitHash
+            const tarFileUrl = values.createWarehouseFrom.tarFileUrl || `https://github.com/NixOS/nixpkgs/archive/${nixCommitHash}.tar.gz`
+            varNames.push(varName)
+            const template = `
+                ${varName} = (core.import
+                        (core.fetchTarball
+                            ({url=${JSON.stringify(tarFileUrl)};})
+                        )
+                        ({
+                            config = CONFIG_HERE;
+                        })
+                    );
+            `
+            
+        } else if (kind == "(warehouse)") {
+
+        } else if (kind == "(compute)") {
+
+        } else if (kind == "(package)") {
+            
+        }
+    }
+    
+    nixCode = `
+        let
+            #
+            # create a standard library for convienience 
+            # 
+            frozenStd = (builtins.import 
+                (builtins.fetchTarball
+                    ({url="https://github.com/NixOS/nixpkgs/archive/8917ffe7232e1e9db23ec9405248fd1944d0b36f.tar.gz";})
+                )
+                ({})
+            );
+            __core__ = (frozenStd.lib.mergeAttrs
+                (frozenStd.lib.mergeAttrs
+                    (frozenStd.buildPackages) # <- for fetchFromGitHub, installShellFiles, getAttrFromPath, etc 
+                    (frozenStd.lib.mergeAttrs
+                        ({ stdenv = frozenStd.stdenv; })
+                        (frozenStd.lib) # <- for mergeAttrs, optionals, getAttrFromPath, etc 
+                    )
+                )
+                (builtins) # <- for import, fetchTarball, etc 
+            );
+        in
+            __core__.mkShell {
+                # inside that shell, make sure to use these packages
+                buildInputs =  [
+                    
+                ];
+                
+                nativeBuildInputs = [
+                    
+                ];
+                
+                # run some bash code before starting up the shell
+                shellHook = ''
+                    
+                    
+                    
+                '';
+            }
+`
 }

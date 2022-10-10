@@ -19,4 +19,20 @@ let
         (builtins) # <- for import, fetchTarball, etc 
     );
 in
-    core
+    core.mkShell {
+        # inside that shell, make sure to use these packages
+        buildInputs =  [
+            
+        ];
+        
+        nativeBuildInputs = [
+            
+        ];
+        
+        # run some bash code before starting up the shell
+        shellHook = ''
+            
+            
+            
+        '';
+    }
