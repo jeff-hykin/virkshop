@@ -1,6 +1,6 @@
-import { FileSystem } from "https://deno.land/x/quickr@0.3.42/main/file_system.js"
-import { run, hasCommand, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.3.42/main/run.js"
-import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.3.42/main/console.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.3.44/main/file_system.js"
+import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.3.44/main/run.js"
+import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.3.44/main/console.js"
 import { indent, findAll } from "https://deno.land/x/good@0.5.1/string.js"
 
 
@@ -495,6 +495,7 @@ class NixVar {
     name = null
 }
 
+const validVariableNameRegex = /^ *\b[a-zA-Z_][a-zA-Z_0-9]*\b *$/
 const nixVarSupport = new Type("tag:yaml.org,2002:var", {
     kind: "scalar",
     predicate: function javascriptValueisNixVar(object) {
@@ -506,7 +507,7 @@ const nixVarSupport = new Type("tag:yaml.org,2002:var", {
         
         data = data.trim()
         // if its a variable name
-        if (data.match(/^ *\b[a-zA-Z_][a-zA-Z_0-9]*\b *$/)) {
+        if (data.match(validVariableNameRegex)) {
             return true
         } else {
             return false
@@ -524,8 +525,8 @@ const nixVarSupport = new Type("tag:yaml.org,2002:var", {
 
 // hack it into the default schema (cause .extend() isnt available)
 yaml.DEFAULT_SCHEMA.explicit.push(nixVarSupport)
-yaml.DEFAULT_SCHEMA.compiledTypeMap.fallback["tag:yaml.org,2002:var"] = nixVarSupport
-yaml.DEFAULT_SCHEMA.compiledTypeMap.scalar["tag:yaml.org,2002:var"] = nixVarSupport
+yaml.DEFAULT_SCHEMA.compiledTypeMap.fallback["tag:yaml.org,2002:nix"] = nixVarSupport
+yaml.DEFAULT_SCHEMA.compiledTypeMap.scalar["tag:yaml.org,2002:nix"] = nixVarSupport
 
 export const escapeNixString = (string)=>{
     return `"${string.replace(/\$\{|[\\"]/g, '\\$&').replace(/\u0000/g, '\\0')}"`
@@ -605,43 +606,92 @@ export const escapeNixObject = (obj)=> {
 export const yamlToNix = function(yamlString) {
     const dataStructure = yaml.parse(yamlString, {schema: yaml.DEFAULT_SCHEMA,},)
     let indentLevel = 3
-    let nixCode = ``
+    let nixCode = `
+        let
+    `
     const varNames = []
     const buildInputs = []
     const nativeBuildInputs = []
+    let defaultWarehouseName = ""
+    const computedValues = {}
     for (const eachEntry of dataStructure) {
         const kind = Object.keys(eachEntry)[0]
-        if (kind == "(defaultWarehouse)") {
+        // 
+        // (warehouse)
+        // 
+        if (kind == "(defaultWarehouse)" || kind == "(warehouse)") {
+            // 
+            // make sure defaultWarehouse is defined first, and that theres only one
+            // 
+            if (kind == "(defaultWarehouse)") {
+                if (defaultWarehouse) {
+                    throw Error(`Looks like (defaultWarehouse) is getting defined twice. Please check the yaml file to make sure theres only one (defaultWarehouse)`)
+                }
+            } else {
+                if (!defaultWarehouseName) {
+                    throw Error(`I see a warehouse being added, but the defaultWarehouse hasn't been defined yet. Please define one, its the same structure as a warehouse but with "(defaultWarehouse)" as the name`)
+                }
+            }
             const values = eachEntry[kind]
-            // saveAs: "!!var defaultWarehouse"
             // createWarehouseFrom:
             //     tarFileUrl: &defaultWarehouseAnchor "https://github.com/NixOS/nixpkgs/archive/c82b46413401efa740a0b994f52e9903a4f6dcd5.tar.gz"
-            // config: &defaultWarehouseConfig
-            //     allowUnfree: true
-            //     cudaSupport: true
-            //     permittedInsecurePackages: [ "openssl-1.0.2u" ]
+            // arguments:
+            //     config:
+            //         allowUnfree: true
+            //         cudaSupport: true
+            //         permittedInsecurePackages: [ "openssl-1.0.2u" ]
+            // saveAs: "!!nix defaultWarehouse"
 
-            const varName = values.saveAs.replace(/!!var +/,"")
+            const varName = values.saveAs.replace(/!!nix +/,"")
             const nixCommitHash = values.createWarehouseFrom.nixCommitHash
             const tarFileUrl = values.createWarehouseFrom.tarFileUrl || `https://github.com/NixOS/nixpkgs/archive/${nixCommitHash}.tar.gz`
+            const warehouseArguments = values.arguments || {}
             varNames.push(varName)
-            const template = `
+            nixCode += `
                 ${varName} = (core.import
                         (core.fetchTarball
                             ({url=${JSON.stringify(tarFileUrl)};})
                         )
-                        ({
-                            config = CONFIG_HERE;
-                        })
+                        (\n${indent({ string: escapeNixObject(warehouseArguments), by: "                        " })})
                     );
             `
-            
-        } else if (kind == "(warehouse)") {
-
+            // save defaultWarehouse name
+            if (kind == "(defaultWarehouse)") {
+                defaultWarehouse = varName
+            }
+        // 
+        // (compute)
+        // 
         } else if (kind == "(compute)") {
-
+            // - (compute):
+            //     runCommand: [ "nix-shell", "--pure", "--packages", "deno", "deno eval 'console.log(JSON.stringify(Deno.build.os==\'darwin\'))'", "-I", *defaultWarehouseAnchor ]
+            //     saveAs: "!!nix isMac"
+            const values = eachEntry[kind]
+            const varName = values.saveAs.replace(/!!nix +/,"")
+            // TODO: make sure everything in the runCommand is a string
+            let resultAsJson
+            try {
+                resultAsJson = await run(...values.runCommmand, Out(returnAsString))
+            } catch (error) {
+                throw Error(`There was an error when trying to run this command: ${values.runCommmand}\nMake sure you only use "nix-shell" since that is the only command that is guaranteed to exist`)
+            }
+            let resultAsValue
+            try {
+                resultAsValue = JSON.parse(resultAsJson)
+            } catch (error) {
+                throw Error(`There was an error with the output of this command: ${values.runCommmand}\nThe output needs to be a valid JSON string, but there was an error while parsing the string: ${error}`)
+            }
+            computedValues[varNames] = resultAsValue
+            varNames.push(varName)
+            nixCode += `
+                ${varName} = (\n${indent({ string: escapeNixObject(warehouseArguments), by: "                        " })});
+            `
+        // 
+        // (package)
+        // 
         } else if (kind == "(package)") {
-            
+            const values = eachEntry[kind]
+            if ()
         }
     }
     
@@ -684,5 +734,5 @@ export const yamlToNix = function(yamlString) {
                     
                 '';
             }
-`
+        `
 }
