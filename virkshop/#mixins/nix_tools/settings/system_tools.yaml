@@ -4,7 +4,7 @@
 # 
 #
 - (defaultWarehouse):
-    saveAs: "!!nix defaultWarehouse"
+    saveAs: "defaultWarehouse"
     createWarehouseFrom:
         tarFileUrl: &defaultWarehouseAnchor "https://github.com/NixOS/nixpkgs/archive/c82b46413401efa740a0b994f52e9903a4f6dcd5.tar.gz"
     arguments:
@@ -14,22 +14,22 @@
             permittedInsecurePackages: [ "openssl-1.0.2u" ]
 
 - (warehouse):
+    saveAs: "warehouseWithTorch_1_8_1"
     createWarehouseFrom: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/141439f6f11537ee349a58aaf97a5a5fc072365c.tar.gz" }
     arguments:
         config: {}
-    saveAs: "!!nix warehouseWithTorch_1_8_1"
     
 - (warehouse):
+    saveAs: "warehouseWithNcclCudaToolkit_11_2"
     createWarehouseFrom: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/2cdd608fab0af07647da29634627a42852a8c97f.tar.gz" }
     arguments:
         config: {}
-    saveAs: "!!nix warehouseWithNcclCudaToolkit_11_2"
         
 - (warehouse):
+    saveAs: "warehouseForCuda"
     createWarehouseFrom: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/c82b46413401efa740a0b994f52e9903a4f6dcd5.tar.gz" }
     arguments:
         config: {}
-    saveAs: "!!nix warehouseForCuda"
 
 
 # 
@@ -39,12 +39,15 @@
 #
 # isLinux
 - (compute):
-    runCommand: [ "nix-shell", "--pure", "--packages", "deno", "deno eval 'console.log(JSON.stringify(Deno.build.os==\'linux\'))'", "-I", *defaultWarehouseAnchor ]
-    saveAs: "!!nix isLinux"
+    runCommand: [ "deno", "eval", "console.log(JSON.stringify(Deno.build.os=='linux'))" ]
+    withPackages: [ "deno" ]
+    saveAs: isLinux
 
 - (compute):
     runCommand: [ "nix-shell", "--pure", "--packages", "deno", "deno eval 'console.log(JSON.stringify(Deno.build.os==\'darwin\'))'", "-I", *defaultWarehouseAnchor ]
-    saveAs: "!!nix isMac"
+    withPackages: [ "deno" ]
+    fromWarehouse: !!warehouse warehouseForCuda
+    saveAs: isMac
 
 
 # 
@@ -55,56 +58,56 @@
 # 
 # 
 - (package):
-    from: !!nix warehouseForCuda
+    from: !!warehouse warehouseForCuda
     load: [ "python38",]
-    saveAs: "!!nix python"
+    saveAs: "python"
     asBuildInput: true
 
 - (package):
-    from: !!nix warehouseForCuda
+    from: !!warehouse warehouseForCuda
     load: [ "python38Packages",]
-    saveAs: "!!nix pythonPackages"
+    saveAs: "pythonPackages"
     asBuildInput: true
 
 - (package):
-    from: !!nix pythonPackages
+    from: !!warehouse pythonPackages
     load: [ "black",]
     asBuildInput: true
 
 - (package):
-    from: !!nix pythonPackages
+    from: !!warehouse pythonPackages
     load: [ "poetry",]
     asBuildInput: true
 
 - (package):
-    from: !!nix pythonPackages
+    from: !!warehouse pythonPackages
     load: [ "setuptools",]
     asBuildInput: true
 
 - (package):
-    from: !!nix pythonPackages
+    from: !!warehouse pythonPackages
     load: [ "pybullet",]
-    onlyIf: !!nix isLinux
+    onlyIf: !!computed isLinux
     asBuildInput: true
 
 - (package):
-    from: !!nix pythonPackages
+    from: !!warehouse pythonPackages
     load: [ "pyopengl",]
-    onlyIf: !!nix isLinux
+    onlyIf: !!computed isLinux
     asBuildInput: true
 
 - (package):
-    from: !!nix pythonPackages
+    from: !!warehouse pythonPackages
     load: [ "pip",]
     asBuildInput: true
 
 - (package):
-    from: !!nix pythonPackages
+    from: !!warehouse pythonPackages
     load: [ "virtualenv",]
     asBuildInput: true
 
 - (package):
-    from: !!nix pythonPackages
+    from: !!warehouse pythonPackages
     load: [ "wheel",]
     asBuildInput: true
 
@@ -119,35 +122,35 @@
 # pytorch needs cuda, so its got a lot of extra work
 # 
 - (package):
-    onlyIf: !!nix isLinux
-    from: !!nix warehouseForCuda
+    onlyIf: !!computed isLinux
+    from: !!warehouse warehouseForCuda
     load: [ "cudaPackages", "cudatoolkit_11_2" ]
-    saveAs: "!!nix cudatoolkit"
+    saveAs: "cudatoolkit"
     asBuildInput: true
 
 - (package):
-    onlyIf: !!nix isLinux
-    from: !!nix warehouseWithNcclCudaToolkit_11_2
+    onlyIf: !!computed isLinux
+    from: !!warehouse warehouseWithNcclCudaToolkit_11_2
     load: [ "nccl_cudatoolkit_11" ]
-    saveAs: "!!nix nccl"
+    saveAs: "nccl"
 
 - (package):
-    onlyIf: !!nix isLinux
-    from: !!nix warehouseForCuda
+    onlyIf: !!computed isLinux
+    from: !!warehouse warehouseForCuda
     load: [ "cudnn_cudatoolkit_11_2" ]
-    saveAs: "!!nix cudnn"
+    saveAs: "cudnn"
     asBuildInput: true
 
 - (package):
-    onlyIf: !!nix isLinux
-    from: !!nix warehouseForCuda
+    onlyIf: !!computed isLinux
+    from: !!warehouse warehouseForCuda
     load: [ "magma" ]
     override: { "cudatoolkit": !!nix cudatoolkit }
-    saveAs: "!!nix magma"
+    saveAs: "magma"
 
 - (package):
-    onlyIf: !!nix isLinux
-    from: !!nix warehouseForCuda
+    onlyIf: !!computed isLinux
+    from: !!warehouse warehouseForCuda
     load: [ "linuxPackages", "nvidia_x11" ]
     override: {
         "cudaSupport": true,
@@ -156,12 +159,12 @@
         "nccl": !!nix nccl,
         "magma": !!nix magma
     }
-    saveAs: "!!nix nvidiaX11"
+    saveAs: "nvidiaX11"
     asBuildInput: true
 
 - (package):
-    onlyIf: !!nix isLinux
-    from: !!nix pythonPackages
+    onlyIf: !!computed isLinux
+    from: !!warehouse pythonPackages
     load: [ "pytorchWithCuda" ]
     override: {
         "cudaSupport": true,
@@ -170,15 +173,15 @@
         "nccl": !!nix nccl,
         "magma": !!nix magma
     }
-    saveAs: "!!nix pytorch"
+    saveAs: "pytorch"
     asBuildInput: true
 
 # 
 # project system packages
 # 
 - (package):
-    onlyIf: !!nix isLinux
-    saveAs: "!!nix nvidiaDocker"
+    onlyIf: !!computed isLinux
+    saveAs: "nvidiaDocker"
     load: [ "nvidia-docker",]
     from: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/860b56be91fb874d48e23a950815969a7b832fbc.tar.gz" }
     asBuildInput: true
@@ -231,7 +234,7 @@
 # Nvidia
 # 
 - (package):
-    onlyIf: !!nix isLinux
+    onlyIf: !!computed isLinux
     from: { tarFileUrl: "https://github.com/guibou/nixGL/archive/17658df1e17a64bc23ee5c93cfa9e8b663a4ac81.tar.gz" }
     load: [ "auto", "nixGLNvidia", ]
     asBuildInput: true
@@ -241,14 +244,14 @@
 # 
 
 - (package):
-    onlyIf: !!nix isLinux
-    from: !!nix warehouseForCuda
+    onlyIf: !!computed isLinux
+    from: !!warehouse warehouseForCuda
     load: [ "glib",]
     asNativeBuildInput: true
     asBuildInput: true
 
 - (package):
-    onlyIf: !!nix isLinux
+    onlyIf: !!computed isLinux
     load: [ "libglvnd",]
     from: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/559cf76fa3642106d9f23c9e845baf4d354be682.tar.gz" }
     asNativeBuildInput: true
@@ -268,22 +271,22 @@
 # Linux
 # 
 - (package):
-    onlyIf: !!nix isLinux
+    onlyIf: !!computed isLinux
     load: [ "pkgconfig",]
     asNativeBuildInput: true
 
 - (package):
-    onlyIf: !!nix isLinux
+    onlyIf: !!computed isLinux
     load: [ "libconfig",]
     asNativeBuildInput: true
 
 - (package):
-    onlyIf: !!nix isLinux
+    onlyIf: !!computed isLinux
     load: [ "cmake",]
     asNativeBuildInput: true
 
 - (package):
-    onlyIf: !!nix isLinux
+    onlyIf: !!computed isLinux
     load: [ "stdenv", "cc",]
     asBuildInput: true
 
@@ -291,57 +294,57 @@
 # Mac
 # 
 - (package):
-    onlyIf: !!nix isMac
+    onlyIf: !!computed isMac
     load: [ "xcbuild",]
     asNativeBuildInput: true
 
 - (package):
-    onlyIf: !!nix isMac
+    onlyIf: !!computed isMac
     load: [ "xcodebuild",]
     asNativeBuildInput: true
 
 - (package):
-    onlyIf: !!nix isMac
+    onlyIf: !!computed isMac
     load: [ "darwin", "libobjc", ]
     asNativeBuildInput: true
 
 - (package):
-    onlyIf: !!nix isMac
+    onlyIf: !!computed isMac
     load: [ "darwin", "apple_sdk", "frameworks", "CoreServices" ]
     asNativeBuildInput: true
 
 - (package):
-    onlyIf: !!nix isMac
+    onlyIf: !!computed isMac
     load: [ "darwin", "apple_sdk", "frameworks", "CoreFoundation" ]
     asNativeBuildInput: true
 
 - (package):
-    onlyIf: !!nix isMac
+    onlyIf: !!computed isMac
     load: [ "darwin", "apple_sdk", "frameworks", "Foundation" ]
     asNativeBuildInput: true
 
 - (package):
-    onlyIf: !!nix isMac
+    onlyIf: !!computed isMac
     load: [ "darwin", "apple_sdk", "frameworks", "AVKit" ]
     asNativeBuildInput: true
 
 - (package):
-    onlyIf: !!nix isMac
+    onlyIf: !!computed isMac
     load: [ "darwin", "apple_sdk", "frameworks", "AppKit" ]
     asNativeBuildInput: true
 
 - (package):
-    onlyIf: !!nix isMac
+    onlyIf: !!computed isMac
     load: [ "darwin", "apple_sdk", "frameworks", "WebKit" ]
     asNativeBuildInput: true
 
 - (package):
-    onlyIf: !!nix isMac
+    onlyIf: !!computed isMac
     load: [ "darwin", "apple_sdk", "frameworks", "Accounts" ]
     asNativeBuildInput: true
 
 - (package):
-    onlyIf: !!nix isMac
+    onlyIf: !!computed isMac
     load: [ "darwin", "apple_sdk", "frameworks", "Security" ]
     asNativeBuildInput: true
 
@@ -418,32 +421,32 @@
     asBuildInput: true
 
 - (package):
-    onlyIf: !!nix isLinux
+    onlyIf: !!computed isLinux
     load: [ "pkgconfig",]
     asNativeBuildInput: true
 
 - (package):
-    onlyIf: !!nix isLinux
+    onlyIf: !!computed isLinux
     load: [ "libconfig",]
     asNativeBuildInput: true
 
 - (package):
-    onlyIf: !!nix isLinux
+    onlyIf: !!computed isLinux
     load: [ "cmake",]
     asNativeBuildInput: true
 
 - (package):
-    onlyIf: !!nix isLinux
+    onlyIf: !!computed isLinux
     load: [ "libGLU",]
     asBuildInput: true
 
 - (package):
-    onlyIf: !!nix isLinux
+    onlyIf: !!computed isLinux
     load: [ "xvfb-run",]
     asBuildInput: true
 
 - (package):
-    onlyIf: !!nix isLinux
+    onlyIf: !!computed isLinux
     load: [ "stdenv", "cc",]
     asBuildInput: true
 

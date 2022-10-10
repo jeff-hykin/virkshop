@@ -488,132 +488,266 @@ function pathOfCaller() {
 }
 
 
-import { Type } from "https://deno.land/std@0.82.0/encoding/_yaml/type.ts"
-import * as yaml from "https://deno.land/std@0.82.0/encoding/yaml.ts";
+// 
+// 
+// Yaml support
+// 
+// 
+    import { Type } from "https://deno.land/std@0.82.0/encoding/_yaml/type.ts"
+    import * as yaml from "https://deno.land/std@0.82.0/encoding/yaml.ts";
+    
+    class NixValue {}
 
-class NixVar {
-    name = null
-}
-
-const validVariableNameRegex = /^ *\b[a-zA-Z_][a-zA-Z_0-9]*\b *$/
-const nixVarSupport = new Type("tag:yaml.org,2002:var", {
-    kind: "scalar",
-    predicate: function javascriptValueisNixVar(object) {
-        return object instanceof NixVar
-    },
-    resolve: function yamlNodeIsValidNixVar(data) {
-        if (typeof data !== 'string') return false
-        if (data.length === 0) return false
-        
-        data = data.trim()
-        // if its a variable name
-        if (data.match(validVariableNameRegex)) {
-            return true
-        } else {
-            return false
+    // 
+    // !!nix support
+    // 
+        class NixVar extends NixValue {
+            name = null
         }
-    },
-    construct: function createJavasriptValueFromYamlString(data) {
-        const nixVar = new NixVar()
-        nixVar.name = data.trim()
-        return nixVar
-    },
-    represent: function nixVarValueToYamlString(object /*, style*/) {
-        return object.name
-    },
-})
 
-// hack it into the default schema (cause .extend() isnt available)
-yaml.DEFAULT_SCHEMA.explicit.push(nixVarSupport)
-yaml.DEFAULT_SCHEMA.compiledTypeMap.fallback["tag:yaml.org,2002:nix"] = nixVarSupport
-yaml.DEFAULT_SCHEMA.compiledTypeMap.scalar["tag:yaml.org,2002:nix"] = nixVarSupport
-
-export const escapeNixString = (string)=>{
-    return `"${string.replace(/\$\{|[\\"]/g, '\\$&').replace(/\u0000/g, '\\0')}"`
-}
-
-export const escapeNixObject = (obj)=> {
-    const objectType = typeof obj
-    if (obj == null) {
-        return `null`
-    } else if (objectType == 'boolean') {
-        return `${obj}`
-    } else if (objectType == 'number') {
-        // Infinity or Nan
-        if (obj !== obj || obj+1 === obj) {
-            return `"${obj}"`
-        // floats and decimals
-        } else {
-            return `${obj}`
-        }
-    } else if (objectType == 'string') {
-        return escapeNixString(obj)
-    } else if (obj instanceof Object) {
-        // 
-        // Variable
-        // 
-        if (obj instanceof NixVar) {
-            return obj.name
-        // 
-        // Array
-        // 
-        } else if (obj instanceof Array) {
-            if (obj.length == 0) {
-                return `[]`
-            } else {
-                return `[\n${
-                    obj.map(
-                        each=>indent({string:escapeNixObject(each)})
-                    ).join("\n")
-                }]`
-            }
-        // 
-        // Plain Object
-        // 
-        } else {
-            const entries = Object.entries(obj)
-            if (entries.length == 0) {
-                return `{}`
-            } else {
-                let string = "{\n"
-                for (const [key, value] of entries) {
-                    const valueAsString = escapeNixObject(value)
-                    const valueIsSingleLine = !valueAsString.match(/\n/)
-                    if (valueIsSingleLine) {
-                        string += indent({
-                            string: `${escapeNixObject(key)} = ${escapeNixObject(value)};`
-                        }) + "\n"
-                    } else {
-                        string += indent({
-                            string: `${escapeNixObject(key)} = (\n${
-                                indent({
-                                    string: escapeNixObject(value)
-                                })
-                            });`
-                        })+"\n"
-                    }
+        const validVariableNameRegex = /^ *\b[a-zA-Z_][a-zA-Z_0-9]*\b *$/
+        const nixVarSupport = new Type("tag:yaml.org,2002:nix", {
+            kind: "scalar",
+            predicate: function javascriptValueisNixVar(object) {
+                return object instanceof NixVar
+            },
+            resolve: function yamlNodeIsValidNixVar(data) {
+                if (typeof data !== 'string') return false
+                if (data.length === 0) return false
+                
+                data = data.trim()
+                // if its a variable name
+                if (data.match(validVariableNameRegex)) {
+                    return true
+                } else {
+                    return false
                 }
-                string += "}"
-                return string
-            }
-        }
-    // } else { // TODO: add regex support (hard because of escaping)
-    } else {
-        throw Error(`Unable to convert this value to a Nix representation: ${obj}`)
-    }
-}
+            },
+            construct: function createJavasriptValueFromYamlString(data) {
+                const nixVar = new NixVar()
+                nixVar.name = data.trim()
+                return nixVar
+            },
+            represent: function nixVarValueToYamlString(object /*, style*/) {
+                return object.name
+            },
+        })
 
-export const yamlToNix = function(yamlString) {
+        // hack it into the default schema (cause .extend() isnt available)
+        yaml.DEFAULT_SCHEMA.explicit.push(nixVarSupport)
+        yaml.DEFAULT_SCHEMA.compiledTypeMap.fallback["tag:yaml.org,2002:nix"] = nixVarSupport
+        yaml.DEFAULT_SCHEMA.compiledTypeMap.scalar["tag:yaml.org,2002:nix"] = nixVarSupport
+    // 
+    // !!warehouse support
+    // 
+        class WarehouseVar extends NixValue {
+            name = null
+        }
+
+        const warehouseVarSupport = new Type("tag:yaml.org,2002:warehouse", {
+            kind: "scalar",
+            predicate: function javascriptValueisNixVar(object) {
+                return object instanceof WarehouseVar
+            },
+            resolve: function yamlNodeIsValidNixVar(data) {
+                if (typeof data !== 'string') return false
+                if (data.length === 0) return false
+                
+                data = data.trim()
+                // if its a variable name
+                if (data.match(validVariableNameRegex)) {
+                    return true
+                } else {
+                    return false
+                }
+            },
+            construct: function createJavasriptValueFromYamlString(data) {
+                const nixVar = new WarehouseVar()
+                nixVar.name = data.trim()
+                return nixVar
+            },
+            represent: function nixVarValueToYamlString(object /*, style*/) {
+                return object.name
+            },
+        })
+
+        // hack it into the default schema (cause .extend() isnt available)
+        yaml.DEFAULT_SCHEMA.explicit.push(warehouseVarSupport)
+        yaml.DEFAULT_SCHEMA.compiledTypeMap.fallback["tag:yaml.org,2002:warehouse"] = warehouseVarSupport
+        yaml.DEFAULT_SCHEMA.compiledTypeMap.scalar["tag:yaml.org,2002:warehouse"] = warehouseVarSupport
+    // 
+    // !!computed support
+    // 
+        class ComputedVar extends NixValue {
+            name = null
+        }
+
+        const warehouseVarSupport = new Type("tag:yaml.org,2002:computed", {
+            kind: "scalar",
+            predicate: function javascriptValueisNixVar(object) {
+                return object instanceof ComputedVar
+            },
+            resolve: function yamlNodeIsValidNixVar(data) {
+                if (typeof data !== 'string') return false
+                if (data.length === 0) return false
+                
+                data = data.trim()
+                // if its a variable name
+                if (data.match(validVariableNameRegex)) {
+                    return true
+                } else {
+                    return false
+                }
+            },
+            construct: function createJavasriptValueFromYamlString(data) {
+                const nixVar = new ComputedVar()
+                nixVar.name = data.trim()
+                return nixVar
+            },
+            represent: function nixVarValueToYamlString(object /*, style*/) {
+                return object.name
+            },
+        })
+
+        // hack it into the default schema (cause .extend() isnt available)
+        yaml.DEFAULT_SCHEMA.explicit.push(warehouseVarSupport)
+        yaml.DEFAULT_SCHEMA.compiledTypeMap.fallback["tag:yaml.org,2002:computed"] = warehouseVarSupport
+        yaml.DEFAULT_SCHEMA.compiledTypeMap.scalar["tag:yaml.org,2002:computed"] = warehouseVarSupport
+    // 
+    // !!package support
+    // 
+        class PackageVar extends NixValue {
+            name = null
+        }
+
+        const warehouseVarSupport = new Type("tag:yaml.org,2002:package", {
+            kind: "scalar",
+            predicate: function javascriptValueisNixVar(object) {
+                return object instanceof PackageVar
+            },
+            resolve: function yamlNodeIsValidNixVar(data) {
+                if (typeof data !== 'string') return false
+                if (data.length === 0) return false
+                
+                data = data.trim()
+                // if its a variable name
+                if (data.match(validVariableNameRegex)) {
+                    return true
+                } else {
+                    return false
+                }
+            },
+            construct: function createJavasriptValueFromYamlString(data) {
+                const nixVar = new PackageVar()
+                nixVar.name = data.trim()
+                return nixVar
+            },
+            represent: function nixVarValueToYamlString(object /*, style*/) {
+                return object.name
+            },
+        })
+
+        // hack it into the default schema (cause .extend() isnt available)
+        yaml.DEFAULT_SCHEMA.explicit.push(warehouseVarSupport)
+        yaml.DEFAULT_SCHEMA.compiledTypeMap.fallback["tag:yaml.org,2002:package"] = warehouseVarSupport
+        yaml.DEFAULT_SCHEMA.compiledTypeMap.scalar["tag:yaml.org,2002:package"] = warehouseVarSupport
+
+// 
+// javascript to Nix
+// 
+    export const escapeNixString = (string)=>{
+        return `"${string.replace(/\$\{|[\\"]/g, '\\$&').replace(/\u0000/g, '\\0')}"`
+    }
+
+    export const escapeNixObject = (obj)=> {
+        const objectType = typeof obj
+        if (obj == null) {
+            return `null`
+        } else if (objectType == 'boolean') {
+            return `${obj}`
+        } else if (objectType == 'number') {
+            // Infinity or Nan
+            if (obj !== obj || obj+1 === obj) {
+                return `"${obj}"`
+            // floats and decimals
+            } else {
+                return `${obj}`
+            }
+        } else if (objectType == 'string') {
+            return escapeNixString(obj)
+        } else if (obj instanceof Object) {
+            // 
+            // Variable
+            // 
+            if (obj instanceof NixValue) {
+                return obj.name
+            // 
+            // Array
+            // 
+            } else if (obj instanceof Array) {
+                if (obj.length == 0) {
+                    return `[]`
+                } else {
+                    return `[\n${
+                        obj.map(
+                            each=>indent({string:escapeNixObject(each)})
+                        ).join("\n")
+                    }]`
+                }
+            // 
+            // Plain Object
+            // 
+            } else {
+                const entries = Object.entries(obj)
+                if (entries.length == 0) {
+                    return `{}`
+                } else {
+                    let string = "{\n"
+                    for (const [key, value] of entries) {
+                        const valueAsString = escapeNixObject(value)
+                        const valueIsSingleLine = !valueAsString.match(/\n/)
+                        if (valueIsSingleLine) {
+                            string += indent({
+                                string: `${escapeNixObject(key)} = ${escapeNixObject(value)};`
+                            }) + "\n"
+                        } else {
+                            string += indent({
+                                string: `${escapeNixObject(key)} = (\n${
+                                    indent({
+                                        string: escapeNixObject(value)
+                                    })
+                                });`
+                            })+"\n"
+                        }
+                    }
+                    string += "}"
+                    return string
+                }
+            }
+        // } else { // TODO: add regex support (hard because of escaping)
+        } else {
+            throw Error(`Unable to convert this value to a Nix representation: ${obj}`)
+        }
+    }
+
+// 
+// fornixToNix
+// 
+export const fornixToNix = async function(yamlString) {
+    // FIXME: add support for overwriting values (saveAs: python, then saveAs: python without breaking)
     const dataStructure = yaml.parse(yamlString, {schema: yaml.DEFAULT_SCHEMA,},)
     let indentLevel = 3
     let nixCode = `
         let
     `
     const varNames = []
-    const buildInputs = []
-    const nativeBuildInputs = []
+    let defaultWarehouse = null
     let defaultWarehouseName = ""
-    const computedValues = {}
+    const buildInputStrings = []
+    const nativeBuildInputStrings = []
+    const computed = {}
+    const warehouses = {}
+    const packages = {}
     for (const eachEntry of dataStructure) {
         const kind = Object.keys(eachEntry)[0]
         // 
@@ -646,6 +780,10 @@ export const yamlToNix = function(yamlString) {
             const nixCommitHash = values.createWarehouseFrom.nixCommitHash
             const tarFileUrl = values.createWarehouseFrom.tarFileUrl || `https://github.com/NixOS/nixpkgs/archive/${nixCommitHash}.tar.gz`
             const warehouseArguments = values.arguments || {}
+            warehouses[varName] = new WarehouseVar()
+            warehouses[varName].name = varName
+            warehouses[varName].tarFileUrl = tarFileUrl
+            warehouses[varName].arguments = warehouseArguments
             varNames.push(varName)
             nixCode += `
                 ${varName} = (core.import
@@ -657,7 +795,8 @@ export const yamlToNix = function(yamlString) {
             `
             // save defaultWarehouse name
             if (kind == "(defaultWarehouse)") {
-                defaultWarehouse = varName
+                defaultWarehouseName = varName
+                defaultWarehouse = warehouses[varNames]
             }
         // 
         // (compute)
@@ -667,13 +806,20 @@ export const yamlToNix = function(yamlString) {
             //     runCommand: [ "nix-shell", "--pure", "--packages", "deno", "deno eval 'console.log(JSON.stringify(Deno.build.os==\'darwin\'))'", "-I", *defaultWarehouseAnchor ]
             //     saveAs: "!!nix isMac"
             const values = eachEntry[kind]
-            const varName = values.saveAs.replace(/!!nix +/,"")
+            const varName = values.saveAs
+            const packages = values.packages
+            const whichWarehouse = values.fromWarehouse || defaultWarehouse
+            const tarFileUrl = warehouses[whichWarehouse.name].tarFileUrl // TODO: there's a lot of things that could screw up here, add checks/warnings for them
+            const escapedArguments = 'NO_COLOR=true '+values.runCommand.map(each=>`'${each.replace(`'`, `'"'"'`)}'`).join(" ")
+            const fullCommand = ["nix-shell", "--pure", "--packages", ...packages, "-I", "nixpkgs="+tarFileUrl, "--run",  escapedArguments,]
+            
             // TODO: make sure everything in the runCommand is a string
             let resultAsJson
             try {
-                resultAsJson = await run(...values.runCommmand, Out(returnAsString))
+                resultAsJson = await run(...fullCommand, Stdout(returnAsString))
+                // TODO: grab STDOUT and STDERR for better error messages
             } catch (error) {
-                throw Error(`There was an error when trying to run this command: ${values.runCommmand}\nMake sure you only use "nix-shell" since that is the only command that is guaranteed to exist`)
+                throw Error(`There was an error when trying to run this command:\n    ${fullCommand}`)
             }
             let resultAsValue
             try {
@@ -681,17 +827,67 @@ export const yamlToNix = function(yamlString) {
             } catch (error) {
                 throw Error(`There was an error with the output of this command: ${values.runCommmand}\nThe output needs to be a valid JSON string, but there was an error while parsing the string: ${error}`)
             }
-            computedValues[varNames] = resultAsValue
+            computed[varNames] = resultAsValue
             varNames.push(varName)
             nixCode += `
-                ${varName} = (\n${indent({ string: escapeNixObject(warehouseArguments), by: "                        " })});
+                ${varName} = (\n${indent({ string: escapeNixObject(resultAsValue), by: "                        " })});
             `
         // 
         // (package)
         // 
         } else if (kind == "(package)") {
+            // from: !!warehouse pythonPackages
+            // load: [ "pyopengl",]
+            // onlyIf: !!computed isLinux
+            // asBuildInput: true
             const values = eachEntry[kind]
-            if ()
+
+            // 
+            // handle onlyIf
+            // 
+            if (values.onlyIf instanceof ComputedVar) {
+                // skip if value is false
+                if (!computed[values.onlyIf]) {
+                    continue
+                }
+            } else {
+                // FIXME values.onlyIf  !!nix
+            }
+
+            
+            // 
+            // get nix-value
+            // 
+            const source = values.from || defaultWarehouse
+            const loadAttribute = values.load.map(each=>escapeNixString(each)).join(".")
+            let nixValue 
+            if (source instanceof NixValue) {
+                nixValue = ${source.name}.${loadAttribute}
+            // from a hash/url directly
+            } else {
+                // FIXME
+            }
+            
+            // 
+            // add to build inputs
+            // 
+            if (values.asBuildInput) {
+                buildInputStrings.push(nixValue)
+            }
+            if (values.asNativeBuildInput) {
+                nativeBuildInputStrings.push(nixValue)
+            }
+            
+            // 
+            // create name if needed
+            // 
+            if (values.saveAs) {
+                const varName = values.saveAs
+                varNames.push(varName)
+                nixCode += `
+                    ${varName} = ${nixValue};
+                `
+            }
         }
     }
     
