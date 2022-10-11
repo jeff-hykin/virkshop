@@ -239,7 +239,9 @@ export const createVirkshop = async (arg)=>{
                     temporary:        { get() { return `${virkshop.pathTo.mixture}/temporary` }},
                     fakeHome:         { get() { return `${virkshop.pathTo.temporary}/long_term/home` }},
                     virkshopOptions:  { get() { return `${virkshop.pathTo.settings}/virkshop/options.json` }},
-                    _passthroughData: { get() { return `${virkshop.pathTo.temporary}/short_term/virkshop/_passthroughData.json` }},
+                    systemTools:      { get() { return `${virkshop.pathTo.mixins}/nix_tools/settings/system_tools.yaml` }}, // FIXME: shouldn't reference anything inside #mixins directly
+                    _passthroughData: { get() { return `${virkshop.pathTo.temporary}/short_term/virkshop/_passthrough_data.json` }},
+                    _tempShellFile:   { get() { return `${virkshop.pathTo.temporary}/short_term/virkshop/shell.nix` }},
                 }
             ),
             structure: {
@@ -432,8 +434,14 @@ export const createVirkshop = async (arg)=>{
                     FileSystem.cwd                 = virkshop.pathTo.fakeHome
 
                     // TODO: read the toml file to get the default nix hash then use -I arg in nix-shell
-                    
-                    await run`nix-shell --pure --command zsh --keep VIRKSHOP_FOLDER --keep VIRKSHOP_FAKE_HOME --keep VIRKSHOP_REAL_HOME --keep VIRKSHOP_PROJECT_FOLDER`
+                    const yamlString = await FileSystem.read(virkshop.pathTo.systemTools)
+                    // TODO: get a hash of this and see if nix-shell should even be regenerated or not
+                    const nixShellString = await fornixToNix(yamlString)
+                    await FileSystem.write({
+                        data: nixShellString,
+                        path: virkshop.pathTo._tempShellFile,
+                    })
+                    await run`nix-shell --pure --command zsh --keep VIRKSHOP_FOLDER --keep VIRKSHOP_FAKE_HOME --keep VIRKSHOP_REAL_HOME --keep VIRKSHOP_PROJECT_FOLDER ${virkshop.pathTo._tempShellFile}`
 
                     // TODO: call all the on_quit scripts
                 },

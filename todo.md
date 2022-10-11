@@ -1,7 +1,9 @@
+
+# pre-alpha:
 - have virkshop/enter do the basics of
     - DONE: generate the #mixture
     - DONE: generate the .zshrc file
-    - convert the system_tools.yaml into a nix file using deno
+    - DONE convert the system_tools.yaml into a nix file using deno
         - convert the warehouses using the template, and concat
         - convert the packages using the template, and concat
         - create a javascript value to nix value converter
@@ -17,6 +19,12 @@
         - write a temp file deno.js.sh that translates all the env changes to zsh
         - run the zsh file
     - load all the env vars
+
+# beta
+- allow loading advanced nix code
+- cli "virkshop/install [package name]"
+
+old todo:
 
 - create virkshop/after_entering
 - have `virkshop.trigger` run/execute all the files without `.deno.js`, and async import all the files that DO have `.deno.js`
