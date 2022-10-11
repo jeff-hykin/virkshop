@@ -1,6 +1,4 @@
 # To-implement
-- all mixins (other than virkshop) will be linked into commands/, events/, etc and only removed linked items
-- generate a temp nix toml by combining all the tomls from all the mixins (or by having nix iteratively import them)
 - create/design the API for
     - marking env vars to be passed along
     - appending to env vars

@@ -215,6 +215,7 @@
 - (package):
     asBuildInput: true
     load: [ "zsh",]
+    saveAs: zsh
 
 - (package):
     asBuildInput: true

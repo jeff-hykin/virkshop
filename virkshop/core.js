@@ -239,7 +239,7 @@ export const createVirkshop = async (arg)=>{
                     settings:         { get() { return `${virkshop.pathTo.mixture}/settings` }},
                     temporary:        { get() { return `${virkshop.pathTo.mixture}/temporary` }},
                     fakeHome:         { get() { return `${virkshop.pathTo.temporary}/long_term/home` }},
-                    virkshopOptions:  { get() { return `${virkshop.pathTo.settings}/virkshop/options.json` }},
+                    virkshopOptions:  { get() { return `${virkshop.pathTo.mixins}/virkshop/settings/virkshop/options.json` }},
                     systemTools:      { get() { return `${virkshop.pathTo.settings}/system_tools.yaml` }},
                     _passthroughData: { get() { return `${virkshop.pathTo.temporary}/short_term/virkshop/_passthrough_data.json` }},
                     _tempShellFile:   { get() { return `${virkshop.pathTo.temporary}/short_term/virkshop/shell.nix` }},
@@ -439,6 +439,7 @@ export const createVirkshop = async (arg)=>{
                     Console.env.VIRKSHOP_REAL_HOME = virkshop.pathTo.realHome
                     Console.env.HOME               = virkshop.pathTo.fakeHome
                     FileSystem.cwd                 = virkshop.pathTo.fakeHome
+                    Console.env._PWD               = Console.env.PWD
                     
                     debuggingMode && console.log("    [Creating shell.nix]")
                     // TODO: read the toml file to get the default nix hash then use -I arg in nix-shell
@@ -450,7 +451,7 @@ export const createVirkshop = async (arg)=>{
                         path: virkshop.pathTo._tempShellFile,
                     })
                     debuggingMode && console.log("    [Handing control over to nix]")
-                    await run`nix-shell --pure --command zsh --keep NIX_SSL_CERT_FILE --keep VIRKSHOP_FOLDER --keep VIRKSHOP_FAKE_HOME --keep VIRKSHOP_REAL_HOME --keep VIRKSHOP_PROJECT_FOLDER ${virkshop.pathTo._tempShellFile} -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/ce6aa13369b667ac2542593170993504932eb836.tar.gz` // FIXME: use the defaultWarehouse
+                    await run`nix-shell --pure --command zsh --keep _PWD --keep NIX_SSL_CERT_FILE --keep VIRKSHOP_FOLDER --keep VIRKSHOP_FAKE_HOME --keep VIRKSHOP_REAL_HOME --keep VIRKSHOP_PROJECT_FOLDER ${virkshop.pathTo._tempShellFile} -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/ce6aa13369b667ac2542593170993504932eb836.tar.gz` // FIXME: use the defaultWarehouse
 
                     // TODO: call all the on_quit scripts
                 },
@@ -963,7 +964,8 @@ export const fornixToNix = async function(yamlString) {
             `
         }
     }
-
+    
+    // TODO: validate that all varNames are actually valid variable names 
 
     // 
     // library paths for all packages
@@ -978,9 +980,9 @@ export const fornixToNix = async function(yamlString) {
             __nixShellEscapedJsonData__ = (
                 let 
                     nixShellDataJson = (__core__.toJSON {
-                        packagePaths = {\n${indent({string:libraryPathsString, by: "                            ",})}
+                        libraryPaths = {\n${indent({string:libraryPathsString, by: "                            ",})}
                         };
-                        libraryPaths = {\n${indent({string:packagePathStrings, by: "                            ",})}
+                        packagePaths = {\n${indent({string:packagePathStrings, by: "                            ",})}
                         };
                     });
                     bashEscapedJson = (builtins.replaceStrings

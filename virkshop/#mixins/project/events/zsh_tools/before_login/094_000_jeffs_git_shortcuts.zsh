@@ -11,12 +11,16 @@ git_checkout () {
         git switch "$@"
         return 
     }
-    printf '%s' "$__temp_var__branches" | grep "$2" 2>/dev/null 1>/dev/null && {
+    # if second arg exists
+    if [ -n "$2" ]
+    then
+        printf '%s' "$__temp_var__branches" | grep "$2" 2>/dev/null 1>/dev/null && {
+            unset __temp_var__branches
+            git switch "$@"
+            return
+        }
         unset __temp_var__branches
-        git switch "$@"
-        return
-    }
-    unset __temp_var__branches
+    fi
     # 
     # otherwise use checkout
     # 
@@ -29,12 +33,32 @@ git_commit_hashes () {
 }
 
 git_log () {
-    git log --oneline
+    git log --first-parent --date=short --pretty=format:"%Cblue%ad %h%Cgreen %s %Creset%d"
 }
 
 git_current_commit_hash () {
     # https://stackoverflow.com/questions/949314/how-to-retrieve-the-hash-for-the-current-commit-in-git
     git rev-parse HEAD
+}
+
+git_oldest_commit_hash () {
+    git log --reverse --oneline | head -n1 | sed -e 's/ .*//' 
+}
+
+git_squash_all () {
+    git reset --soft $(git_oldest_commit_hash)
+}
+
+git_squash_to () {
+    commit_hash="$1"
+    commit_message="$2"
+    git reset --soft "$commit_hash" && git add -A && git commit -m "$commit_message" && echo "squash complete"
+}
+
+git_squash () {
+    args="$@"
+    git reset --soft HEAD~2 && git add -A && git commit -m "$args" && echo "squash complete"
+    git_log | head -n5
 }
 
 # 
@@ -92,6 +116,34 @@ git_keep_theirs () { # git keep theirs
     git checkout --theirs .
     git add -u
     git commit -m "_Accepting all incoming changes $@"
+}
+
+git_add_upstream () {
+    remote_name="$1"
+    remote_url="$2"
+    if [ -z "$remote_name" ]
+    then
+        echo "what should the upstream source be called?"
+        read remote_name
+    fi
+    if [ -z "$remote_url" ]
+    then
+        echo "what is the url to the upstream source?"
+        read remote_url
+    fi
+    
+    git remote add "$remote_name" "$remote_url"
+}
+
+git_change_origin () {
+    remote_url="$1"
+    if [ -z "$remote_url" ]
+    then
+        echo "what is the url to the upstream source?"
+        read remote_url
+    fi
+    # change origin
+    git remote set-url "origin" "$remote_url"
 }
 
 # 
@@ -230,34 +282,6 @@ git_steal_into_submodule () {
         __temp_var__branch_of_repo="master"
     fi
     __temp_var__branch_to_go_back_to="$(git_current_branch_name)"
-    
-    # FIXME: follow the git_steal_external_branch pattern
-    
-    # echo "#" && \
-    # echo "# adding remote as ""@$__temp_var__name_for_repo" && \
-    # echo "#" && \
-    # git remote add "@$__temp_var__name_for_repo" "$__temp_var__url_for_repo" && \
-    # echo "#" && \
-    # echo "# fetching that branch" && \
-    # echo "#" && \
-    # git fetch "@$__temp_var__name_for_repo" "$__temp_var__branch_of_repo" && \
-    # echo "#" && \
-    # echo "# creating our branch: ""@$__temp_var__name_for_repo/$__temp_var__branch_of_repo" && \
-    # echo "#" && \
-    # git checkout -b "@$__temp_var__name_for_repo/$__temp_var__branch_of_repo" "remotes/@$__temp_var__name_for_repo/$__temp_var__branch_of_repo" && \
-    # git push --set-upstream origin "@$__temp_var__name_for_repo/$__temp_var__branch_of_repo" --force && \
-    # echo "#" && \
-    # echo "# uploading their commits: ""@$__temp_var__name_for_repo/$__temp_var__branch_of_repo" && \
-    # echo "#" && \
-    # git push && \
-    # echo "#" && \
-    # echo "# switching back to original branch: $__temp_var__branch_to_go_back_to" && \
-    # echo "#" && \
-    # git checkout "$__temp_var__branch_to_go_back_to" && \
-    # echo "#" && \
-    # echo "# adding submodule: $__temp_var__path_to_submodule" && \
-    # echo "#" && \
-    # git submodule add -b "@$__temp_var__name_for_repo/$__temp_var__branch_of_repo" -- "$(git config --get remote.origin.url)" "$__temp_var__path_to_submodule"
 }
 
 # 
@@ -389,9 +413,6 @@ git_url_of_origin () {
     git config --get remote.origin.url
 }
 
-# self submodule
-# git submodule add -b jirl --name "jirl" -- https://github.com/jeff-hykin/model_racer.git ./source/jirl
-
 # 
 # short names
 # 
@@ -406,5 +427,7 @@ alias gb="git branch -a"
 alias gnb="git_new_branch"
 alias gd="git_delete_changes"
 alias gcp="git add -A;git stash"
+alias gct="git add -A;git stash"
 alias gpst="git stash pop;git add -A"
 alias gundo="git reset --soft HEAD~1"
+alias gurl="git_url_of_origin"
