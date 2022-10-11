@@ -12,7 +12,25 @@
         - figure out how to escape the attribute paths for packages
         - keep track of packages that are native build inputs or regular build inputs
         - generate the mkshell at the end
-    - run the nix-shell command with the generated nix.shell
+    - DONE run the nix-shell command with the generated nix.shell
+    - create a new fix for getting package paths
+        need to keep track of paths when generating yaml file
+        packagePathsAsJson = (main.toJSON
+            ({
+                packagePathFor = depedencyPackages;
+                libPathFor = (main.listToAttrs
+                    (main.map
+                        (each:
+                            ({
+                                name = each.name;
+                                value = "${main.makeLibraryPath [ each.value ]}";
+                            })
+                        )
+                        (tomlAndBuiltinPackagesWithSources)
+                    )
+                );
+            })
+        );
     - create a proxy-object representing the ENV
         - allow for getting and setting 
         - import a deno.js file and watch for changes to the proxy

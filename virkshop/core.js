@@ -441,7 +441,8 @@ export const createVirkshop = async (arg)=>{
                         data: nixShellString,
                         path: virkshop.pathTo._tempShellFile,
                     })
-                    await run`nix-shell --pure --command zsh --keep VIRKSHOP_FOLDER --keep VIRKSHOP_FAKE_HOME --keep VIRKSHOP_REAL_HOME --keep VIRKSHOP_PROJECT_FOLDER ${virkshop.pathTo._tempShellFile}`
+                    console.log("Starting Nix... (it takes a while the first time)")
+                    await run`nix-shell --pure --command zsh --keep NIX_SSL_CERT_FILE --keep VIRKSHOP_FOLDER --keep VIRKSHOP_FAKE_HOME --keep VIRKSHOP_REAL_HOME --keep VIRKSHOP_PROJECT_FOLDER ${virkshop.pathTo._tempShellFile} -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/ce6aa13369b667ac2542593170993504932eb836.tar.gz` // FIXME: use the defaultWarehouse
 
                     // TODO: call all the on_quit scripts
                 },
