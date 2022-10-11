@@ -4,7 +4,7 @@ import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan,
 import { indent, findAll } from "https://deno.land/x/good@0.5.1/string.js"
 
 
-const escapeShellArgument = (string) => string.replace(`'`, `'"'"'`)
+const escapeShellArgument = (string) => string.replace(/'/g, `'"'"'`)
 
 async function recursivelyFileLink({targetFolder, existingFolder}) {
     const target = await FileSystem.info(targetFolder)
@@ -582,7 +582,7 @@ function pathOfCaller() {
             name = null
         }
 
-        const warehouseVarSupport = new Type("tag:yaml.org,2002:computed", {
+        const computedVarSupport = new Type("tag:yaml.org,2002:computed", {
             kind: "scalar",
             predicate: function javascriptValueisNixVar(object) {
                 return object instanceof ComputedVar
@@ -610,9 +610,9 @@ function pathOfCaller() {
         })
 
         // hack it into the default schema (cause .extend() isnt available)
-        yaml.DEFAULT_SCHEMA.explicit.push(warehouseVarSupport)
-        yaml.DEFAULT_SCHEMA.compiledTypeMap.fallback["tag:yaml.org,2002:computed"] = warehouseVarSupport
-        yaml.DEFAULT_SCHEMA.compiledTypeMap.scalar["tag:yaml.org,2002:computed"] = warehouseVarSupport
+        yaml.DEFAULT_SCHEMA.explicit.push(computedVarSupport)
+        yaml.DEFAULT_SCHEMA.compiledTypeMap.fallback["tag:yaml.org,2002:computed"] = computedVarSupport
+        yaml.DEFAULT_SCHEMA.compiledTypeMap.scalar["tag:yaml.org,2002:computed"] = computedVarSupport
     // 
     // !!package support
     // 
@@ -620,7 +620,7 @@ function pathOfCaller() {
             name = null
         }
 
-        const warehouseVarSupport = new Type("tag:yaml.org,2002:package", {
+        const packageVarSupport = new Type("tag:yaml.org,2002:package", {
             kind: "scalar",
             predicate: function javascriptValueisNixVar(object) {
                 return object instanceof PackageVar
@@ -648,9 +648,9 @@ function pathOfCaller() {
         })
 
         // hack it into the default schema (cause .extend() isnt available)
-        yaml.DEFAULT_SCHEMA.explicit.push(warehouseVarSupport)
-        yaml.DEFAULT_SCHEMA.compiledTypeMap.fallback["tag:yaml.org,2002:package"] = warehouseVarSupport
-        yaml.DEFAULT_SCHEMA.compiledTypeMap.scalar["tag:yaml.org,2002:package"] = warehouseVarSupport
+        yaml.DEFAULT_SCHEMA.explicit.push(packageVarSupport)
+        yaml.DEFAULT_SCHEMA.compiledTypeMap.fallback["tag:yaml.org,2002:package"] = packageVarSupport
+        yaml.DEFAULT_SCHEMA.compiledTypeMap.scalar["tag:yaml.org,2002:package"] = packageVarSupport
 
 // 
 // javascript to Nix
@@ -787,10 +787,10 @@ export const fornixToNix = async function(yamlString) {
             varNames.push(varName)
             nixCode += `
                 ${varName} = (core.import
-                        (core.fetchTarball
+                        (__core__.fetchTarball
                             ({url=${JSON.stringify(tarFileUrl)};})
                         )
-                        (\n${indent({ string: escapeNixObject(warehouseArguments), by: "                        " })})
+                        (${indent({ string: escapeNixObject(warehouseArguments), by: "                        " })})
                     );
             `
             // save defaultWarehouse name
@@ -807,11 +807,16 @@ export const fornixToNix = async function(yamlString) {
             //     saveAs: "!!nix isMac"
             const values = eachEntry[kind]
             const varName = values.saveAs
-            const packages = values.packages
+            const packages = values.withPackages || []
             const whichWarehouse = values.fromWarehouse || defaultWarehouse
             const tarFileUrl = warehouses[whichWarehouse.name].tarFileUrl // TODO: there's a lot of things that could screw up here, add checks/warnings for them
-            const escapedArguments = 'NO_COLOR=true '+values.runCommand.map(each=>`'${each.replace(`'`, `'"'"'`)}'`).join(" ")
+            const escapedArguments = 'NO_COLOR=true '+values.runCommand.map(each=>`'${escapeShellArgument(each)}'`).join(" ")
             const fullCommand = ["nix-shell", "--pure", "--packages", ...packages, "-I", "nixpkgs="+tarFileUrl, "--run",  escapedArguments,]
+            
+            const commandForDebugging = fullCommand.join(" ")
+            if (! packages) {
+                throw Error(`For\n- (compute):\n    saveAs: ${varName}\n    withPackages: []\nThe withPackages being empty is a problem. Try at least try: withPackages: ["bash"]`)
+            }
             
             // TODO: make sure everything in the runCommand is a string
             let resultAsJson
@@ -819,18 +824,18 @@ export const fornixToNix = async function(yamlString) {
                 resultAsJson = await run(...fullCommand, Stdout(returnAsString))
                 // TODO: grab STDOUT and STDERR for better error messages
             } catch (error) {
-                throw Error(`There was an error when trying to run this command:\n    ${fullCommand}`)
+                throw Error(`There was an error when trying to run this command:\n    ${commandForDebugging}`)
             }
             let resultAsValue
             try {
                 resultAsValue = JSON.parse(resultAsJson)
             } catch (error) {
-                throw Error(`There was an error with the output of this command: ${values.runCommmand}\nThe output needs to be a valid JSON string, but there was an error while parsing the string: ${error}`)
+                throw Error(`There was an error with the output of this command: ${commandForDebugging}\nThe output needs to be a valid JSON string, but there was an error while parsing the string: ${error}\n\nStandard output of the command was: ${JSON.stringify(resultAsJson)}`)
             }
             computed[varNames] = resultAsValue
             varNames.push(varName)
             nixCode += `
-                ${varName} = (\n${indent({ string: escapeNixObject(resultAsValue), by: "                        " })});
+                ${varName} = (${indent({ string: escapeNixObject(resultAsValue), by: "                        " })});
             `
         // 
         // (package)
@@ -862,7 +867,7 @@ export const fornixToNix = async function(yamlString) {
             const loadAttribute = values.load.map(each=>escapeNixString(each)).join(".")
             let nixValue 
             if (source instanceof NixValue) {
-                nixValue = ${source.name}.${loadAttribute}
+                nixValue = `${source.name}.${loadAttribute}`
             // from a hash/url directly
             } else {
                 // FIXME
@@ -891,42 +896,52 @@ export const fornixToNix = async function(yamlString) {
         }
     }
     
-    nixCode = `
+    return `
         let
             #
             # create a standard library for convienience 
             # 
-            frozenStd = (builtins.import 
-                (builtins.fetchTarball
-                    ({url="https://github.com/NixOS/nixpkgs/archive/8917ffe7232e1e9db23ec9405248fd1944d0b36f.tar.gz";})
-                )
-                ({})
-            );
-            __core__ = (frozenStd.lib.mergeAttrs
-                (frozenStd.lib.mergeAttrs
-                    (frozenStd.buildPackages) # <- for fetchFromGitHub, installShellFiles, getAttrFromPath, etc 
+            __core__ = (
+                let
+                    frozenStd = (builtins.import 
+                        (builtins.fetchTarball
+                            ({url="https://github.com/NixOS/nixpkgs/archive/8917ffe7232e1e9db23ec9405248fd1944d0b36f.tar.gz";})
+                        )
+                        ({})
+                    );
+                in
                     (frozenStd.lib.mergeAttrs
-                        ({ stdenv = frozenStd.stdenv; })
-                        (frozenStd.lib) # <- for mergeAttrs, optionals, getAttrFromPath, etc 
+                        (frozenStd.lib.mergeAttrs
+                            (frozenStd.buildPackages) # <- for fetchFromGitHub, installShellFiles, getAttrFromPath, etc 
+                            (frozenStd.lib.mergeAttrs
+                                ({ stdenv = frozenStd.stdenv; })
+                                (frozenStd.lib) # <- for mergeAttrs, optionals, getAttrFromPath, etc 
+                            )
+                        )
+                        (builtins) # <- for import, fetchTarball, etc 
                     )
-                )
-                (builtins) # <- for import, fetchTarball, etc 
             );
+
+            ${nixCode}
         in
             __core__.mkShell {
                 # inside that shell, make sure to use these packages
                 buildInputs =  [
-                    
+                    ${indent({
+                        string:buildInputStrings.join("\n"),
+                        by: "                    ",
+                    })}
                 ];
                 
                 nativeBuildInputs = [
-                    
+                    ${indent({
+                        string: nativeBuildInputStrings.join("\n"),
+                        by: "                    ",
+                    })}
                 ];
                 
                 # run some bash code before starting up the shell
                 shellHook = ''
-                    
-                    
                     
                 '';
             }

@@ -44,7 +44,7 @@
     saveAs: isLinux
 
 - (compute):
-    runCommand: [ "nix-shell", "--pure", "--packages", "deno", "deno eval 'console.log(JSON.stringify(Deno.build.os==\'darwin\'))'", "-I", *defaultWarehouseAnchor ]
+    runCommand: [ "deno", "eval", "console.log(JSON.stringify(Deno.build.os=='darwin'))" ]
     withPackages: [ "deno" ]
     fromWarehouse: !!warehouse warehouseForCuda
     saveAs: isMac
