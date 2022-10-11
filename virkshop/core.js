@@ -273,6 +273,7 @@ export const createVirkshop = async (arg)=>{
             },
             _stages: {
                 async phase0(mixinPaths) {
+                    console.log("[Phase0: Establishing/Verifying Structure]")
                     mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
 
                     Console.env.VIRKSHOP_FOLDER = virkshop.pathTo.virkshop
@@ -317,14 +318,17 @@ export const createVirkshop = async (arg)=>{
                     }))
                 },
                 async phase1(mixinPaths) {
+                    console.log("[Phase1: Mixins Setup]")
                     mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
                     const alreadExecuted = new Set()
                     const phase1Promises = []
                     for (const eachMixinPath of mixinPaths) {
+                        const mixinName = FileSystem.basename(eachMixinPath)
                         // let the mixin link everything within itself
                         const selfSetupPromise = FileSystem.recursivelyListItemsIn(`${eachMixinPath}/events/virkshop/before_entering`).then(
                             async (phase1Items)=>{
                                 phase1Items.sort() // FIXME: this is javascript so of course it won't actually sort alpha-numerically
+                                const startTime = (new Date()).getTime()
                                 for (const eachItem of phase1Items) {
                                     // if its not a folder
                                     if (!eachItem.isFolder && eachItem.exists) {
@@ -348,8 +352,8 @@ export const createVirkshop = async (arg)=>{
                                         }
                                     }
                                 }
-
-                                
+                                const duration = (new Date()).getTime() - startTime
+                                console.log(`     [setup in ${duration}ms: ${mixinName}]`)
                             }
                         )
                         phase1Promises.push(selfSetupPromise)
@@ -374,8 +378,10 @@ export const createVirkshop = async (arg)=>{
                     await Promise.all(phase1Promises)
                 },
                 async phase2(mixinPaths) {
+                    console.log("[Phase2: Nix+Zsh Setup]")
                     mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
                     
+                    console.log("    [Creating .zshrc]")
                     await Promise.all([
                         // 
                         // once mixins have created their internal peices, connect them to the larger outside system
@@ -432,7 +438,8 @@ export const createVirkshop = async (arg)=>{
                     Console.env.VIRKSHOP_REAL_HOME = virkshop.pathTo.realHome
                     Console.env.HOME               = virkshop.pathTo.fakeHome
                     FileSystem.cwd                 = virkshop.pathTo.fakeHome
-
+                    
+                    console.log("    [Creating shell.nix]")
                     // TODO: read the toml file to get the default nix hash then use -I arg in nix-shell
                     const yamlString = await FileSystem.read(virkshop.pathTo.systemTools)
                     // TODO: get a hash of this and see if nix-shell should even be regenerated or not
@@ -441,7 +448,7 @@ export const createVirkshop = async (arg)=>{
                         data: nixShellString,
                         path: virkshop.pathTo._tempShellFile,
                     })
-                    console.log("Starting Nix... (it takes a while the first time)")
+                    console.log("    [Handing control over to nix]")
                     await run`nix-shell --pure --command zsh --keep NIX_SSL_CERT_FILE --keep VIRKSHOP_FOLDER --keep VIRKSHOP_FAKE_HOME --keep VIRKSHOP_REAL_HOME --keep VIRKSHOP_PROJECT_FOLDER ${virkshop.pathTo._tempShellFile} -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/ce6aa13369b667ac2542593170993504932eb836.tar.gz` // FIXME: use the defaultWarehouse
 
                     // TODO: call all the on_quit scripts
@@ -744,6 +751,7 @@ function pathOfCaller() {
 // 
 export const fornixToNix = async function(yamlString) {
     // FIXME: add support for overwriting values (saveAs: python, then saveAs: python without breaking)
+    // TODO: make __core__ not be a name, just insert it everywhere using "let,in"
     const dataStructure = yaml.parse(yamlString, {schema: yaml.DEFAULT_SCHEMA,},)
     let indentLevel = 3
     let nixCode = `
@@ -754,6 +762,7 @@ export const fornixToNix = async function(yamlString) {
     const buildInputStrings = []
     const nativeBuildInputStrings = []
     const computed = {}
+    const nixValues = {}
     const warehouses = {}
     const packages = {}
     const warehouseAsNixValue = (values)=> {
@@ -795,7 +804,7 @@ export const fornixToNix = async function(yamlString) {
             //         permittedInsecurePackages: [ "openssl-1.0.2u" ]
             // saveAs: "!!nix defaultWarehouse"
 
-            const varName = values.saveAs.replace(/!!nix +/,"")
+            const varName = values.saveAs
             const nixCommitHash = values.createWarehouseFrom.nixCommitHash
             const tarFileUrl = values.createWarehouseFrom.tarFileUrl || `https://github.com/NixOS/nixpkgs/archive/${nixCommitHash}.tar.gz`
             const warehouseArguments = values.arguments || {}
@@ -860,6 +869,7 @@ export const fornixToNix = async function(yamlString) {
             // onlyIf: !!computed isLinux
             // asBuildInput: true
             const values = eachEntry[kind]
+            console.debug(`values is:`,values)
 
             // 
             // handle onlyIf
@@ -908,12 +918,82 @@ export const fornixToNix = async function(yamlString) {
             if (values.saveAs) {
                 const varName = values.saveAs
                 varNames.push(varName)
+                packages[varName] = values
                 nixCode += `
                 ${varName} = ${nixValue};
                 `
             }
+        // 
+        // (nix)
+        // 
+        } else if (kind == "(nix)") {
+            // from: !!warehouse pythonPackages
+            // load: [ "pyopengl",]
+            // saveAs: varName
+            const values = eachEntry[kind]
+            
+            // 
+            // get nix-value
+            // 
+            const source = values.from || defaultWarehouse
+            const loadAttribute = values.load.map(each=>escapeNixString(each)).join(".")
+            let nixValue
+            if (source instanceof NixValue) {
+                nixValue = `${source.name}.${loadAttribute}`
+            // from a hash/url directly
+            } else {
+                if (source instanceof Object) {
+                    nixValue = `${warehouseAsNixValue(source)}.${loadAttribute}`
+                } else if (typeof source == "string") {
+                    nixValue = `${warehouseAsNixValue({createWarehouseFrom:{ nixCommitHash:source }})}.${loadAttribute}`
+                }
+                // TODO: else error
+            }
+            
+            // 
+            // create name if needed
+            // 
+            const varName = values.saveAs
+            varNames.push(varName)
+            nixValues[varName] = values
+            nixCode += `
+                ${varName} = ${nixValue};
+            `
         }
     }
+
+
+    // 
+    // library paths for all packages
+    // 
+    let libraryPathsString = ""
+    let packagePathStrings = ""
+    for (const [varName, value] of Object.entries(packages)) {
+        libraryPathsString += `"${varName}" = __core__.lib.makeLibraryPath [ ${varName} ];\n`
+        packagePathStrings += `"${varName}" = ${varName};\n`
+    }
+    let nixShellData = `
+            __nixShellEscapedJsonData__ = (
+                let 
+                    nixShellDataJson = (__core__.toJSON {
+                        packagePaths = {\n${indent({string:libraryPathsString, by: "                            ",})}
+                        };
+                        libraryPaths = {\n${indent({string:packagePathStrings, by: "                            ",})}
+                        };
+                    });
+                    bashEscapedJson = (builtins.replaceStrings
+                        [
+                            "'"
+                        ]
+                        [
+                            ${escapeNixString(`'"'"'`)}
+                        ]
+                        nixShellDataJson
+                    );
+                in
+                    bashEscapedJson
+            );
+    `
     
     return `
         let
@@ -940,8 +1020,12 @@ export const fornixToNix = async function(yamlString) {
                         (builtins) # <- for import, fetchTarball, etc 
                     )
             );
-
+            
+            # 
+            # Packages, Vars, and Compute
+            # 
             ${nixCode}
+            ${nixShellData}
         in
             __core__.mkShell {
                 # inside that shell, make sure to use these packages
@@ -958,9 +1042,9 @@ export const fornixToNix = async function(yamlString) {
                 ];
                 
                 # run some bash code before starting up the shell
-                shellHook = ''
-                    
-                '';
+                shellHook = "
+                    export VIRKSHOP_NIX_SHELL_DATA='\${__nixShellEscapedJsonData__}'
+                ";
             }
         `.replace(/\n        /g,"\n")
 }
