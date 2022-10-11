@@ -108,7 +108,14 @@ import { virkshop } from "./core.js"
 
         `
 
-        if (OperatingSystem.commonChecks.isWindows) {
+        if (OperatingSystem.commonChecks.isMac) {
+            // make sure xcode tools are installed
+            let result = "" 
+            while (!result.match("already installed")) {
+                await Console.askFor.confirmation("XCode commandline tools dont seem to be installed\nI'm going to send you a prompt to install it okay?")
+                result = await run("xcode-select", "--install", Out(returnAsString))
+            }
+        } else if (OperatingSystem.commonChecks.isWindows) {
             throw Error(`\n\nWindows isn't directly supported, but if you install WSL then it should work.\nHere's a tutorial link for installing WSL Ubuntu: https://www.youtube.com/watch?v=EwRVswCtmX4\n\n`)
             // TODO: auto check for WSL and if it's available, try to automatically enter WSL and run this script again inside of it
         }
