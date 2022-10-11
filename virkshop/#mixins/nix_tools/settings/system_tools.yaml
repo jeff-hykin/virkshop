@@ -46,7 +46,7 @@
 - (compute):
     runCommand: [ "deno", "eval", "console.log(JSON.stringify(Deno.build.os=='darwin'))" ]
     withPackages: [ "deno" ]
-    fromWarehouse: !!warehouse warehouseForCuda
+    fromWarehouse: !!warehouse defaultWarehouse
     saveAs: isMac
 
 
@@ -70,51 +70,52 @@
     asBuildInput: true
 
 - (package):
-    from: !!warehouse pythonPackages
+    from: !!package pythonPackages
     load: [ "black",]
     asBuildInput: true
 
 - (package):
-    from: !!warehouse pythonPackages
+    from: !!package pythonPackages
     load: [ "poetry",]
     asBuildInput: true
 
 - (package):
-    from: !!warehouse pythonPackages
+    from: !!package pythonPackages
     load: [ "setuptools",]
     asBuildInput: true
 
 - (package):
-    from: !!warehouse pythonPackages
+    from: !!package pythonPackages
     load: [ "pybullet",]
     onlyIf: !!computed isLinux
     asBuildInput: true
 
 - (package):
-    from: !!warehouse pythonPackages
+    from: !!package pythonPackages
     load: [ "pyopengl",]
     onlyIf: !!computed isLinux
     asBuildInput: true
 
 - (package):
-    from: !!warehouse pythonPackages
+    from: !!package pythonPackages
     load: [ "pip",]
     asBuildInput: true
 
 - (package):
-    from: !!warehouse pythonPackages
+    from: !!package pythonPackages
     load: [ "virtualenv",]
     asBuildInput: true
 
 - (package):
-    from: !!warehouse pythonPackages
+    from: !!package pythonPackages
     load: [ "wheel",]
     asBuildInput: true
 
 
 # the newer version of shap is broken for some reason so this links to an older one
 - (package):
-    from: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/3f50332bc4913a56ad216ca01f5d0bd24277a6b2.tar.gz" }
+    from: 
+        createWarehouseFrom: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/3f50332bc4913a56ad216ca01f5d0bd24277a6b2.tar.gz" }
     load: [ "python38Packages", "shap",]
     asBuildInput: true
 
@@ -183,7 +184,8 @@
     onlyIf: !!computed isLinux
     saveAs: "nvidiaDocker"
     load: [ "nvidia-docker",]
-    from: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/860b56be91fb874d48e23a950815969a7b832fbc.tar.gz" }
+    from: 
+        createWarehouseFrom: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/860b56be91fb874d48e23a950815969a7b832fbc.tar.gz" }
     asBuildInput: true
 
 - (package):
@@ -253,7 +255,8 @@
 - (package):
     onlyIf: !!computed isLinux
     load: [ "libglvnd",]
-    from: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/559cf76fa3642106d9f23c9e845baf4d354be682.tar.gz" }
+    from:
+        createWarehouseFrom: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/559cf76fa3642106d9f23c9e845baf4d354be682.tar.gz" }
     asNativeBuildInput: true
 
 # 
@@ -625,7 +628,8 @@
 # 
 - (package):
     # keep deno pinned even if the main warehouse changes
-    from: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/c82b46413401efa740a0b994f52e9903a4f6dcd5.tar.gz" }
+    from: 
+        createWarehouseFrom: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/c82b46413401efa740a0b994f52e9903a4f6dcd5.tar.gz" }
     load: [ "deno",]
     asBuildInput: true
 

@@ -692,7 +692,7 @@ function pathOfCaller() {
                         obj.map(
                             each=>indent({string:escapeNixObject(each)})
                         ).join("\n")
-                    }]`
+                    }\n]`
                 }
             // 
             // Plain Object
@@ -738,7 +738,6 @@ export const fornixToNix = async function(yamlString) {
     const dataStructure = yaml.parse(yamlString, {schema: yaml.DEFAULT_SCHEMA,},)
     let indentLevel = 3
     let nixCode = `
-        let
     `
     const varNames = []
     let defaultWarehouse = null
@@ -748,6 +747,17 @@ export const fornixToNix = async function(yamlString) {
     const computed = {}
     const warehouses = {}
     const packages = {}
+    const warehouseAsNixValue = (values)=> {
+        const nixCommitHash = values.createWarehouseFrom.nixCommitHash
+        const tarFileUrl = values.createWarehouseFrom.tarFileUrl || `https://github.com/NixOS/nixpkgs/archive/${nixCommitHash}.tar.gz`
+        const warehouseArguments = values.arguments || {}
+        return `(__core__.import
+            (__core__.fetchTarball
+                ({url=${JSON.stringify(tarFileUrl)};})
+            )
+            (${indent({ string: escapeNixObject(warehouseArguments), by: "            ", noLead: true})})
+        )`
+    }
     for (const eachEntry of dataStructure) {
         const kind = Object.keys(eachEntry)[0]
         // 
@@ -786,12 +796,7 @@ export const fornixToNix = async function(yamlString) {
             warehouses[varName].arguments = warehouseArguments
             varNames.push(varName)
             nixCode += `
-                ${varName} = (core.import
-                        (__core__.fetchTarball
-                            ({url=${JSON.stringify(tarFileUrl)};})
-                        )
-                        (${indent({ string: escapeNixObject(warehouseArguments), by: "                        " })})
-                    );
+                ${varName} = ${indent({ string: warehouseAsNixValue(values), by: "        ", noLead: true })};
             `
             // save defaultWarehouse name
             if (kind == "(defaultWarehouse)") {
@@ -804,7 +809,7 @@ export const fornixToNix = async function(yamlString) {
         } else if (kind == "(compute)") {
             // - (compute):
             //     runCommand: [ "nix-shell", "--pure", "--packages", "deno", "deno eval 'console.log(JSON.stringify(Deno.build.os==\'darwin\'))'", "-I", *defaultWarehouseAnchor ]
-            //     saveAs: "!!nix isMac"
+            //     saveAs: isMac
             const values = eachEntry[kind]
             const varName = values.saveAs
             const packages = values.withPackages || []
@@ -832,10 +837,10 @@ export const fornixToNix = async function(yamlString) {
             } catch (error) {
                 throw Error(`There was an error with the output of this command: ${commandForDebugging}\nThe output needs to be a valid JSON string, but there was an error while parsing the string: ${error}\n\nStandard output of the command was: ${JSON.stringify(resultAsJson)}`)
             }
-            computed[varNames] = resultAsValue
+            computed[varName] = resultAsValue
             varNames.push(varName)
             nixCode += `
-                ${varName} = (${indent({ string: escapeNixObject(resultAsValue), by: "                        " })});
+                ${varName} = (${indent({ string: escapeNixObject(resultAsValue), by: "                        ", noLead: true})});
             `
         // 
         // (package)
@@ -852,7 +857,7 @@ export const fornixToNix = async function(yamlString) {
             // 
             if (values.onlyIf instanceof ComputedVar) {
                 // skip if value is false
-                if (!computed[values.onlyIf]) {
+                if (!computed[values.onlyIf.name]) {
                     continue
                 }
             } else {
@@ -865,13 +870,20 @@ export const fornixToNix = async function(yamlString) {
             // 
             const source = values.from || defaultWarehouse
             const loadAttribute = values.load.map(each=>escapeNixString(each)).join(".")
+            console.debug(`source is:`,source)
             let nixValue 
             if (source instanceof NixValue) {
                 nixValue = `${source.name}.${loadAttribute}`
             // from a hash/url directly
             } else {
-                // FIXME
+                if (source instanceof Object) {
+                    nixValue = `${warehouseAsNixValue(source)}.${loadAttribute}`
+                } else if (typeof source == "string") {
+                    nixValue = `${warehouseAsNixValue({createWarehouseFrom:{ nixCommitHash:source }})}.${loadAttribute}`
+                }
+                // TODO: else error
             }
+            console.debug(`nixValue is:`,nixValue)
             
             // 
             // add to build inputs
@@ -890,7 +902,7 @@ export const fornixToNix = async function(yamlString) {
                 const varName = values.saveAs
                 varNames.push(varName)
                 nixCode += `
-                    ${varName} = ${nixValue};
+                ${varName} = ${nixValue};
                 `
             }
         }
@@ -926,15 +938,13 @@ export const fornixToNix = async function(yamlString) {
         in
             __core__.mkShell {
                 # inside that shell, make sure to use these packages
-                buildInputs =  [
-                    ${indent({
+                buildInputs =  [\n${indent({
                         string:buildInputStrings.join("\n"),
                         by: "                    ",
                     })}
                 ];
                 
-                nativeBuildInputs = [
-                    ${indent({
+                nativeBuildInputs = [\n${indent({
                         string: nativeBuildInputStrings.join("\n"),
                         by: "                    ",
                     })}
@@ -945,5 +955,5 @@ export const fornixToNix = async function(yamlString) {
                     
                 '';
             }
-        `
+        `.replace(/\n        /g,"\n")
 }
