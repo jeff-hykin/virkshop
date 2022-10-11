@@ -7,6 +7,6 @@
         "**/dist": true,
         "**/.cache": true,
         "**/.venv": true,
-        "virkshop/**/*": true,
+        "virkshop/**/*": false,
     },
 }

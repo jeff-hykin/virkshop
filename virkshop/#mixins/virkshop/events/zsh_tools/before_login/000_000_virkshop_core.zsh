@@ -1,5 +1,12 @@
 cd $_PWD
 unset _PWD
+
+if [ "$VIRKSHOP_DEBUG" = "true" ]
+then
+    deno eval 'console.log(`     [${(new Date()).getTime()-Deno.env.get("_shell_start_time")}ms nix-shell]`)'
+fi
+unset _shell_start_time
+
 # This is runtime-faster than creating/calling several individual commands
 system_tools () {
     sub_command="$1"

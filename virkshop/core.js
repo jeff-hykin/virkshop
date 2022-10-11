@@ -354,7 +354,7 @@ export const createVirkshop = async (arg)=>{
                                     }
                                 }
                                 const duration = (new Date()).getTime() - startTime
-                                debuggingMode && console.log(`     [setup in ${duration}ms: ${mixinName}]`)
+                                debuggingMode && console.log(`     [${duration}ms: setting up ${mixinName}]`)
                             }
                         )
                         phase1Promises.push(selfSetupPromise)
@@ -380,9 +380,9 @@ export const createVirkshop = async (arg)=>{
                 },
                 async phase2(mixinPaths) {
                     debuggingMode && console.log("[Phase2: Nix+Zsh Setup]")
+                    var startTime = (new Date()).getTime()
                     mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
                     
-                    debuggingMode && console.log("    [Creating .zshrc]")
                     await Promise.all([
                         // 
                         // once mixins have created their internal peices, connect them to the larger outside system
@@ -435,13 +435,9 @@ export const createVirkshop = async (arg)=>{
                             })
                         })())
                     ])
+                    var duration = (new Date()).getTime() - startTime; var startTime = (new Date()).getTime()
+                    debuggingMode && console.log(`     [${duration}ms creating .zshrc]`)
                     
-                    Console.env.VIRKSHOP_REAL_HOME = virkshop.pathTo.realHome
-                    Console.env.HOME               = virkshop.pathTo.fakeHome
-                    FileSystem.cwd                 = virkshop.pathTo.fakeHome
-                    Console.env._PWD               = Console.env.PWD
-                    
-                    debuggingMode && console.log("    [Creating shell.nix]")
                     // TODO: read the toml file to get the default nix hash then use -I arg in nix-shell
                     const yamlString = await FileSystem.read(virkshop.pathTo.systemTools)
                     // TODO: get a hash of this and see if nix-shell should even be regenerated or not
@@ -450,8 +446,15 @@ export const createVirkshop = async (arg)=>{
                         data: nixShellString,
                         path: virkshop.pathTo._tempShellFile,
                     })
-                    debuggingMode && console.log("    [Handing control over to nix]")
-                    await run`nix-shell --pure --command zsh --keep _PWD --keep NIX_SSL_CERT_FILE --keep VIRKSHOP_FOLDER --keep VIRKSHOP_FAKE_HOME --keep VIRKSHOP_REAL_HOME --keep VIRKSHOP_PROJECT_FOLDER ${virkshop.pathTo._tempShellFile} -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/ce6aa13369b667ac2542593170993504932eb836.tar.gz` // FIXME: use the defaultWarehouse
+                    var duration = (new Date()).getTime() - startTime; var startTime = (new Date()).getTime()
+                    debuggingMode && console.log(`     [${duration}ms creating shell.nix]`)
+                    
+                    Console.env.VIRKSHOP_REAL_HOME = virkshop.pathTo.realHome
+                    Console.env.HOME               = virkshop.pathTo.fakeHome
+                    Console.env._shell_start_time  = `${startTime}`
+                    Console.env.VIRKSHOP_DEBUG     = `${debuggingMode}`
+
+                    await run`nix-shell --pure --command zsh --keep NIX_SSL_CERT_FILE --keep VIRKSHOP_DEBUG --keep _shell_start_time --keep VIRKSHOP_FOLDER --keep VIRKSHOP_FAKE_HOME --keep VIRKSHOP_REAL_HOME --keep VIRKSHOP_PROJECT_FOLDER ${virkshop.pathTo._tempShellFile} -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/ce6aa13369b667ac2542593170993504932eb836.tar.gz` // FIXME: use the defaultWarehouse
 
                     // TODO: call all the on_quit scripts
                 },
