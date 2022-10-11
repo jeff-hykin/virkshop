@@ -172,6 +172,7 @@ async function linkMixinShortcuts(path) {
     }
 }
 
+let debuggingMode = false
 const virkshopIdentifierPath = `#mixins/virkshop/settings/virkshop/`
 export const createVirkshop = async (arg)=>{
     var { virkshopPath, projectPath } = {...arg}
@@ -273,7 +274,7 @@ export const createVirkshop = async (arg)=>{
             },
             _stages: {
                 async phase0(mixinPaths) {
-                    console.log("[Phase0: Establishing/Verifying Structure]")
+                    debuggingMode && console.log("[Phase0: Establishing/Verifying Structure]")
                     mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
 
                     Console.env.VIRKSHOP_FOLDER = virkshop.pathTo.virkshop
@@ -318,7 +319,7 @@ export const createVirkshop = async (arg)=>{
                     }))
                 },
                 async phase1(mixinPaths) {
-                    console.log("[Phase1: Mixins Setup]")
+                    debuggingMode && console.log("[Phase1: Mixins Setup]")
                     mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
                     const alreadExecuted = new Set()
                     const phase1Promises = []
@@ -353,7 +354,7 @@ export const createVirkshop = async (arg)=>{
                                     }
                                 }
                                 const duration = (new Date()).getTime() - startTime
-                                console.log(`     [setup in ${duration}ms: ${mixinName}]`)
+                                debuggingMode && console.log(`     [setup in ${duration}ms: ${mixinName}]`)
                             }
                         )
                         phase1Promises.push(selfSetupPromise)
@@ -378,10 +379,10 @@ export const createVirkshop = async (arg)=>{
                     await Promise.all(phase1Promises)
                 },
                 async phase2(mixinPaths) {
-                    console.log("[Phase2: Nix+Zsh Setup]")
+                    debuggingMode && console.log("[Phase2: Nix+Zsh Setup]")
                     mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
                     
-                    console.log("    [Creating .zshrc]")
+                    debuggingMode && console.log("    [Creating .zshrc]")
                     await Promise.all([
                         // 
                         // once mixins have created their internal peices, connect them to the larger outside system
@@ -439,7 +440,7 @@ export const createVirkshop = async (arg)=>{
                     Console.env.HOME               = virkshop.pathTo.fakeHome
                     FileSystem.cwd                 = virkshop.pathTo.fakeHome
                     
-                    console.log("    [Creating shell.nix]")
+                    debuggingMode && console.log("    [Creating shell.nix]")
                     // TODO: read the toml file to get the default nix hash then use -I arg in nix-shell
                     const yamlString = await FileSystem.read(virkshop.pathTo.systemTools)
                     // TODO: get a hash of this and see if nix-shell should even be regenerated or not
@@ -448,7 +449,7 @@ export const createVirkshop = async (arg)=>{
                         data: nixShellString,
                         path: virkshop.pathTo._tempShellFile,
                     })
-                    console.log("    [Handing control over to nix]")
+                    debuggingMode && console.log("    [Handing control over to nix]")
                     await run`nix-shell --pure --command zsh --keep NIX_SSL_CERT_FILE --keep VIRKSHOP_FOLDER --keep VIRKSHOP_FAKE_HOME --keep VIRKSHOP_REAL_HOME --keep VIRKSHOP_PROJECT_FOLDER ${virkshop.pathTo._tempShellFile} -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/ce6aa13369b667ac2542593170993504932eb836.tar.gz` // FIXME: use the defaultWarehouse
 
                     // TODO: call all the on_quit scripts
@@ -479,6 +480,8 @@ export const createVirkshop = async (arg)=>{
             },
         },
     )
+
+    debuggingMode = virkshop.options.debuggingMode
     return virkshop
 }
 
