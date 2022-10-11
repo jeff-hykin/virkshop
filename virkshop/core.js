@@ -239,7 +239,7 @@ export const createVirkshop = async (arg)=>{
                     temporary:        { get() { return `${virkshop.pathTo.mixture}/temporary` }},
                     fakeHome:         { get() { return `${virkshop.pathTo.temporary}/long_term/home` }},
                     virkshopOptions:  { get() { return `${virkshop.pathTo.settings}/virkshop/options.json` }},
-                    systemTools:      { get() { return `${virkshop.pathTo.mixins}/nix_tools/settings/system_tools.yaml` }}, // FIXME: shouldn't reference anything inside #mixins directly
+                    systemTools:      { get() { return `${virkshop.pathTo.settings}/system_tools.yaml` }},
                     _passthroughData: { get() { return `${virkshop.pathTo.temporary}/short_term/virkshop/_passthrough_data.json` }},
                     _tempShellFile:   { get() { return `${virkshop.pathTo.temporary}/short_term/virkshop/shell.nix` }},
                 }
@@ -344,7 +344,7 @@ export const createVirkshop = async (arg)=>{
                                                 await run`${eachItem.path}`
                                             }
                                         } catch (error) {
-                                            console.debug(`\n\nWARNING: error while executing before_entering of ${FileSystem.basename(eachMixinPath)}, ${error.stack}`,)
+                                            console.log(`\n\nWARNING: error while executing before_entering of ${FileSystem.basename(eachMixinPath)}, ${error.stack}`,)
                                         }
                                     }
                                 }
@@ -878,7 +878,6 @@ export const fornixToNix = async function(yamlString) {
             // 
             const source = values.from || defaultWarehouse
             const loadAttribute = values.load.map(each=>escapeNixString(each)).join(".")
-            console.debug(`source is:`,source)
             let nixValue 
             if (source instanceof NixValue) {
                 nixValue = `${source.name}.${loadAttribute}`
@@ -891,7 +890,6 @@ export const fornixToNix = async function(yamlString) {
                 }
                 // TODO: else error
             }
-            console.debug(`nixValue is:`,nixValue)
             
             // 
             // add to build inputs
