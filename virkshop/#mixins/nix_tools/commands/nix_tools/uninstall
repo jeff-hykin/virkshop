@@ -1,3 +1,14 @@
+echo ""
+echo "If you've still got a problem after this"
+if [ "$(uname)" = "Darwin" ] 
+then
+    echo "take a look here: https://nixos.org/manual/nix/stable/installation/installing-binary.html#macos"
+else
+    echo "take a look here: https://nixos.org/manual/nix/stable/installation/installing-binary.html#linux"
+fi
+echo "Okay?"
+read
+
 delete_user () {
     user="$1"
     # logs them out by locking the account
@@ -88,4 +99,11 @@ fi
 if [ -f "/etc/bash.bashrc.backup-before-nix" ]
 then
     sudo mv /etc/bash.bashrc.backup-before-nix /etc/bash.bashrc
+fi
+
+if [ "$(uname)" = "Darwin" ] 
+then
+    # remove volume if it was mounted
+    sudo diskutil list | grep 'Nix Store' && sudo diskutil apfs deleteVolume /nix
+    echo "may need to reboot for full effect"
 fi
