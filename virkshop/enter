@@ -33,8 +33,9 @@ import { virkshop } from "./core.js"
 // 
 // 
     async function installNix() {
-        const nixScriptLocalCopy = `
-        #!/bin/sh
+        const nixVersion = `nix-2.9.2` // 2.3.8
+        const urlSource = `https://releases.nixos.org/nix/nix-${nixVersion}` // "https://releases.nixos.org/nix/nix-2.3.8"
+        const nixScriptLocalCopy = `#!/bin/sh
 
             # This script installs the Nix package manager on your system by
             # downloading a binary distribution and running its installer script
@@ -48,7 +49,7 @@ import { virkshop } from "./core.js"
 
             umask 0022
 
-            tmpDir="$(mktemp -d -t nix-binary-tarball-unpack.XXXXXXXXXX || \
+            tmpDir="$(mktemp -d -t nix-binary-tarball-unpack.XXXXXXXXXX || \\
                     oops "Can't create temporary directory for downloading the Nix binary tarball")"
             cleanup() {
                 rm -rf "$tmpDir"
@@ -61,25 +62,72 @@ import { virkshop } from "./core.js"
             }
 
             case "$(uname -s).$(uname -m)" in
-                Linux.x86_64) system=x86_64-linux; hash=0c8a432993d06e4d882ad48cde81d9bef23842cf6d7432cd93ef1a99c8d4ef43;;
-                Linux.i?86) system=i686-linux; hash=b6e100a704065728ce10408df3ccb2b97c68e4aa033efe5ec9c6d3346f98f011;;
-                Linux.aarch64) system=aarch64-linux; hash=0b35f0d3b480e15ca4bf57ee0d90c5dd209f8bf6ab0c429a2e4aca6565b9d9a6;;
-                Darwin.x86_64) system=x86_64-darwin; hash=1da9492d6ea1d0ae470df5aed61897f4e3166360a510eb4b5755b1bfb5128177;;
+                Linux.x86_64)
+                    hash=e5fd4e993bc6c565aa0544eec2db6a977e496896f4133002436b1be1d3e9a8f6
+                    path=xwn7n573m5m3j4c01dljm0xis1d1l0qq/${nixVersion}-x86_64-linux.tar.xz
+                    system=x86_64-linux
+                    ;;
+                Linux.i?86)
+                    hash=d8d6a8a08a40ad0e22491b57402de2212d055e91d3e03fc5cee0db5064319f72
+                    path=nz375g80bx5i26gzqfsddiz3b4kk0ghn/${nixVersion}-i686-linux.tar.xz
+                    system=i686-linux
+                    ;;
+                Linux.aarch64)
+                    hash=b1bd23a831357e9041a255fd23a7665f51cbd40229773eb7eb66c5b3d3976986
+                    path=39wdq7nscrd9jf0dz858s89kwpvqjrv1/${nixVersion}-aarch64-linux.tar.xz
+                    system=aarch64-linux
+                    ;;
+                Linux.armv6l_linux)
+                    hash=29c88bd45341eb05c239ad7a51840e57a28749db3cac3432983076018a0df1c5
+                    path=zm4i801kcna7530ml0c81girb7m403bi/${nixVersion}-armv6l-linux.tar.xz
+                    system=armv6l-linux
+                    ;;
+                Linux.armv7l_linux)
+                    hash=983299e3d1b6fdadc487624d94e66a4e7b268c4acc77707739ef1bb78783a4a4
+                    path=bcvm9kkqw4wyycybhsz3ygy0lrja8905/${nixVersion}-armv7l-linux.tar.xz
+                    system=armv7l-linux
+                    ;;
+                Darwin.x86_64)
+                    hash=09bbf6c6f75a6cb5073d7360f29168994ed45ef53ee9348f7a452ec7dc31ddf7
+                    path=fzalici37aikkxqilzi3qjiq4qr2sllk/${nixVersion}-x86_64-darwin.tar.xz
+                    system=x86_64-darwin
+                    ;;
+                Darwin.arm64|Darwin.aarch64)
+                    hash=aa5405f427a94b26c839cebb2735c6f40ecac970920881942b2ba6d147ce05dc
+                    path=2clmi87ali1zc3g856pszfin8aw5jigv/${nixVersion}-aarch64-darwin.tar.xz
+                    system=aarch64-darwin
+                    ;;
                 *) oops "sorry, there is no binary distribution of Nix for your platform";;
             esac
 
-            url="https://releases.nixos.org/nix/nix-2.3.8/nix-2.3.8-$system.tar.xz"
+            # Use this command-line option to fetch the tarballs using nar-serve or Cachix
+            if [ "\${1:-}" = "--tarball-url-prefix" ]; then
+                if [ -z "\${2:-}" ]; then
+                    oops "missing argument for --tarball-url-prefix"
+                fi
+                url=\${2}/\${path}
+                shift 2
+            else
+                url=${urlSource}/${nixVersion}-$system.tar.xz
+            fi
 
-            tarball="$tmpDir/$(basename "$tmpDir/nix-2.3.8-$system.tar.xz")"
+            tarball=$tmpDir/${nixVersion}-$system.tar.xz
 
-            require_util curl "download the binary tarball"
             require_util tar "unpack the binary tarball"
             if [ "$(uname -s)" != "Darwin" ]; then
                 require_util xz "unpack the binary tarball"
             fi
 
-            echo "downloading Nix 2.3.8 binary tarball for $system from '$url' to '$tmpDir'..."
-            curl -L "$url" -o "$tarball" || oops "failed to download '$url'"
+            if command -v curl > /dev/null 2>&1; then
+                fetch() { curl --fail -L "$1" -o "$2"; }
+            elif command -v wget > /dev/null 2>&1; then
+                fetch() { wget "$1" -O "$2"; }
+            else
+                oops "you don't have wget or curl installed, which I need to download the binary tarball"
+            fi
+
+            echo "downloading ${nixVersion} binary tarball for $system from '$url' to '$tmpDir'..."
+            fetch "$url" "$tarball" || oops "failed to download '$url'"
 
             if command -v sha256sum > /dev/null 2>&1; then
                 hash2="$(sha256sum -b "$tarball" | cut -c1-64)"
@@ -102,20 +150,13 @@ import { virkshop } from "./core.js"
             script=$(echo "$unpack"/*/install)
 
             [ -e "$script" ] || oops "installation script is missing from the binary tarball!"
+            export INVOKED_FROM_INSTALL_IN=1
             "$script" "$@"
 
             } # End of wrapping
-
         `
 
-        if (OperatingSystem.commonChecks.isMac) {
-            // make sure xcode tools are installed
-            let result = "" 
-            while (!result.match("already installed")) {
-                await Console.askFor.confirmation("XCode commandline tools dont seem to be installed\nI'm going to send you a prompt to install it okay?")
-                result = await run("xcode-select", "--install", Out(returnAsString))
-            }
-        } else if (OperatingSystem.commonChecks.isWindows) {
+        if (OperatingSystem.commonChecks.isWindows) {
             throw Error(`\n\nWindows isn't directly supported, but if you install WSL then it should work.\nHere's a tutorial link for installing WSL Ubuntu: https://www.youtube.com/watch?v=EwRVswCtmX4\n\n`)
             // TODO: auto check for WSL and if it's available, try to automatically enter WSL and run this script again inside of it
         }
@@ -235,7 +276,8 @@ import { virkshop } from "./core.js"
         // 
         // if nix not installed
         // 
-        if (!await hasCommand('nix')) {
+        let nixStoreFolderInfo = await FileSystem.info(`/nix/store`)
+        if (!nixStoreFolderInfo.isFolder) {
             console.log("|------------------------------------------------------|")
             console.log("|                                                      |")
             console.log("|    I'll try to install nix for you                   |")
@@ -254,6 +296,26 @@ import { virkshop } from "./core.js"
             }
 
             if (OperatingSystem.commonChecks.isMac) {
+                // make sure xcode tools are installed
+                let result = await run("xcode-select", "--install", Out(returnAsString))
+                while (!result.match("already installed")) {
+                    await Console.askFor.confirmation("XCode commandline tools dont seem to be installed\nI'm going to send you a prompt to install it okay?")
+                    result = await run("xcode-select", "--install", Out(returnAsString))
+                }
+                // alternative for no-prompt installation:
+                    // xcode-select -p &> /dev/null
+                    // if [ $? -ne 0 ]; then
+                    //     echo "Command Line Tools for Xcode not found. Installing from softwareupdate…"
+                    //     # This temporary file prompts the 'softwareupdate' utility to list the Command Line Tools
+                    //     echo 
+                    //     echo "This is probably going to take 5-30min to install" 
+                    //     touch /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress;
+                    //     PROD=$(softwareupdate -l | grep "\*.*Command Line" | tail -n 1 | sed 's/^[^C]* //')
+                    //     softwareupdate -i "$PROD" --verbose;
+                    // else
+                    //     echo "Command Line Tools for Xcode have been installed."
+                    // fi
+                
                 const version = await run`sw_vers -productVersion ${Stdout(returnAsString)}`
                 const versionMatch = version.match(/([0-9]+)\.([0-9]+)\.([0-9]+)?/g)
                 let [majorVersion, minorVersion, patchVersion] = [ 12, 4, 0 ]
@@ -280,38 +342,41 @@ import { virkshop } from "./core.js"
                 
                 // Catalina, Big Sur, Monterey, and beyond
                 if (majorVersion > 10 || (majorVersion == 10 && minorVersion >= 15)) {
-                    var { success } = await run`sh -c ${'sh <(curl -Lk https://releases.nixos.org/nix/nix-2.3.8/install) --darwin-use-unencrypted-nix-store-volume'}`
+                    var { success } = await run`bash -c ${`yes | bash <(curl -Lk ${urlSource}/install) --darwin-use-unencrypted-nix-store-volume`}`
+                    if (!success) {
+                        // fallback
+                        var { success } = await run`bash -c ${`bash <(curl -L https://nixos.org/nix/install)`}`
+                    }
                 // Older than Catalina (Mojave, High Siera, Siera, Yosemite, Mavericks, etc)
                 } else {
-                    var { success } = await run`curl -Lk https://releases.nixos.org/nix/nix-2.3.8/install | sh -s -- --daemon`
+                    var { success } = await run`curl -Lk ${urlSource}/install | sh -s -- --daemon`
                 }
 
             } else if (OperatingSystem.commonChecks.isLinux) {
                 var nixScript
                 try {
-                    nixScript = await curlString`https://releases.nixos.org/nix/nix-2.3.8/install`
+                    nixScript = await curlString`${urlSource}/install`
                 // if host is down, or fails for some other reason, use the locally stored copy (which may be out of date)
                 } catch (error) {
                     nixScript = nixScriptLocalCopy
                 }
-
-                // prefer single-user install (no groups/users, no systemd need, and seems to not need shell reload)
-                await run("sh", "-s", Stdin(nixScript))
-
-                // alternative multi-user install (encouraged by nixpkgs)
-                // check if systemd exists
-                // if pidof systemd
-                // then
-                //     # multi-user install if systemd exists
-                //     curl -Lk https://releases.nixos.org/nix/nix-2.3.8/install | sh -s -- --daemon
-                // else
-                //     # single-user install if systemd exists
-                //     curl -L https://releases.nixos.org/nix/nix-2.3.8/install | sh
-                // fi
+                
+                if (await hasCommand("pidof")) {
+                    var { success } = await run`pidof systemd`
+                    if (success) {
+                        await run`bash -c ${`yes | bash <(curl -Lk ${urlSource}/install) --daemon`}`
+                    } else {
+                        // fallback on single user installation
+                        await run("sh", "-s", Stdin(nixScript))
+                    }
+                } else {
+                    // fallback on single user installation
+                    await run("sh", "-s", Stdin(nixScript))
+                }
             }
         }
 
-        const nixStoreFolderInfo = await FileSystem.info(`/nix/store`)
+        nixStoreFolderInfo = await FileSystem.info(`/nix/store`)
         if (!nixStoreFolderInfo.isFolder) {
             console.log(red`There was a bit of a problem :/                                         `)
             console.log(`---------------------------------------------------------------------------`)
@@ -324,7 +389,6 @@ import { virkshop } from "./core.js"
             await Console.askFor.confirmation('Continue without nix? (basically everything will break)')
         }
     }
-
     async function sourceNixSetup() {
         // 
         // add nix certificate file
