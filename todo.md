@@ -13,8 +13,11 @@
         - keep track of packages that are native build inputs or regular build inputs
         - generate the mkshell at the end
     - DONE run the nix-shell command with the generated nix.shell
-    - create a new fix for getting package paths
+    - DONE create a new fix for getting package paths
         need to keep track of paths when generating yaml file
+        add another field to the (package) that allows a package to export
+        env vars, which can be done in the shellHook
+        `__core__.lib.main.makeLibraryPath [ __core__.pkgs.${attributePath} ]`
         packagePathsAsJson = (main.toJSON
             ({
                 packagePathFor = depedencyPackages;
@@ -31,6 +34,7 @@
                 );
             })
         );
+    - fix problem with linked folders
     - create a proxy-object representing the ENV
         - allow for getting and setting 
         - import a deno.js file and watch for changes to the proxy

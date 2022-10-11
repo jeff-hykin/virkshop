@@ -869,7 +869,6 @@ export const fornixToNix = async function(yamlString) {
             // onlyIf: !!computed isLinux
             // asBuildInput: true
             const values = eachEntry[kind]
-            console.debug(`values is:`,values)
 
             // 
             // handle onlyIf
