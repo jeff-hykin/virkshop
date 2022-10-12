@@ -1,6 +1,6 @@
-import { FileSystem } from "https://deno.land/x/quickr@0.3.44/main/file_system.js"
-import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.3.44/main/run.js"
-import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.3.44/main/console.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.4.0/main/file_system.js"
+import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.4.0/main/run.js"
+import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.4.0/main/console.js"
 import { indent, findAll } from "https://deno.land/x/good@0.5.1/string.js"
 
 
@@ -26,7 +26,11 @@ async function recursivelyFileLink({targetFolder, existingFolder}) {
 
 async function linkMixinNamespace(path) {
     const mixinName = FileSystem.basename(path)
-    for (const eachSpecialFolder of virkshop.structure.specialMixinFolders) { // FIXME: home folder needs to be treated differently
+    for (const eachSpecialFolder of virkshop.structure.specialMixinFolders) {
+        if (FileSystem.basename(eachSpecialFolder) == 'home') {
+            // TODO: BETA: home folder needs to be treated differently
+            continue
+        }
         const mixinFolder                      = `${path}/${eachSpecialFolder}/${mixinName}`
         const commonFolderReservedForThisMixin = `${virkshop.pathTo.mixture}/${eachSpecialFolder}/${mixinName}`
 
@@ -53,7 +57,7 @@ async function linkMixinNamespace(path) {
             await FileSystem.remove(commonFolderReservedForThisMixin)
             needToCreateNamespace = true
         } else {
-            const target = FileSystem.makeAbsolutePath(namespaceCheck.pathToNextTarget)
+            const target = await FileSystem.nextTargetOf(namespaceCheck.path)
             const thisFolder = FileSystem.makeAbsolutePath(mixinFolder)
             if (target != thisFolder) {
                 await FileSystem.remove(commonFolderReservedForThisMixin)
@@ -67,54 +71,6 @@ async function linkMixinNamespace(path) {
                 newItem: commonFolderReservedForThisMixin
             })
         }
-
-        
-
-        // // 
-        // // create shortcuts within the commonFolderReservedForThisMixin
-        // // 
-        // // TODO: maybe rethink this
-        // const nestedNamespace = `${commonFolder}/${mixinName}/${mixinName}`
-        // for (const eachPath of await FileSystem.listPathsIn(nestedNamespace)) {
-        //     const relativePart = eachPath.slice(nestedNamespace.length)
-        //     const targetLocation = await FileSystem.info(`${commonFolderReservedForThisMixin}/${relativePart}`)
-        //     // if hardlink
-        //     if (targetLocation.isFile && !targetLocation.isSymlink) {
-        //         // assume the user put it there, or that its the plugin's ownership
-        //         continue
-        //     // if symlink
-        //     } else if (targetLocation.isFile) {
-        //         // remove broken things
-        //         if (targetLocation.isBrokenLink) {
-        //             await FileSystem.remove(targetLocation.path)
-        //         } else {
-        //             const target      = FileSystem.makeAbsolutePath(targetLocation.path)
-        //             const currentItem = FileSystem.makeAbsolutePath(eachPath)
-        //             if (target == currentItem) {
-        //                 // already linked
-        //                 continue
-        //             } else {
-        //                 // linked but to the wrong thing
-        //                 // FIXME: add a warning about conflicting items here, and replace the symlink with the warning
-        //                 //        note its possible for one to be a file and the other a folder
-        //                 continue
-        //             }
-        //         }
-        //     }
-        //     const mixinItem = await FileSystem.info(eachPath)
-        //     if (mixinItem.isFile) {
-        //         // FIXME: this could technically destroy a user-made file by having it as part of the parent path
-                
-        //         // make sure it exists by this point
-        //         await FileSystem.ensureIsFolder(FileSystem.parent)
-        //         // create the shortcut
-        //         await FileSystem.relativeLink({
-        //             existingItem: mixinItem.path,
-        //             newItem: targetLocation.path,
-        //         })
-        //     }
-        //     // TODO: consider another edgecase of mixin item being a file, but existing item being a folder
-        // }
     }
 }
 
@@ -131,6 +87,7 @@ async function linkMixinShortcuts(path) {
         // 
         for (const eachPath of await FileSystem.recursivelyListPathsIn(mixinFolder)) {
             const relativePart = eachPath.slice(mixinFolder.length)
+            const sourceLocation = eachPath
             const targetLocation = await FileSystem.info(`${commonFolder}/${relativePart}`)
             // if hardlink
             if (targetLocation.isFile && !targetLocation.isSymlink) {
@@ -142,22 +99,36 @@ async function linkMixinShortcuts(path) {
                 if (targetLocation.isBrokenLink) {
                     await FileSystem.remove(targetLocation.path)
                 } else {
-                    const target      = FileSystem.makeAbsolutePath(targetLocation.path)
-                    const currentItem = FileSystem.makeAbsolutePath(eachPath)
-                    if (target == currentItem) {
+                    const currentTarget  = await FileSystem.finalTargetOf(targetLocation.path)
+                    const intendedTarget = await FileSystem.finalTargetOf(eachPath)
+                    if (currentTarget == intendedTarget) {
                         // already linked
                         continue
                     } else {
                         // linked but to the wrong thing
-                        // FIXME: add a warning about conflicting items here, and replace the symlink with the warning
-                        //        note its possible for one to be a file and the other a folder
-                        continue
+                        console.warn(`
+                            This path:               ${targetLocation.path}
+                            Should link to:          ${intendedTarget}
+                            But instead it links to: ${currentTarget}
+
+                            The fix is probably to just delete: ${targetLocation.path}
+                            (I'm not sure how you would end up in this situation)
+                        `.replace(/\n                            /g,"\n"))
+                        const answeredYes = await Console.askFor.yesNo("Would you like me to delete it for you?")
+                        if (answeredYes) {
+                            await FileSystem.remove(targetLocation.path)
+                        }
+                        console.log("Continuing setup ...")
+
+                        if (!answeredYes) {
+                            continue
+                        }
                     }
                 }
             }
             const mixinItem = await FileSystem.info(eachPath)
             if (mixinItem.isFile) {
-                // FIXME: this could technically destroy a user-made file by having it as part of the parent path
+                // TODO: this could technically destroy a user-made file, if it was "thing/thing" in a "thing/thing/${mixinItem}" path
                 
                 // make sure it exists by this point
                 await FileSystem.ensureIsFolder(FileSystem.parentPath(mixinItem.path))
@@ -269,7 +240,42 @@ export const createVirkshop = async (arg)=>{
                 environmentVariables: {},
             },
             _internal: {
-                zshSourceFiles: {},
+                zshrcString: `
+                    # don't let zsh update itself without telling all the other packages 
+                    # instead use nix to update zsh
+                    DISABLE_AUTO_UPDATE="true"
+                    DISABLE_UPDATE_PROMPT="true"
+
+                    if [ "$VIRKSHOP_DEBUG" = "true" ]
+                    then
+                        deno eval 'console.log(\`     [\${(new Date()).getTime()-Deno.env.get("_shell_start_time")}ms nix-shell]\`)'
+                    fi
+                    unset _shell_start_time
+
+                    # This is runtime-faster than creating/calling several individual commands
+                    system_tools () {
+                        sub_command="$1"
+                        shift
+                        if [ "$sub_command" = "nix_path_for" ]
+                        then
+                            sub_command="$1"
+                            shift
+                            if [ "$sub_command" = "package" ]
+                            then
+                                deno eval 'console.log(JSON.parse(Deno.env.get("VIRKSHOP_NIX_SHELL_DATA")).packagePaths[Deno.args[0]])' "$@"
+                            fi
+                        elif [ "$sub_command" = "nix_lib_path_for" ]
+                        then
+                            sub_command="$1"
+                            shift
+                            if [ "$sub_command" = "package" ]
+                            then
+                                deno eval 'console.log(JSON.parse(Deno.env.get("VIRKSHOP_NIX_SHELL_DATA")).libraryPaths[Deno.args[0]])' "$@"
+                            fi
+                        fi
+                    }
+                `,
+                zshSourceFiles: [],
                 zshSourceFileSetupPromises: [],
             },
             _stages: {
@@ -304,7 +310,7 @@ export const createVirkshop = async (arg)=>{
                     // link virkshop folders up-and-out into the project folder
                     await Promise.all(Object.entries(virkshop.options.linkToProject).map(async ([whereInProject, whereInVirkshop])=>{
                         
-                        const sourcePath = `${virkshop.pathTo.virkshop}/${whereInVirkshop.replace(/^\$VIRKSHOP_FOLDER/,"./")}`
+                        const sourcePath = `${virkshop.pathTo.virkshop}/${whereInVirkshop.replace(/^\$VIRKSHOP_FOLDER/g,"./")}`
                         const target = await FileSystem.info(`${virkshop.pathTo.project}/${whereInProject}`)
                         if (target.isBrokenLink) {
                             await FileSystem.remove(target.path)
@@ -366,8 +372,8 @@ export const createVirkshop = async (arg)=>{
                             await Promise.all(
                                 files.filter(each=>each.match(/\.zsh$/)).map(async eachZshPath=>{
                                     const basename = FileSystem.basename(eachZshPath)
-                                    // FIXME: create a warning if a name is already in zshSourceFiles
-                                    virkshop._internal.zshSourceFiles[basename] = await FileSystem.read(eachZshPath)
+                                    // TODO: allow for nesting (dont use basename, instead subtract the common folder)
+                                    virkshop._internal.zshSourceFiles.push([ basename, await FileSystem.read(eachZshPath) ])
                                 })
                             )
                         }))
@@ -381,6 +387,15 @@ export const createVirkshop = async (arg)=>{
                 async phase2(mixinPaths) {
                     debuggingMode && console.log("[Phase2: Nix+Zsh Setup]")
                     var startTime = (new Date()).getTime()
+                    
+                    // 
+                    // start fornixToNix because the system commands in there can take a long time
+                    // 
+                    // TODO: read the toml file to get the default nix hash then use -I arg in nix-shell
+                    const yamlString = await FileSystem.read(virkshop.pathTo.systemTools)
+                    // TODO: get a hash of this and see if nix-shell should even be regenerated or not (as an optimization)
+                    const nixShellStringPromise = fornixToNix(yamlString)
+
                     mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
                     
                     await Promise.all([
@@ -405,26 +420,19 @@ export const createVirkshop = async (arg)=>{
                             // TODO: make sure this .zshrc only runs once per login rather than per shell
                             // TODO: add dynamic per-shell hooks
 
-                            let zshrcString = `
-                                # don't let zsh update itself without telling all the other packages 
-                                # instead use nix to update zsh
-                                DISABLE_AUTO_UPDATE="true"
-                                DISABLE_UPDATE_PROMPT="true"
-                                
-                                ${envVars}
-                                
+                            let zshrcString = envVars + virkshop._internal.zshrcString + `
                                 export VIRKSHOP_FOLDER='${escapeShellArgument(virkshop.pathTo.virkshop)}'
                                 export VIRKSHOP_FAKE_HOME='${escapeShellArgument(virkshop.pathTo.fakeHome)}'
                                 export VIRKSHOP_REAL_HOME='${escapeShellArgument(virkshop.pathTo.realHome)}'
                                 export VIRKSHOP_PROJECT_FOLDER='${escapeShellArgument(virkshop.pathTo.project)}'
-                            `
+                            `.replace(/\n                                /g,"\n")
                             
                             // all of these need to be resolved before zshSourceFiles can be used
                             await Promise.all(virkshop._internal.zshSourceFileSetupPromises)
                             const fileNames = Object.keys(virkshop._internal.zshSourceFiles)
-                            fileNames.sort() // FIXME: should be alpha numeric, but might not be because javascript
-                            for (const eachFileName of fileNames) {
-                                zshrcString += `\n${virkshop._internal.zshSourceFiles[eachFileName]}\n`
+                            const sortedFiles = virkshop._internal.zshSourceFiles.sort(([name1, contents1], [name2, contents2]) => name1.localeCompare(name2))
+                            for (const [eachName, eachContent] of sortedFiles) {
+                                zshrcString += `\n#\n# ${eachName}\n#\n${eachContent}\n`
                             }
 
                             // write the new .zshrc file
@@ -438,10 +446,7 @@ export const createVirkshop = async (arg)=>{
                     var duration = (new Date()).getTime() - startTime; var startTime = (new Date()).getTime()
                     debuggingMode && console.log(`     [${duration}ms creating .zshrc]`)
                     
-                    // TODO: read the toml file to get the default nix hash then use -I arg in nix-shell
-                    const yamlString = await FileSystem.read(virkshop.pathTo.systemTools)
-                    // TODO: get a hash of this and see if nix-shell should even be regenerated or not
-                    const nixShellString = await fornixToNix(yamlString)
+                    const nixShellString = await nixShellStringPromise
                     await FileSystem.write({
                         data: nixShellString,
                         path: virkshop.pathTo._tempShellFile,
@@ -681,7 +686,7 @@ function pathOfCaller() {
     export const escapeNixString = (string)=>{
         return `"${string.replace(/\$\{|[\\"]/g, '\\$&').replace(/\u0000/g, '\\0')}"`
     }
-
+    
     export const escapeNixObject = (obj)=> {
         const objectType = typeof obj
         if (obj == null) {
@@ -731,11 +736,11 @@ function pathOfCaller() {
                         const valueIsSingleLine = !valueAsString.match(/\n/)
                         if (valueIsSingleLine) {
                             string += indent({
-                                string: `${escapeNixObject(key)} = ${escapeNixObject(value)};`
+                                string: `${escapeNixString(key)} = ${escapeNixObject(value)};`
                             }) + "\n"
                         } else {
                             string += indent({
-                                string: `${escapeNixObject(key)} = (\n${
+                                string: `${escapeNixString(key)} = (\n${
                                     indent({
                                         string: escapeNixObject(value)
                                     })
@@ -759,6 +764,7 @@ function pathOfCaller() {
 export const fornixToNix = async function(yamlString) {
     // FIXME: add support for overwriting values (saveAs: python, then saveAs: python without breaking)
     // TODO: make __core__ not be a name, just insert it everywhere using "let,in"
+    const start = (new Date()).getTime()
     const dataStructure = yaml.parse(yamlString, {schema: yaml.DEFAULT_SCHEMA,},)
     let indentLevel = 3
     let nixCode = `
@@ -837,30 +843,34 @@ export const fornixToNix = async function(yamlString) {
             //     saveAs: isMac
             const values = eachEntry[kind]
             const varName = values.saveAs
-            const packages = values.withPackages || []
-            const whichWarehouse = values.fromWarehouse || defaultWarehouse
-            const tarFileUrl = warehouses[whichWarehouse.name].tarFileUrl // TODO: there's a lot of things that could screw up here, add checks/warnings for them
-            const escapedArguments = 'NO_COLOR=true '+values.runCommand.map(each=>`'${escapeShellArgument(each)}'`).join(" ")
-            const fullCommand = ["nix-shell", "--pure", "--packages", ...packages, "-I", "nixpkgs="+tarFileUrl, "--run",  escapedArguments,]
-            
-            const commandForDebugging = fullCommand.join(" ")
-            if (! packages) {
-                throw Error(`For\n- (compute):\n    saveAs: ${varName}\n    withPackages: []\nThe withPackages being empty is a problem. Try at least try: withPackages: ["bash"]`)
-            }
-            
-            // TODO: make sure everything in the runCommand is a string
-            let resultAsJson
-            try {
-                resultAsJson = await run(...fullCommand, Stdout(returnAsString))
-                // TODO: grab STDOUT and STDERR for better error messages
-            } catch (error) {
-                throw Error(`There was an error when trying to run this command:\n    ${commandForDebugging}`)
-            }
             let resultAsValue
-            try {
-                resultAsValue = JSON.parse(resultAsJson)
-            } catch (error) {
-                throw Error(`There was an error with the output of this command: ${commandForDebugging}\nThe output needs to be a valid JSON string, but there was an error while parsing the string: ${error}\n\nStandard output of the command was: ${JSON.stringify(resultAsJson)}`)
+            if (values.builtinDenoEval) {
+                resultAsValue = eval(values.builtinDenoEval)
+            } else {
+                const packages = values.withPackages || []
+                const whichWarehouse = values.fromWarehouse || defaultWarehouse
+                const tarFileUrl = warehouses[whichWarehouse.name].tarFileUrl // TODO: there's a lot of things that could screw up here, add checks/warnings for them
+                const escapedArguments = 'NO_COLOR=true '+values.runCommand.map(each=>`'${escapeShellArgument(each)}'`).join(" ")
+                const fullCommand = ["nix-shell", "--pure", "--packages", ...packages, "-I", "nixpkgs="+tarFileUrl, "--run",  escapedArguments,]
+                
+                const commandForDebugging = fullCommand.join(" ")
+                if (! packages) {
+                    throw Error(`For\n- (compute):\n    saveAs: ${varName}\n    withPackages: []\nThe withPackages being empty is a problem. Try at least try: withPackages: ["bash"]`)
+                }
+                
+                // TODO: make sure everything in the runCommand is a string
+                let resultAsJson
+                try {
+                    resultAsJson = await run(...fullCommand, Stdout(returnAsString))
+                    // TODO: grab STDOUT and STDERR for better error messages
+                } catch (error) {
+                    throw Error(`There was an error when trying to run this command:\n    ${commandForDebugging}`)
+                }
+                try {
+                    resultAsValue = JSON.parse(resultAsJson)
+                } catch (error) {
+                    throw Error(`There was an error with the output of this command: ${commandForDebugging}\nThe output needs to be a valid JSON string, but there was an error while parsing the string: ${error}\n\nStandard output of the command was: ${JSON.stringify(resultAsJson)}`)
+                }
             }
             computed[varName] = resultAsValue
             varNames.push(varName)

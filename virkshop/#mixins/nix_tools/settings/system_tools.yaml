@@ -37,17 +37,24 @@
 # compute values
 # 
 #
+
+# # example1: using command line 
+# - (compute):
+#     runCommand: [ "python", "-c", "from sys import platform;import json;print(json.dumps(platform == 'darwin'))" ]
+#     withPackages: [ "python" ]
+#     fromWarehouse: !!warehouse defaultWarehouse
+#     saveAs: isMac
+
+# example1: using builtinDenoEval
+- (compute): # approach is about 1000ms faster than commandline because that the deno runtime is already instantiated (the runtime is parsing this file)
+    builtinDenoEval: Deno.build.os == 'darwin'
+    saveAs: isMac
+
 # isLinux
 - (compute):
-    runCommand: [ "deno", "eval", "console.log(JSON.stringify(Deno.build.os=='linux'))" ]
-    withPackages: [ "deno" ]
+    builtinDenoEval: Deno.build.os == 'linux'
     saveAs: isLinux
 
-- (compute):
-    runCommand: [ "deno", "eval", "console.log(JSON.stringify(Deno.build.os=='darwin'))" ]
-    withPackages: [ "deno" ]
-    fromWarehouse: !!warehouse defaultWarehouse
-    saveAs: isMac
 
 
 # 
