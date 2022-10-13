@@ -1,0 +1,1 @@
+../../../../vs_code_tools/events/virkshop/before_entering/096_000_vscode_injection.deno.js

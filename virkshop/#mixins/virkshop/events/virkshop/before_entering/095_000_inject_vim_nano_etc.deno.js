@@ -1,0 +1,1 @@
+../../../../project/events/virkshop/before_entering/095_000_inject_vim_nano_etc.deno.js

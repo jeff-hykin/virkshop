@@ -459,7 +459,7 @@
 - (package):
     asBuildInput: true
     load: [ "deno",]
-    from: "c82b46413401efa740a0b994f52e9903a4f6dcd5"
+    from: "ce6aa13369b667ac2542593170993504932eb836"
 
 - (package):
     asBuildInput: true

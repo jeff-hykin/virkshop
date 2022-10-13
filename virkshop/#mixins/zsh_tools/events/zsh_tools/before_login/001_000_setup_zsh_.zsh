@@ -1,0 +1,1 @@
+../../../../project/events/zsh_tools/before_login/001_000_setup_zsh_.zsh

@@ -334,7 +334,8 @@ export const createVirkshop = async (arg)=>{
                         // let the mixin link everything within itself
                         const selfSetupPromise = FileSystem.recursivelyListItemsIn(`${eachMixinPath}/events/virkshop/before_entering`).then(
                             async (phase1Items)=>{
-                                phase1Items.sort() // FIXME: this is javascript so of course it won't actually sort alpha-numerically
+                                // alpha numeric order
+                                phase1Items.sort((each1, each2) => each1.basename.localeCompare(each2.basename))
                                 const startTime = (new Date()).getTime()
                                 for (const eachItem of phase1Items) {
                                     // if its not a folder
@@ -469,11 +470,14 @@ export const createVirkshop = async (arg)=>{
                 const eventPathInfo = await FileSystem.info(eventPath)
                 if (eventPathInfo.isFolder) {
                     const paths = await FileSystem.recursivelyListPathsIn(eventPath)
-                    paths.sort()
-                    // FIXME: sort them numerically
+                    paths.sort((each1, each2) => each1.localeCompare(each2))
                     // FIXME: pad out the 0's to make the numbers equal lengths
-                    // FIXME: import the .deno.js files instead of executing them
                     for (const eachPath of paths) {
+                        // FIXME: import the .deno.js files instead of executing them
+                        // if (eachPath.endsWith(".deno.js")) {
+                        //     // convert them to a hex string then put them in a import statement and eval it
+                        //     FileSystem.read(eachPath)
+                        // }
                         await run`${eachPath}`
                     }
                 }
@@ -501,7 +505,7 @@ function pathOfCaller() {
     const filePaths = findAll(/^.+file:\/\/(\/[\w\W]*?):/gm, err.stack).map(each=>each[1])
     
     // if valid file
-    // FIXME: make sure this works inside of anonymous functions (not sure if error stack handles that well)
+    // TODO: make sure this works inside of anonymous functions (not sure if error stack handles that well)
     const secondPath = filePaths[1]
     if (secondPath) {
         try {
