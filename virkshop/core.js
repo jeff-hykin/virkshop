@@ -425,6 +425,7 @@ export const createVirkshop = async (arg)=>{
                                                 const uniquePath = await FileSystem.finalTargetOf(eachItem.path)
                                                 if (!alreadExecuted.has(uniquePath)) {
                                                     alreadExecuted.add(uniquePath)
+                                                    // puts things inside of virkshop._internal.deadlines
                                                     await virkshop.runDenoImport({
                                                         path: eachItem.path,
                                                         source: eachItem.path.slice(parentFolderString.length),
@@ -450,34 +451,28 @@ export const createVirkshop = async (arg)=>{
                         // schedule some work for phase2 so that it runs ASAP
                         virkshop._internal.deadlines.beforeShellScripts.push(selfSetupPromise.then(async ()=>{
                             // read the the before_login files as soon as possible
-                            const parentFolderString = `${eachMixinPath}/events/virkshop/during_setup/`
+                            const eventName = `during_setup`
+                            const parentFolderString = `${eachMixinPath}/events/virkshop/${eventName}/`
                             const files = await FileSystem.listFilePathsIn(parentFolderString)
-                            await Promise.all(files.map(async each=>{
-                                    if (each.match(/\.deno\.js$/))) {
-                                        const source = eachItem.path.slice(parentFolderString.length)
-                                        // see: https://github.com/denoland/deno/issues/15382
-                                        const escapedPath = `${encodeURIComponent(eachItem.path).replace(/%2F/g,'/')}`
-                                        const {deadlines} = await import(escapedPath) || {}
-                                        for (const eachDeadlineName of Object.keys(virkshop._internal.deadlines)) {
-                                            if (deadlines[eachDeadlineName] instanceof Function) {
-                                                virkshop._internal.deadlines[eachDeadlineName].push(
-                                                    // start the function, and we'll await it at the respective deadline
-                                                    deadlines[eachDeadlineName](
-                                                        virkshop._internal.createApi({
-                                                            source,
-                                                            mixinName,
-                                                            eventName,
-                                                            deadlineName: eachDeadlineName,
-                                                        })
-                                                    )
-                                                )
-                                            }
-                                        }
-                                    } else if (each.match(/\.zsh$/))) {
-                                        virkshop._internal.shellSetupPriorities.push(
-                                            [ eachZshPath.slice(parentFolderString.length), await FileSystem.read(eachZshPath) ]
-                                        )
-                                    }
+                            await Promise.all(files.map(async eachPath=>{
+                                if (eachPath.match(/\.deno\.js$/))) {
+                                    // puts things inside of virkshop._internal.deadlines
+                                    await virkshop.runDenoImport({
+                                        path: eachPath,
+                                        source: eachPath.slice(parentFolderString.length),
+                                        mixinName,
+                                        eventName,
+                                    })
+                                } else if (eachPath.match(/\.zsh$/))) {
+                                    virkshop._internal.shellSetupPriorities.push(
+                                        [
+                                            eachZshPath.slice(parentFolderString.length),
+                                            await FileSystem.read(eachZshPath),
+                                        ]
+                                    )
+                                } else {
+                                    console.warn(`\n\nThis file: ${eachPath}\nwas inside a ${eventName}/\nBut it didn't have a .zsh or .deno.js file extension\n(so it will be ignored besides generating this warning)`)
+                                }
                             }))
                         }))
                     }
