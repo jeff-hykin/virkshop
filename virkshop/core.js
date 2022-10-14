@@ -240,6 +240,11 @@ export const createVirkshop = async (arg)=>{
                 environmentVariables: {},
             },
             _internal: {
+                homeMappingObject: {},
+                zshPriorityObject: {},
+                deadlines: {
+                    beforeEnteringVirkshop: [],
+                },
                 zshrcString: `
                     # don't let zsh update itself without telling all the other packages 
                     # instead use nix to update zsh
@@ -279,6 +284,7 @@ export const createVirkshop = async (arg)=>{
                 zshSourceFileSetupPromises: [],
             },
             _stages: {
+                // phase 0: "prep" creates/discovers basic virkshop structure (establish linked files/folders, clean broken links)
                 async phase0(mixinPaths) {
                     debuggingMode && console.log("[Phase0: Establishing/Verifying Structure]")
                     mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
@@ -324,6 +330,7 @@ export const createVirkshop = async (arg)=>{
                         }
                     }))
                 },
+                // phase 1: "mixing" lets all the mixin's set themselves up (but other mixins are not guarenteed to be setup)
                 async phase1(mixinPaths) {
                     debuggingMode && console.log("[Phase1: Mixins Setup]")
                     mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
@@ -332,7 +339,7 @@ export const createVirkshop = async (arg)=>{
                     for (const eachMixinPath of mixinPaths) {
                         const mixinName = FileSystem.basename(eachMixinPath)
                         // let the mixin link everything within itself
-                        const selfSetupPromise = FileSystem.recursivelyListItemsIn(`${eachMixinPath}/events/virkshop/before_entering`).then(
+                        const selfSetupPromise = FileSystem.recursivelyListItemsIn(`${eachMixinPath}/events/virkshop/before_setup`).then(
                             async (phase1Items)=>{
                                 // alpha numeric order
                                 phase1Items.sort((each1, each2) => each1.basename.localeCompare(each2.basename))
@@ -349,7 +356,8 @@ export const createVirkshop = async (arg)=>{
                                                     alreadExecuted.add(uniquePath)
                                                     // see: https://github.com/denoland/deno/issues/15382
                                                     const escapedPath = `${encodeURIComponent(eachItem.path).replace(/%2F/g,'/')}`
-                                                    await import(escapedPath)
+                                                    const {deadlines} = await import(escapedPath)
+
                                                 }
                                             // otherwise execute it
                                             } else {
@@ -385,6 +393,7 @@ export const createVirkshop = async (arg)=>{
                     // 
                     await Promise.all(phase1Promises)
                 },
+                // phase 2: "cooking" enters the virkshop, and runs zsh login scripts created by the mixins
                 async phase2(mixinPaths) {
                     debuggingMode && console.log("[Phase2: Nix+Zsh Setup]")
                     var startTime = (new Date()).getTime()
@@ -418,9 +427,6 @@ export const createVirkshop = async (arg)=>{
                                 envVars += `export ${key}='${escapeShellArgument(value)}'\n`
                             }
                             
-                            // TODO: make sure this .zshrc only runs once per login rather than per shell
-                            // TODO: add dynamic per-shell hooks
-
                             let zshrcString = envVars + virkshop._internal.zshrcString + `
                                 export VIRKSHOP_FOLDER='${escapeShellArgument(virkshop.pathTo.virkshop)}'
                                 export VIRKSHOP_FAKE_HOME='${escapeShellArgument(virkshop.pathTo.fakeHome)}'
@@ -438,7 +444,7 @@ export const createVirkshop = async (arg)=>{
 
                             // write the new .zshrc file
                             await FileSystem.write({
-                                path: `${virkshop.pathTo.fakeHome}/.zshrc`,
+                                path: `${virkshop.pathTo.fakeHome}/.zlogin`,
                                 data: zshrcString,
                                 force: true,
                             })
