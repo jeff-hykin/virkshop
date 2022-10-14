@@ -34,7 +34,7 @@
                 );
             })
         );
-    - get `code` command to work
+    - DONE get `nano` command to work
         - implement injectUsersCommand()
     - get the home folder to link to `.cache/nix` and the deno cache
         - implement linkRealHomeFor()
@@ -128,26 +128,20 @@
         done < "$__temp_var__temp_folder/pipe_for_while_$__NESTED_WHILE_COUNTER";__NESTED_WHILE_COUNTER="$((__NESTED_WHILE_COUNTER - 1))"
         ```
     - fix problem with linked folders
-    - create a proxy-object representing the ENV
-        - allow for getting and setting 
-        - import a deno.js file and watch for changes to the proxy
-        - write a temp file deno.js.sh that translates all the env changes to zsh
-        - run the zsh file
-    - load all the env vars
+    - DONE load all the env vars
 
 - reconsider having the .zshrc always generated (generate 1 other file and have a .zshrc that is synced)
-- rename events
-    - "before_every_shell" for zsh
+- DONE rename events
+
+- get git ignore to work 
+- purge/clean event
+- allow loading advanced nix code
 
 # beta
-- allow loading advanced nix code
 - cli "virkshop/install [package name]"
 - make a way to change shells (implement a javascript API for Zsh shell)
 old todo:
 
-- DONE add a `zsh_tools` mixin with events for enter/exit
-    - rename `phase_1` to `before_entering`
-    - use `zsh_tools/events/zsh_tools/during_start` as a replacement for `phase_2`
 - create `virkshop.appendToEnvVar`
     - will need a way to save/seralize data
         - add a hidden getter that maps to a json file inside of short term temp
