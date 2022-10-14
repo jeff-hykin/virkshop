@@ -37,7 +37,7 @@
     - get `code` command to work
         - implement injectUsersCommand()
     - get the home folder to link to `.cache/nix` and the deno cache
-        - implement useRealHomeFor()
+        - implement linkRealHomeFor()
     - add commands to path (use deno to make them executable, use deno to make the zsh function for each folder)
         ```
         # 
@@ -135,10 +135,14 @@
         - run the zsh file
     - load all the env vars
 
+- reconsider having the .zshrc always generated (generate 1 other file and have a .zshrc that is synced)
+- rename events
+    - "before_every_shell" for zsh
+
 # beta
 - allow loading advanced nix code
 - cli "virkshop/install [package name]"
-
+- make a way to change shells (implement a javascript API for Zsh shell)
 old todo:
 
 - DONE add a `zsh_tools` mixin with events for enter/exit

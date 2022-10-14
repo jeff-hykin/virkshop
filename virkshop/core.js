@@ -1,6 +1,6 @@
-import { FileSystem } from "https://deno.land/x/quickr@0.4.0/main/file_system.js"
-import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.4.0/main/run.js"
-import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.4.0/main/console.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.4.1/main/file_system.js"
+import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.4.1/main/run.js"
+import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.4.1/main/console.js"
 import { indent, findAll } from "https://deno.land/x/good@0.5.1/string.js"
 
 
@@ -150,7 +150,7 @@ export const createVirkshop = async (arg)=>{
     virkshopPath = virkshopPath || Console.env.VIRKSHOP_FOLDER         // env var is used when already inside of the virkshop
     projectPath  = projectPath  || Console.env.VIRKSHOP_PROJECT_FOLDER // env var is used when already inside of the virkshop
 
-    const realHome = Console.env.VIRKSHOP_REAL_HOME || Console.env.HOME
+    const realHome = Console.env.VIRKSHOP_USERS_HOME || Console.env.HOME
     
     // 
     // auto-detect a virkshop path
@@ -212,7 +212,7 @@ export const createVirkshop = async (arg)=>{
                     fakeHome:         { get() { return `${virkshop.pathTo.temporary}/long_term/home` }},
                     virkshopOptions:  { get() { return `${virkshop.pathTo.mixins}/virkshop/settings/virkshop/options.json` }},
                     systemTools:      { get() { return `${virkshop.pathTo.settings}/system_tools.yaml` }},
-                    _passthroughData: { get() { return `${virkshop.pathTo.temporary}/short_term/virkshop/_passthrough_data.json` }},
+                    commands:         { get() { return `${virkshop.pathTo.mixture}/commands` }},
                     _tempShellFile:   { get() { return `${virkshop.pathTo.temporary}/short_term/virkshop/shell.nix` }},
                 }
             ),
@@ -225,27 +225,93 @@ export const createVirkshop = async (arg)=>{
                     'settings'
                 ],
             },
-            injectUsersCommand(commandName) {
-                // FIXME: implement
-                    // check if command exists
-                    // create a new command, absolute path it to the old command, give it the users home as HOME
-            },
-            useRealHomeFor(path) {
-                // FIXME: implement
-                    // create path in real home folder if it doesn't exist
-                    // FIXME: need to specify if folder or file
-                    // create an absolute-path link from the fake home version to the real home version
-            },
-            _passthroughData: {
-                environmentVariables: {},
-            },
             _internal: {
                 homeMappingObject: {},
-                zshPriorityObject: {},
+                shellSetupPriorities: [],
                 deadlines: {
+                    beforeSetup: [],
+                    beforeReadingSystemTools: [],
+                    beforeShellScripts: [],
                     beforeEnteringVirkshop: [],
                 },
-                zshrcString: `
+                sortPrioitiesByPath(array, convert=each=>each) {
+                    array.sort((each1, each2) => convert(each1).localeCompare(convert(each2)))
+                },
+                createApi({ source, mixinName, eventName, deadlineName }) {
+                    return {
+                        ...virkshop,
+                        source,
+                        mixinName,
+                        eventName,
+                        addToShellProfile(string) {
+                            if (deadlineName == "beforeEnteringVirkshop") {
+                                throw Error(`
+                                    There is a virkshop.addToShellProfile() inside a ${deadlineName}()
+                                    In this file: ${this.source}
+                                    
+                                    The problem:
+                                        The shell profile will already be done by the time of ${deadlineName}
+                                    
+                                    Likely solution:
+                                        Change ${deadlineName}() to beforeShellScripts()
+                                        Note: the available deadlines are:
+                                            beforeSetup, beforeReadingSystemTools, beforeShellScripts, beforeEnteringVirkshop
+                                `.replace(/\n                                /g,"\n"))
+                            }
+                            
+                            virkshop._internal.shellSetupPriorities.push([ this.source, string ])
+                        },
+                        setEnvVar(name, value) {
+                            if (deadlineName == "beforeEnteringVirkshop") {
+                                throw Error(`
+                                    There is a virkshop.setEnvVar() inside a ${deadlineName}()
+                                    In this file: ${this.source}
+                                    
+                                    The problem:
+                                        The shell profile will already be done by the time of ${deadlineName}
+                                    
+                                    Likely solution:
+                                        Change ${deadlineName}() to beforeShellScripts()
+                                        Note: the available deadlines are:
+                                            beforeSetup, beforeReadingSystemTools, beforeShellScripts, beforeEnteringVirkshop
+                                `.replace(/\n                                /g,"\n"))
+                            }
+                            
+                            virkshop._internal.shellSetupPriorities.push([ this.source, `${name}='${escapeShellArgument(value)}'` ])
+                        },
+                        injectUsersCommand(commandName) {
+                            virkshop._internal.beforeEnteringVirkshop.push(((async ()=>{
+                                const pathThatIsHopefullyGitIgnored = `${virkshop.pathTo.temporary}/long_term/${this.eventName}/${this.mixinName}`
+                                const commandPath = `${virkshop.pathTo.commands}/${commandName}`
+                                
+                                await FileSystem.ensureIsFile(pathThatIsHopefullyGitIgnored)
+                                await FileSystem.relativeLink({
+                                    existingItem: pathThatIsHopefullyGitIgnored,
+                                    newItem: commandPath,
+                                })
+                                
+                                // TODO: there's a lot that could be optimized here since system commands are slow.
+                                // Note: this command is intentionally never awaited because it only needs to be done by the time nix-shell starts, which takes multiple orders of magnitude more time (not awaiting lets it be done in parallel)
+                                run("command", "-v", commandName).then(async (absolutePathToCommand)=>{
+                                    await FileSystem.write({
+                                        path: pathThatIsHopefullyGitIgnored,
+                                        data: `#!/usr/bin/env bash\nHOME='${escapeShellArgument(virkshop.pathTo.realHome)}' PATH='${escapeShellArgument(Console.env.PATH)}' ${absolutePathToExecutable} "$@"`,
+                                    })
+                                })
+                            })()))
+                        },
+                        linkRealHomeFor(path) {
+                            // use this:
+                            virkshop._internal.homeMappingObject
+                            
+                            // FIXME: implement
+                                // create path in real home folder if it doesn't exist
+                                // FIXME: need to specify if folder or file
+                                // create an absolute-path link from the fake home version to the real home version
+                        },
+                    }
+                },
+                shellProfileString: `
                     # don't let zsh update itself without telling all the other packages 
                     # instead use nix to update zsh
                     DISABLE_AUTO_UPDATE="true"
@@ -280,27 +346,27 @@ export const createVirkshop = async (arg)=>{
                         fi
                     }
                 `,
-                zshSourceFiles: [],
-                zshSourceFileSetupPromises: [],
             },
             _stages: {
+                // 
+                // 
                 // phase 0: "prep" creates/discovers basic virkshop structure (establish linked files/folders, clean broken links)
+                // 
+                // 
                 async phase0(mixinPaths) {
                     debuggingMode && console.log("[Phase0: Establishing/Verifying Structure]")
                     mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
-
-                    Console.env.VIRKSHOP_FOLDER = virkshop.pathTo.virkshop
+                    
                     // 
-                    // establish mixins protected namespace
+                    // find hard home files (so they can be protected)
                     // 
-                    // FIXME: problem here with priority, what happens if two extensions write to the same location
-                    //    SOLUTION! this is just like traits/mixins
-                    //              instead of using a number priority, put all their stuff under a namespace
-                    //              then attempt to put it outside the namespace
-                    //                  if there is a conflict, make the command print out "there is a conflict, please specify if you want the command from __ or __"
-                    //  new FIXME: the above solution doesnt work for the home folder.
-                    //             maybe add a message any time a .profile or .rc file is added to the home and explain
-                    //     possible solution: use the project extension to pick one, which can be a combination (concat or pick one or whatever)
+                    for await (const eachHomePath of FileSystem.recursivelyIteratePathsIn(virkshop.pathTo.fakeHome, { dontFollowSymlinks: true, onlyHardlinks: true, })) {
+                        const shortButUnique = FileSystem.normalize(FileSystem.makeRelativePath({
+                            from: virkshop.pathTo.fakeHome,
+                            to:eachHomePath,
+                        }))
+                        virkshop._internal.homeMappingObject[shortButUnique] = { isHardpath: true }
+                    }
                     
                     // TODO: purge broken system links more
                     
@@ -330,7 +396,11 @@ export const createVirkshop = async (arg)=>{
                         }
                     }))
                 },
+                // 
+                // 
                 // phase 1: "mixing" lets all the mixin's set themselves up (but other mixins are not guarenteed to be setup)
+                // 
+                // 
                 async phase1(mixinPaths) {
                     debuggingMode && console.log("[Phase1: Mixins Setup]")
                     mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
@@ -338,11 +408,12 @@ export const createVirkshop = async (arg)=>{
                     const phase1Promises = []
                     for (const eachMixinPath of mixinPaths) {
                         const mixinName = FileSystem.basename(eachMixinPath)
+                        const eventName = "before_setup"
                         // let the mixin link everything within itself
-                        const selfSetupPromise = FileSystem.recursivelyListItemsIn(`${eachMixinPath}/events/virkshop/before_setup`).then(
+                        const parentFolderString = `${eachMixinPath}/events/virkshop/${eventName}`
+                        const selfSetupPromise = FileSystem.recursivelyListItemsIn(parentFolderString).then(
                             async (phase1Items)=>{
-                                // alpha numeric order
-                                phase1Items.sort((each1, each2) => each1.basename.localeCompare(each2.basename))
+                                virkshop._internal.sortPrioitiesByPath(phase1Items, (each)=>each.path.slice(parentFolderString.length))
                                 const startTime = (new Date()).getTime()
                                 for (const eachItem of phase1Items) {
                                     // if its not a folder
@@ -354,17 +425,19 @@ export const createVirkshop = async (arg)=>{
                                                 const uniquePath = await FileSystem.finalTargetOf(eachItem.path)
                                                 if (!alreadExecuted.has(uniquePath)) {
                                                     alreadExecuted.add(uniquePath)
-                                                    // see: https://github.com/denoland/deno/issues/15382
-                                                    const escapedPath = `${encodeURIComponent(eachItem.path).replace(/%2F/g,'/')}`
-                                                    const {deadlines} = await import(escapedPath)
-
+                                                    await virkshop.runDenoImport({
+                                                        path: eachItem.path,
+                                                        source: eachItem.path.slice(parentFolderString.length),
+                                                        mixinName,
+                                                        eventName,
+                                                    })
                                                 }
                                             // otherwise execute it
                                             } else {
                                                 await run`${eachItem.path}`
                                             }
                                         } catch (error) {
-                                            console.log(`\n\nWARNING: error while executing before_entering of ${FileSystem.basename(eachMixinPath)}, ${error.stack}`,)
+                                            console.log(`\n\nWARNING: error while executing ${eventName} of ${FileSystem.basename(eachMixinPath)}, ${error.stack}`,)
                                         }
                                     }
                                 }
@@ -375,99 +448,252 @@ export const createVirkshop = async (arg)=>{
                         phase1Promises.push(selfSetupPromise)
                         
                         // schedule some work for phase2 so that it runs ASAP
-                        virkshop._internal.zshSourceFileSetupPromises.push(selfSetupPromise.then(async ()=>{
+                        virkshop._internal.deadlines.beforeShellScripts.push(selfSetupPromise.then(async ()=>{
                             // read the the before_login files as soon as possible
-                            const files = await FileSystem.listFilePathsIn(`${eachMixinPath}/events/zsh_tools/before_login/`)
-                            await Promise.all(
-                                files.filter(each=>each.match(/\.zsh$/)).map(async eachZshPath=>{
-                                    const basename = FileSystem.basename(eachZshPath)
-                                    // TODO: allow for nesting (dont use basename, instead subtract the common folder)
-                                    virkshop._internal.zshSourceFiles.push([ basename, await FileSystem.read(eachZshPath) ])
-                                })
-                            )
+                            const parentFolderString = `${eachMixinPath}/events/virkshop/during_setup/`
+                            const files = await FileSystem.listFilePathsIn(parentFolderString)
+                            await Promise.all(files.map(async each=>{
+                                    if (each.match(/\.deno\.js$/))) {
+                                        const source = eachItem.path.slice(parentFolderString.length)
+                                        // see: https://github.com/denoland/deno/issues/15382
+                                        const escapedPath = `${encodeURIComponent(eachItem.path).replace(/%2F/g,'/')}`
+                                        const {deadlines} = await import(escapedPath) || {}
+                                        for (const eachDeadlineName of Object.keys(virkshop._internal.deadlines)) {
+                                            if (deadlines[eachDeadlineName] instanceof Function) {
+                                                virkshop._internal.deadlines[eachDeadlineName].push(
+                                                    // start the function, and we'll await it at the respective deadline
+                                                    deadlines[eachDeadlineName](
+                                                        virkshop._internal.createApi({
+                                                            source,
+                                                            mixinName,
+                                                            eventName,
+                                                            deadlineName: eachDeadlineName,
+                                                        })
+                                                    )
+                                                )
+                                            }
+                                        }
+                                    } else if (each.match(/\.zsh$/))) {
+                                        virkshop._internal.shellSetupPriorities.push(
+                                            [ eachZshPath.slice(parentFolderString.length), await FileSystem.read(eachZshPath) ]
+                                        )
+                                    }
+                            }))
                         }))
                     }
 
                     // 
                     // let the mixins set themselves up before starting phase2
                     // 
-                    await Promise.all(phase1Promises)
+                    await Promise.all(phase1Promises + virkshop._internal.deadlines.beforeSetup)
                 },
+                // 
+                // 
                 // phase 2: "cooking" enters the virkshop, and runs zsh login scripts created by the mixins
+                // 
+                // 
                 async phase2(mixinPaths) {
+                    
+                    // 
+                    // the three operations below can be done in any order, which is why they're in this Promise.all
+                    // 
                     debuggingMode && console.log("[Phase2: Nix+Zsh Setup]")
                     var startTime = (new Date()).getTime()
-                    
-                    // 
-                    // start fornixToNix because the system commands in there can take a long time
-                    // 
-                    // TODO: read the toml file to get the default nix hash then use -I arg in nix-shell
-                    const yamlString = await FileSystem.read(virkshop.pathTo.systemTools)
-                    // TODO: get a hash of this and see if nix-shell should even be regenerated or not (as an optimization)
-                    const nixShellStringPromise = fornixToNix(yamlString)
-
-                    mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
-                    
                     await Promise.all([
-                        // 
-                        // once mixins have created their internal peices, connect them to the larger outside system
-                        // 
-                        Promise.all(
-                            mixinPaths.map(
-                                eachMixinPath=>linkMixinShortcuts(eachMixinPath)
-                            )
-                        ),
 
+                        // 
+                        // parse the systemTools file
+                        // 
+                        ((async ()=>{
+                            // make sure the systemTools file is stable
+                            await Promise.all(virkshop._internal.deadlines.beforeReadingSystemTools)
+                            
+                            const yamlString = await FileSystem.read(virkshop.pathTo.systemTools)
+                            // TODO: get a hash of this and see if nix-shell should even be regenerated or not (as an optimization)
+                            const nixShellString = await fornixToNix(yamlString)
+                            await FileSystem.write({
+                                data: nixShellString,
+                                path: virkshop.pathTo._tempShellFile,
+                            })
+                        })()),
+                        
                         // 
                         // create the zshrc file
                         // 
                         ((async ()=>{
-                            let envVars = ""
-                            for (const [key, value] of Object.entries(virkshop._passthroughData.environmentVariables)) {
-                                envVars += `export ${key}='${escapeShellArgument(value)}'\n`
-                            }
+                            let shellProfileString = virkshop._internal.shellProfileString
                             
-                            let zshrcString = envVars + virkshop._internal.zshrcString + `
-                                export VIRKSHOP_FOLDER='${escapeShellArgument(virkshop.pathTo.virkshop)}'
-                                export VIRKSHOP_FAKE_HOME='${escapeShellArgument(virkshop.pathTo.fakeHome)}'
-                                export VIRKSHOP_REAL_HOME='${escapeShellArgument(virkshop.pathTo.realHome)}'
-                                export VIRKSHOP_PROJECT_FOLDER='${escapeShellArgument(virkshop.pathTo.project)}'
-                            `.replace(/\n                                /g,"\n")
-                            
-                            // all of these need to be resolved before zshSourceFiles can be used
-                            await Promise.all(virkshop._internal.zshSourceFileSetupPromises)
-                            const fileNames = Object.keys(virkshop._internal.zshSourceFiles)
-                            const sortedFiles = virkshop._internal.zshSourceFiles.sort(([name1, contents1], [name2, contents2]) => name1.localeCompare(name2))
-                            for (const [eachName, eachContent] of sortedFiles) {
-                                zshrcString += `\n#\n# ${eachName}\n#\n${eachContent}\n`
+                            // 
+                            // add project commands
+                            // 
+                            shellProfileString += `
+                                #
+                                # inject project's virkshop commands
+                                #
+                                export PATH='${escapeShellArgument(virkshop.pathTo.commands)}:$PATH'
+                            `.replace(/\n */g,"\n")
+
+                            // 
+                            // add during_setup scripts
+                            // 
+                            await Promise.all(virkshop._internal.deadlines.beforeShellScripts)
+                            virkshop._internal.sortPrioitiesByPath(virkshop._internal.shellSetupPriorities , ([eachSource, ...otherData])=>eachSource)
+                            for (const [eachSource, eachContent] of virkshop._internal.shellSetupPriorities) {
+                                // TODO: add a debugging echo here if debuggingMode
+                                shellProfileString += `\n#\n# ${eachSource}\n#\n${eachContent}\n`
                             }
 
-                            // write the new .zshrc file
+                            // 
+                            // add project commands again
+                            // 
+                            shellProfileString += `
+                                #
+                                # inject project's virkshop commands
+                                #
+                                export PATH='${escapeShellArgument(virkshop.pathTo.commands)}:$PATH'
+                            `.replace(/\n */g,"\n")
+                            // 
+                            // make folders work as recursive commands
+                            // 
+                            for (const eachFolderPath of await FileSystem.listFolderPathsIn(virkshop.pathTo.commands)) {
+                                const name = escapeShellArgument(FileSystem.basename(eachFolderPath))
+                                shellProfileString += `
+                                    # 
+                                    # command for ${name} folder
+                                    # 
+                                        '${name}' () {
+                                            # enable globbing
+                                            setopt extended_glob &>/dev/null
+                                            shopt -s globstar &>/dev/null
+                                            shopt -s dotglob &>/dev/null
+                                            local search_path='${escapeShellArgument(FileSystem.makeAbsolutePath(eachFolderPath))}'
+                                            local argument_combination="$search_path/$1"
+                                            while [[ -n "$@" ]]
+                                            do
+                                                shift 1
+                                                for each in "$search_path/"**/*
+                                                do
+                                                    if [[ "$argument_combination" = "$each" ]]
+                                                    then
+                                                        # if its a folder, then we need to go deeper
+                                                        if [[ -d "$each" ]]
+                                                        then
+                                                            search_path="$each"
+                                                            argument_combination="$argument_combination/$1"
+                                                            
+                                                            # if there is no next argument
+                                                            if [[ -z "$1" ]]
+                                                            then
+                                                                printf "\\nThat is a sub folder, not a command\\nValid sub-commands are\\n" 1>&2
+                                                                ls -1FL --group-directories-first --color "$each" | sed 's/^/    /' | sed -E 's/(\\*|@)$/ /' 1>&2
+                                                                return 1 # error, no command
+                                                            fi
+                                                            
+                                                            break
+                                                        # if its a file, run it with the remaining arguments
+                                                        elif [[ -f "$each" ]]
+                                                        then
+                                                            "$each" "$@"
+                                                            # make exit status identical to executed program
+                                                            return $?
+                                                        fi
+                                                    fi
+                                                done
+                                            done
+                                            # if an option was given
+                                            if ! [ -z "$each" ]
+                                            then
+                                                echo "$each"
+                                                printf "\\nI could not find that sub-command\\n" 1>&2
+                                            fi
+                                            printf "Valid next-arguments would be:\\n" 1>&2
+                                            ls -1FL --group-directories-first --color "$search_path" | sed 's/^/    /' | sed -E 's/(\\*|@)$/ /' 1>&2
+                                            return 1 # error, no command
+                                        }
+                                        '__autocomplete_for__${name}' () {
+                                            local commands_path='${escapeShellArgument(virkshop.pathTo.commands)}'
+                                            # TODO: make this space friendly
+                                            # TODO: make this do partial-word complete 
+                                            function join_by { local d=\${1-} f=\${2-}; if shift 2; then printf %s "$f" "\${@/#/$d}"; fi; }
+                                            local item_path="$(join_by "/" $words)"
+                                            if [ -d "$commands_path/$item_path" ]
+                                            then
+                                                compadd $(ls "$commands_path/$item_path")
+                                            elif [ -d "$(dirname "$commands_path/$item_path")" ]
+                                            then
+                                                # check if file exists (finished completion)
+                                                if ! [ -f "$commands_path/$item_path" ]
+                                                then
+                                                    # TODO: add a better check for sub-matches "java" [tab] when "java" and "javascript" exist
+                                                    compadd $(ls "$(dirname "$commands_path/$item_path")")
+                                                fi
+                                            fi
+                                            # echo "$(dirname "$commands_path/$item_path")"
+                                        }
+                                        compdef '__autocomplete_for__${name}' '${name}'
+                                `.replace(/\n                                    /g, "\n")
+                                
+                            }
+                            
+                            // write the new shell profile
                             await FileSystem.write({
                                 path: `${virkshop.pathTo.fakeHome}/.zlogin`,
-                                data: zshrcString,
+                                data: shellProfileString,
                                 force: true,
                             })
-                        })())
+                        })()),
+
+                        // 
+                        // since phase2 created the mixture, connect parts of the mixture to the outside folder system
+                        // 
+                        ((async ()=>{
+                            mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
+                            await Promise.all(
+                                mixinPaths.map(
+                                    eachMixinPath=>linkMixinShortcuts(eachMixinPath)
+                                )
+                            )
+                        })()),
+                        
                     ])
                     var duration = (new Date()).getTime() - startTime; var startTime = (new Date()).getTime()
-                    debuggingMode && console.log(`     [${duration}ms creating .zshrc]`)
-                    
-                    const nixShellString = await nixShellStringPromise
-                    await FileSystem.write({
-                        data: nixShellString,
-                        path: virkshop.pathTo._tempShellFile,
-                    })
-                    var duration = (new Date()).getTime() - startTime; var startTime = (new Date()).getTime()
-                    debuggingMode && console.log(`     [${duration}ms creating shell.nix]`)
-                    
-                    Console.env.VIRKSHOP_REAL_HOME = virkshop.pathTo.realHome
-                    Console.env.HOME               = virkshop.pathTo.fakeHome
-                    Console.env._shell_start_time  = `${startTime}`
-                    Console.env.VIRKSHOP_DEBUG     = `${debuggingMode}`
+                    debuggingMode && console.log(`     [${duration}ms creating shell profile and shell.nix]`)
 
-                    await run`nix-shell --pure --command zsh --keep NIX_SSL_CERT_FILE --keep VIRKSHOP_DEBUG --keep _shell_start_time --keep VIRKSHOP_FOLDER --keep VIRKSHOP_FAKE_HOME --keep VIRKSHOP_REAL_HOME --keep VIRKSHOP_PROJECT_FOLDER ${virkshop.pathTo._tempShellFile} -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/ce6aa13369b667ac2542593170993504932eb836.tar.gz` // FIXME: use the defaultWarehouse
-
+                    // 
+                    // finish dynamic setup
+                    // 
+                    await Promise.all(virkshop._internal.beforeEnteringVirkshop)
+                    // make all commands executable
+                    for await (const eachCommandPath of FileSystem.recursivelyIteratePathsIn(virkshop.pathTo.commands)) {
+                        await FileSystem.addPermissions({path: eachCommandPath, permissions: { owner: {canExecute: true} }})
+                    }
+                    
+                    
+                    // 
+                    // run nix-shell
+                    // 
+                    const envVars = {
+                        _shell_start_time: `${startTime}`,
+                        VIRKSHOP_FOLDER: virkshop.pathTo.virkshop,
+                        VIRKSHOP_PROJECT_FOLDER: virkshop.pathTo.project,
+                        VIRKSHOP_HOME: virkshop.pathTo.fakeHome,
+                        VIRKSHOP_USERS_HOME: virkshop.pathTo.realHome,
+                        VIRKSHOP_DEBUG: `${debuggingMode}`,
+                        NIX_SSL_CERT_FILE: Console.env.NIX_SSL_CERT_FILE,
+                        HOME: virkshop.pathTo.fakeHome,
+                    }
+                    await run(
+                        Env(envVars),
+                        "nix-shell",
+                        "--pure",
+                        "--command", "zsh",
+                        Object.keys(envVars).map(
+                            name=>["--keep", name]
+                        ).flat(),
+                        `${virkshop.pathTo._tempShellFile}`
+                        "-I",
+                        `nixpkgs=https://github.com/NixOS/nixpkgs/archive/ce6aa13369b667ac2542593170993504932eb836.tar.gz`, // FIXME: use the defaultWarehouse
+                    )
                     // TODO: call all the on_quit scripts
                 },
             },
@@ -488,6 +714,25 @@ export const createVirkshop = async (arg)=>{
                     }
                 }
             },
+            async runDenoImport({path, mixinName, eventName, source }) {
+                const escapedPath = `${encodeURIComponent(path).replace(/%2F/g,'/')}`
+                const {deadlines} = await import(escapedPath) || {}
+                for (const eachDeadlineName of Object.keys(virkshop._internal.deadlines)) {
+                    if (deadlines[eachDeadlineName] instanceof Function) {
+                        virkshop._internal.deadlines[eachDeadlineName].push(
+                            // start the function, and we'll await it at the respective deadline
+                            deadlines[eachDeadlineName](
+                                virkshop._internal.createApi({
+                                    source,
+                                    mixinName,
+                                    eventName,
+                                    deadlineName: eachDeadlineName,
+                                })
+                            )
+                        )
+                    }
+                }
+            }
         },
         {
             folder:      { get() { return virkshop.pathTo.virkshop } }, // alias

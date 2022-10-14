@@ -4,7 +4,7 @@
 #     deno
 # AVAILABLE ENV VARS:
 #     VIRKSHOP_FOLDER
-#     VIRKSHOP_FAKE_HOME # same as HOME 
+#     VIRKSHOP_HOME # same as HOME 
 #     VIRKSHOP_PROJECT_FOLDER
 #     NIX_SSL_CERT_FILE
 

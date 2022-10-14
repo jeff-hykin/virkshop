@@ -1,1 +1,0 @@
-../../../../project/events/virkshop/before_entering/010_000_setting_up_env_message.deno.js

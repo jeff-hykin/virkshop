@@ -1,1 +1,0 @@
-../../../../project/events/virkshop/before_entering/060_010_link_tealdeer.deno.js
