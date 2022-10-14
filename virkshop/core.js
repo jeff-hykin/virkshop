@@ -1,4 +1,4 @@
-import { FileSystem } from "https://deno.land/x/quickr@0.4.1/main/file_system.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.4.2/main/file_system.js"
 import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.4.1/main/run.js"
 import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.4.1/main/console.js"
 import { indent, findAll } from "https://deno.land/x/good@0.5.1/string.js"
@@ -68,7 +68,8 @@ async function linkMixinNamespace(path) {
         if (needToCreateNamespace) {
             await FileSystem.relativeLink({
                 existingItem: mixinFolder,
-                newItem: commonFolderReservedForThisMixin
+                newItem: commonFolderReservedForThisMixin,
+                overwrite: true,
             })
         }
     }
@@ -136,6 +137,7 @@ async function linkMixinShortcuts(path) {
                 await FileSystem.relativeLink({
                     existingItem: mixinItem.path,
                     newItem: targetLocation.path,
+                    overwrite: true,
                 })
             }
             // TODO: consider another edgecase of mixin item being a file, but existing item being a folder
@@ -280,23 +282,35 @@ export const createVirkshop = async (arg)=>{
                             virkshop._internal.shellSetupPriorities.push([ this.source, `${name}='${escapeShellArgument(value)}'` ])
                         },
                         injectUsersCommand(commandName) {
-                            virkshop._internal.beforeEnteringVirkshop.push(((async ()=>{
-                                const pathThatIsHopefullyGitIgnored = `${virkshop.pathTo.temporary}/long_term/${this.eventName}/${this.mixinName}`
+                            virkshop._internal.deadlines.beforeEnteringVirkshop.push(((async ()=>{
+                                const pathThatIsHopefullyGitIgnored = `${virkshop.pathTo.temporary}/long_term/${this.eventName}/${this.mixinName}/${commandName}`
                                 const commandPath = `${virkshop.pathTo.commands}/${commandName}`
                                 
                                 await FileSystem.ensureIsFile(pathThatIsHopefullyGitIgnored)
-                                await FileSystem.relativeLink({
-                                    existingItem: pathThatIsHopefullyGitIgnored,
-                                    newItem: commandPath,
-                                })
+                                
+                                try {
+                                    await FileSystem.remove(commandPath)
+                                    // FIXME: relativeLink isnt actually being forceful
+                                    await FileSystem.relativeLink({
+                                        existingItem: pathThatIsHopefullyGitIgnored,
+                                        newItem: commandPath,
+                                        overwrite: true,
+                                        force: true,
+                                    })
+                                } catch (error) {
+                                    
+                                }
                                 
                                 // TODO: there's a lot that could be optimized here since system commands are slow.
                                 // Note: this command is intentionally never awaited because it only needs to be done by the time nix-shell starts, which takes multiple orders of magnitude more time (not awaiting lets it be done in parallel)
-                                run("command", "-v", commandName).then(async (absolutePathToCommand)=>{
-                                    await FileSystem.write({
-                                        path: pathThatIsHopefullyGitIgnored,
-                                        data: `#!/usr/bin/env bash\nHOME='${escapeShellArgument(virkshop.pathTo.realHome)}' PATH='${escapeShellArgument(Console.env.PATH)}' ${absolutePathToExecutable} "$@"`,
-                                    })
+                                run("command", "-v", commandName, Out(returnAsString)).then(async (absolutePathToCommand)=>{
+                                    if (absolutePathToCommand) {
+                                        await FileSystem.write({
+                                            path: pathThatIsHopefullyGitIgnored,
+                                            data: `#!/usr/bin/env bash\nHOME='${escapeShellArgument(virkshop.pathTo.realHome)}' PATH='${escapeShellArgument(Console.env.PATH)}' ${absolutePathToCommand} "$@"`,
+                                            overwrite: true,
+                                        })
+                                    }
                                 })
                             })()))
                         },
@@ -392,6 +406,7 @@ export const createVirkshop = async (arg)=>{
                             await FileSystem.relativeLink({
                                 existingItem: sourcePath,
                                 newItem: target.path,
+                                overwrite: true,
                             })
                         }
                     }))
@@ -455,7 +470,7 @@ export const createVirkshop = async (arg)=>{
                             const parentFolderString = `${eachMixinPath}/events/virkshop/${eventName}/`
                             const files = await FileSystem.listFilePathsIn(parentFolderString)
                             await Promise.all(files.map(async eachPath=>{
-                                if (eachPath.match(/\.deno\.js$/))) {
+                                if (eachPath.match(/\.deno\.js$/)) {
                                     // puts things inside of virkshop._internal.deadlines
                                     await virkshop.runDenoImport({
                                         path: eachPath,
@@ -463,11 +478,11 @@ export const createVirkshop = async (arg)=>{
                                         mixinName,
                                         eventName,
                                     })
-                                } else if (eachPath.match(/\.zsh$/))) {
+                                } else if (eachPath.match(/\.zsh$/)) {
                                     virkshop._internal.shellSetupPriorities.push(
                                         [
-                                            eachZshPath.slice(parentFolderString.length),
-                                            await FileSystem.read(eachZshPath),
+                                            eachPath.slice(parentFolderString.length),
+                                            await FileSystem.read(eachPath),
                                         ]
                                     )
                                 } else {
@@ -494,6 +509,7 @@ export const createVirkshop = async (arg)=>{
                     // 
                     debuggingMode && console.log("[Phase2: Nix+Zsh Setup]")
                     var startTime = (new Date()).getTime()
+                    var defaultWarehouse
                     await Promise.all([
 
                         // 
@@ -505,10 +521,12 @@ export const createVirkshop = async (arg)=>{
                             
                             const yamlString = await FileSystem.read(virkshop.pathTo.systemTools)
                             // TODO: get a hash of this and see if nix-shell should even be regenerated or not (as an optimization)
-                            const nixShellString = await fornixToNix(yamlString)
+                            const result = await fornixToNix(yamlString)
+                            defaultWarehouse = result.defaultWarehouse
                             await FileSystem.write({
-                                data: nixShellString,
+                                data: result.string,
                                 path: virkshop.pathTo._tempShellFile,
+                                overwrite: true,
                             })
                         })()),
                         
@@ -525,7 +543,7 @@ export const createVirkshop = async (arg)=>{
                                 #
                                 # inject project's virkshop commands
                                 #
-                                export PATH='${escapeShellArgument(virkshop.pathTo.commands)}:$PATH'
+                                export PATH='${escapeShellArgument(virkshop.pathTo.commands)}:'"$PATH"
                             `.replace(/\n */g,"\n")
 
                             // 
@@ -545,7 +563,7 @@ export const createVirkshop = async (arg)=>{
                                 #
                                 # inject project's virkshop commands
                                 #
-                                export PATH='${escapeShellArgument(virkshop.pathTo.commands)}:$PATH'
+                                export PATH='${escapeShellArgument(virkshop.pathTo.commands)}:'"$PATH"
                             `.replace(/\n */g,"\n")
                             // 
                             // make folders work as recursive commands
@@ -632,9 +650,10 @@ export const createVirkshop = async (arg)=>{
                             
                             // write the new shell profile
                             await FileSystem.write({
-                                path: `${virkshop.pathTo.fakeHome}/.zlogin`,
+                                path: `${virkshop.pathTo.fakeHome}/.zshrc`,
                                 data: shellProfileString,
                                 force: true,
+                                overwrite: true,
                             })
                         })()),
 
@@ -653,11 +672,11 @@ export const createVirkshop = async (arg)=>{
                     ])
                     var duration = (new Date()).getTime() - startTime; var startTime = (new Date()).getTime()
                     debuggingMode && console.log(`     [${duration}ms creating shell profile and shell.nix]`)
-
+                    
                     // 
                     // finish dynamic setup
                     // 
-                    await Promise.all(virkshop._internal.beforeEnteringVirkshop)
+                    await Promise.all(virkshop._internal.deadlines.beforeEnteringVirkshop)
                     // make all commands executable
                     for await (const eachCommandPath of FileSystem.recursivelyIteratePathsIn(virkshop.pathTo.commands)) {
                         await FileSystem.addPermissions({path: eachCommandPath, permissions: { owner: {canExecute: true} }})
@@ -678,16 +697,15 @@ export const createVirkshop = async (arg)=>{
                         HOME: virkshop.pathTo.fakeHome,
                     }
                     await run(
-                        Env(envVars),
                         "nix-shell",
                         "--pure",
                         "--command", "zsh",
-                        Object.keys(envVars).map(
+                        ...Object.keys(envVars).map(
                             name=>["--keep", name]
                         ).flat(),
-                        `${virkshop.pathTo._tempShellFile}`
-                        "-I",
-                        `nixpkgs=https://github.com/NixOS/nixpkgs/archive/ce6aa13369b667ac2542593170993504932eb836.tar.gz`, // FIXME: use the defaultWarehouse
+                        `${virkshop.pathTo._tempShellFile}`,
+                        "-I", `nixpkgs=${defaultWarehouse.tarFileUrl}`,
+                        Env(envVars),
                     )
                     // TODO: call all the on_quit scripts
                 },
@@ -1082,7 +1100,7 @@ export const fornixToNix = async function(yamlString) {
             // save defaultWarehouse name
             if (kind == "(defaultWarehouse)") {
                 defaultWarehouseName = varName
-                defaultWarehouse = warehouses[varNames]
+                defaultWarehouse = warehouses[varName]
             }
         // 
         // (compute)
@@ -1262,7 +1280,13 @@ export const fornixToNix = async function(yamlString) {
             );
     `
     
-    return `
+    return {
+        defaultWarehouse,
+        computed,
+        nixValues,
+        warehouses,
+        packages,
+        string: `
         let
             #
             # create a standard library for convienience 
@@ -1313,5 +1337,7 @@ export const fornixToNix = async function(yamlString) {
                     export VIRKSHOP_NIX_SHELL_DATA='\${__nixShellEscapedJsonData__}'
                 ";
             }
-        `.replace(/\n        /g,"\n")
+        `.replace(/\n        /g,"\n"),
+    }
+    
 }
