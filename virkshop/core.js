@@ -77,7 +77,7 @@ export const createVirkshop = async (arg)=>{
                     temporary:        { get() { return `${virkshop.pathTo.mixture}/temporary` }},
                     fakeHome:         { get() { return `${virkshop.pathTo.temporary}/long_term/home` }},
                     virkshopOptions:  { get() { return `${virkshop.pathTo.mixins}/virkshop/settings/virkshop/options.json` }},
-                    systemTools:      { get() { return `${virkshop.pathTo.settings}/system_tools.yaml` }},
+                    systemTools:      { get() { return `${virkshop.pathTo.mixins}/nix_tools/settings/system_tools.yaml` }},
                     commands:         { get() { return `${virkshop.pathTo.mixture}/commands` }},
                     _nixBuildShell:   { get() { return `${virkshop.pathTo.mixins}/virkshop/commands/virkshop/nix_build_shell` }},
                     _tempNixShellFile:{ get() { return `${virkshop.pathTo.temporary}/short_term/virkshop/shell.nix` }},
