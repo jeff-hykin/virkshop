@@ -4,149 +4,13 @@ import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan,
 import { indent, findAll } from "https://deno.land/x/good@0.5.1/string.js"
 
 
-const escapeShellArgument = (string) => string.replace(/'/g, `'"'"'`)
-
-async function recursivelyFileLink({targetFolder, existingFolder}) {
-    const target = await FileSystem.info(targetFolder)
-    const existing = await FileSystem.info(existingFolder)
-    
-    const existingItems = await FileSystem.recursivelyListItemsIn(existing)
-    for (const existingItem of existingItems) {
-        const relativePart = await FileSystem.makeRelativePath({
-            from: existing.path,
-            to: existingItem.path 
-        })
-        // link the file (creating any folders necessary in the process)
-        await FileSystem.relativeLink({
-            existingItem: existingItem.path,
-            newItem: `${target.path}/${relativePart}`,
-        })
-    }
-}
-
-async function linkMixinNamespace(path) {
-    const mixinName = FileSystem.basename(path)
-    for (const eachSpecialFolder of virkshop.structure.specialMixinFolders) {
-        if (FileSystem.basename(eachSpecialFolder) == 'home') {
-            // TODO: BETA: home folder needs to be treated differently
-            continue
-        }
-        const mixinFolder                      = `${path}/${eachSpecialFolder}/${mixinName}`
-        const commonFolderReservedForThisMixin = `${virkshop.pathTo.mixture}/${eachSpecialFolder}/${mixinName}`
-
-        await FileSystem.ensureIsFolder(mixinFolder)
-        
-        // 
-        // create the "namespaced" folder of the file first
-        // 
-        const namespaceCheck = await FileSystem.info(commonFolderReservedForThisMixin)
-        let needToCreateNamespace = false
-        if (!namespaceCheck.exists) {
-            needToCreateNamespace = true
-        } else if (!namespaceCheck.isSymlink) {
-            if (namespaceCheck.isFolder) {
-                const paths = await FileSystem.listPathsIn(namespaceCheck.path)
-                for (const eachExisting of paths) {
-                    await FileSystem.move({
-                        item: eachExisting,
-                        newParentFolder: mixinFolder,
-                        overwrite: true,
-                    })
-                }
-            }
-            await FileSystem.remove(commonFolderReservedForThisMixin)
-            needToCreateNamespace = true
-        } else {
-            const target = await FileSystem.nextTargetOf(namespaceCheck.path)
-            const thisFolder = FileSystem.makeAbsolutePath(mixinFolder)
-            if (target != thisFolder) {
-                await FileSystem.remove(commonFolderReservedForThisMixin)
-                needToCreateNamespace = true
-            }
-        }
-        // create the commonFolderReservedForThisMixin
-        if (needToCreateNamespace) {
-            await FileSystem.relativeLink({
-                existingItem: mixinFolder,
-                newItem: commonFolderReservedForThisMixin,
-                overwrite: true,
-            })
-        }
-    }
-}
-
-async function linkMixinShortcuts(path) {
-    // NOTE: linkMixinNamespace needs to be run for EVERY mixin before shortcuts can run. Otherwise there could be order of operations problems
-
-    const mixinName = FileSystem.basename(path)
-    for (const eachSpecialFolder of virkshop.structure.specialMixinFolders) {
-        const commonFolder = `${virkshop.pathTo.mixture}/${eachSpecialFolder}`
-        const mixinFolder  = `${path}/${eachSpecialFolder}`
-
-        // 
-        // add all the shortcut links
-        // 
-        for (const eachPath of await FileSystem.recursivelyListPathsIn(mixinFolder)) {
-            const relativePart = eachPath.slice(mixinFolder.length)
-            const sourceLocation = eachPath
-            const targetLocation = await FileSystem.info(`${commonFolder}/${relativePart}`)
-            // if hardlink
-            if (targetLocation.isFile && !targetLocation.isSymlink) {
-                // assume the user put it there, or that its the plugin's ownership
-                continue
-            // if symlink
-            } else if (targetLocation.isFile) {
-                // remove broken things
-                if (targetLocation.isBrokenLink) {
-                    await FileSystem.remove(targetLocation.path)
-                } else {
-                    const currentTarget  = await FileSystem.finalTargetOf(targetLocation.path)
-                    const intendedTarget = await FileSystem.finalTargetOf(eachPath)
-                    if (currentTarget == intendedTarget) {
-                        // already linked
-                        continue
-                    } else {
-                        // linked but to the wrong thing
-                        console.warn(`
-                            This path:               ${targetLocation.path}
-                            Should link to:          ${intendedTarget}
-                            But instead it links to: ${currentTarget}
-
-                            The fix is probably to just delete: ${targetLocation.path}
-                            (I'm not sure how you would end up in this situation)
-                        `.replace(/\n                            /g,"\n"))
-                        const answeredYes = await Console.askFor.yesNo("Would you like me to delete it for you?")
-                        if (answeredYes) {
-                            await FileSystem.remove(targetLocation.path)
-                        }
-                        console.log("Continuing setup ...")
-
-                        if (!answeredYes) {
-                            continue
-                        }
-                    }
-                }
-            }
-            const mixinItem = await FileSystem.info(eachPath)
-            if (mixinItem.isFile) {
-                // TODO: this could technically destroy a user-made file, if it was "thing/thing" in a "thing/thing/${mixinItem}" path
-                
-                // make sure it exists by this point
-                await FileSystem.ensureIsFolder(FileSystem.parentPath(mixinItem.path))
-                // create the shortcut
-                await FileSystem.relativeLink({
-                    existingItem: mixinItem.path,
-                    newItem: targetLocation.path,
-                    overwrite: true,
-                })
-            }
-            // TODO: consider another edgecase of mixin item being a file, but existing item being a folder
-        }
-    }
-}
-
+// 
+// 
+// Main
+// 
+// 
 let debuggingMode = false
-const virkshopIdentifierPath = `#mixins/virkshop/settings/virkshop/`
+const virkshopIdentifierPath = `#mixins/virkshop/settings/virkshop/` // The only thing that can basically never change
 export const createVirkshop = async (arg)=>{
     var { virkshopPath, projectPath } = {...arg}
     virkshopPath = virkshopPath || Console.env.VIRKSHOP_FOLDER         // env var is used when already inside of the virkshop
@@ -215,7 +79,8 @@ export const createVirkshop = async (arg)=>{
                     virkshopOptions:  { get() { return `${virkshop.pathTo.mixins}/virkshop/settings/virkshop/options.json` }},
                     systemTools:      { get() { return `${virkshop.pathTo.settings}/system_tools.yaml` }},
                     commands:         { get() { return `${virkshop.pathTo.mixture}/commands` }},
-                    _tempShellFile:   { get() { return `${virkshop.pathTo.temporary}/short_term/virkshop/shell.nix` }},
+                    _nixBuildShell:   { get() { return `${virkshop.pathTo.mixins}/virkshop/commands/virkshop/nix_build_shell` }},
+                    _tempNixShellFile:{ get() { return `${virkshop.pathTo.temporary}/short_term/virkshop/shell.nix` }},
                 }
             ),
             structure: {
@@ -320,8 +185,6 @@ export const createVirkshop = async (arg)=>{
                             
                             // FIXME: implement
                                 // create path in real home folder if it doesn't exist
-                                // FIXME: need to specify if folder or file
-                                // create an absolute-path link from the fake home version to the real home version
                         },
                     }
                 },
@@ -384,12 +247,59 @@ export const createVirkshop = async (arg)=>{
                     
                     // TODO: purge broken system links more
                     
-                    // let them finish in any order (efficient), but they need to be done before phase 1 starts
-                    await Promise.all(
-                        mixinPaths.map(
-                            eachMixin=>linkMixinNamespace(eachMixin)
-                        )
-                    )
+                    // 
+                    // let mixins symlinks finish in any order (efficient), but all of them need to be done before phase 1 starts
+                    // 
+                    await Promise.all(mixinPaths.map(async eachPath=>{
+                        const mixinName = FileSystem.basename(eachPath)
+                        for (const eachSpecialFolder of virkshop.structure.specialMixinFolders) {
+                            if (FileSystem.basename(eachSpecialFolder) == 'home') {
+                                // FIXME: home folder needs to be treated differently
+                                continue
+                            }
+                            const mixinFolder                      = `${eachPath}/${eachSpecialFolder}/${mixinName}`
+                            const commonFolderReservedForThisMixin = `${virkshop.pathTo.mixture}/${eachSpecialFolder}/${mixinName}`
+
+                            await FileSystem.ensureIsFolder(mixinFolder)
+                            
+                            // 
+                            // create the "namespaced" folder of the file first
+                            // 
+                            const namespaceCheck = await FileSystem.info(commonFolderReservedForThisMixin)
+                            let needToCreateNamespace = false
+                            if (!namespaceCheck.exists) {
+                                needToCreateNamespace = true
+                            } else if (!namespaceCheck.isSymlink) {
+                                if (namespaceCheck.isFolder) {
+                                    const paths = await FileSystem.listPathsIn(namespaceCheck.path)
+                                    for (const eachExisting of paths) {
+                                        await FileSystem.move({
+                                            item: eachExisting,
+                                            newParentFolder: mixinFolder,
+                                            overwrite: true,
+                                        })
+                                    }
+                                }
+                                await FileSystem.remove(commonFolderReservedForThisMixin)
+                                needToCreateNamespace = true
+                            } else {
+                                const target = await FileSystem.nextTargetOf(namespaceCheck.path)
+                                const thisFolder = FileSystem.makeAbsolutePath(mixinFolder)
+                                if (target != thisFolder) {
+                                    await FileSystem.remove(commonFolderReservedForThisMixin)
+                                    needToCreateNamespace = true
+                                }
+                            }
+                            // create the commonFolderReservedForThisMixin
+                            if (needToCreateNamespace) {
+                                await FileSystem.relativeLink({
+                                    existingItem: mixinFolder,
+                                    newItem: commonFolderReservedForThisMixin,
+                                    overwrite: true,
+                                })
+                            }
+                        }
+                    }))
                     
                     // rule1: never overwrite non-symlink files (in commands/ settings/ etc)
                     //        hardlink files are presumably created by the user, not a mixin
@@ -424,7 +334,9 @@ export const createVirkshop = async (arg)=>{
                     for (const eachMixinPath of mixinPaths) {
                         const mixinName = FileSystem.basename(eachMixinPath)
                         const eventName = "before_setup"
+                        // 
                         // let the mixin link everything within itself
+                        // 
                         const parentFolderString = `${eachMixinPath}/events/virkshop/${eventName}`
                         const selfSetupPromise = FileSystem.recursivelyListItemsIn(parentFolderString).then(
                             async (phase1Items)=>{
@@ -441,7 +353,7 @@ export const createVirkshop = async (arg)=>{
                                                 if (!alreadExecuted.has(uniquePath)) {
                                                     alreadExecuted.add(uniquePath)
                                                     // puts things inside of virkshop._internal.deadlines
-                                                    await virkshop.runDenoImport({
+                                                    await virkshop.importDeadlinesFrom({
                                                         path: eachItem.path,
                                                         source: eachItem.path.slice(parentFolderString.length),
                                                         mixinName,
@@ -463,7 +375,9 @@ export const createVirkshop = async (arg)=>{
                         )
                         phase1Promises.push(selfSetupPromise)
                         
-                        // schedule some work for phase2 so that it runs ASAP
+                        // 
+                        // kick-off work for phase2 so that it runs ASAP
+                        // 
                         virkshop._internal.deadlines.beforeShellScripts.push(selfSetupPromise.then(async ()=>{
                             // read the the before_login files as soon as possible
                             const eventName = `during_setup`
@@ -472,7 +386,7 @@ export const createVirkshop = async (arg)=>{
                             await Promise.all(files.map(async eachPath=>{
                                 if (eachPath.match(/\.deno\.js$/)) {
                                     // puts things inside of virkshop._internal.deadlines
-                                    await virkshop.runDenoImport({
+                                    await virkshop.importDeadlinesFrom({
                                         path: eachPath,
                                         source: eachPath.slice(parentFolderString.length),
                                         mixinName,
@@ -495,7 +409,7 @@ export const createVirkshop = async (arg)=>{
                     // 
                     // let the mixins set themselves up before starting phase2
                     // 
-                    await Promise.all(phase1Promises + virkshop._internal.deadlines.beforeSetup)
+                    await Promise.all(phase1Promises.concat(virkshop._internal.deadlines.beforeSetup))
                 },
                 // 
                 // 
@@ -523,9 +437,10 @@ export const createVirkshop = async (arg)=>{
                             // TODO: get a hash of this and see if nix-shell should even be regenerated or not (as an optimization)
                             const result = await fornixToNix(yamlString)
                             defaultWarehouse = result.defaultWarehouse
+                            // TODO: add error for no default warehouse
                             await FileSystem.write({
                                 data: result.string,
-                                path: virkshop.pathTo._tempShellFile,
+                                path: virkshop.pathTo._tempNixShellFile,
                                 overwrite: true,
                             })
                         })()),
@@ -648,9 +563,25 @@ export const createVirkshop = async (arg)=>{
                                 
                             }
                             
+                            const autogeneratedPath = `${FileSystem.parentPath(shellApi.profilePath)}/${shellApi.autogeneratedProfile}`
+                            const relativeAutogeneratedPath = FileSystem.makeRelativePath({
+                                from: virkshop.pathTo.project,
+                                to: autogeneratedPath,
+                            })
+                            await FileSystem.info(shellApi.profilePath).then(async (itemInfo)=>{
+                                if (!itemInfo.exists) {
+                                    await FileSystem.write({
+                                        path: shellApi.profilePath,
+                                        data: `
+                                            . '${escapeShellArgument(relativeAutogeneratedPath)}'
+                                        `.replace(/\n                                            /g, "\n"),
+                                    })
+                                }
+                            })
+                            
                             // write the new shell profile
                             await FileSystem.write({
-                                path: `${virkshop.pathTo.fakeHome}/.zshrc`,
+                                path: autogeneratedPath,
                                 data: shellProfileString,
                                 force: true,
                                 overwrite: true,
@@ -662,11 +593,75 @@ export const createVirkshop = async (arg)=>{
                         // 
                         ((async ()=>{
                             mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
-                            await Promise.all(
-                                mixinPaths.map(
-                                    eachMixinPath=>linkMixinShortcuts(eachMixinPath)
-                                )
-                            )
+                            await Promise.all(mixinPaths.map(async eachMixinPath=>{
+
+                                const mixinName = FileSystem.basename(eachMixinPath)
+                                for (const eachSpecialFolder of virkshop.structure.specialMixinFolders) {
+                                    const commonFolder = `${virkshop.pathTo.mixture}/${eachSpecialFolder}`
+                                    const mixinFolder  = `${eachMixinPath}/${eachSpecialFolder}`
+
+                                    // 
+                                    // add all the shortcut links
+                                    // 
+                                    for (const eachPath of await FileSystem.recursivelyListPathsIn(mixinFolder)) {
+                                        const relativePart = eachPath.slice(mixinFolder.length)
+                                        const sourceLocation = eachPath
+                                        const targetLocation = await FileSystem.info(`${commonFolder}/${relativePart}`)
+                                        // if hardlink
+                                        if (targetLocation.isFile && !targetLocation.isSymlink) {
+                                            // assume the user put it there, or that its the plugin's ownership
+                                            continue
+                                        // if symlink
+                                        } else if (targetLocation.isFile) {
+                                            // remove broken things
+                                            if (targetLocation.isBrokenLink) {
+                                                await FileSystem.remove(targetLocation.path)
+                                            } else {
+                                                const currentTarget  = await FileSystem.finalTargetOf(targetLocation.path)
+                                                const intendedTarget = await FileSystem.finalTargetOf(eachPath)
+                                                if (currentTarget == intendedTarget) {
+                                                    // already linked
+                                                    continue
+                                                } else {
+                                                    // linked but to the wrong thing
+                                                    console.warn(`
+                                                        This path:               ${targetLocation.path}
+                                                        Should link to:          ${intendedTarget}
+                                                        But instead it links to: ${currentTarget}
+
+                                                        The fix is probably to just delete: ${targetLocation.path}
+                                                        (I'm not sure how you would end up in this situation)
+                                                    `.replace(/\n                            /g,"\n"))
+                                                    const answeredYes = await Console.askFor.yesNo("Would you like me to delete it for you?")
+                                                    if (answeredYes) {
+                                                        await FileSystem.remove(targetLocation.path)
+                                                    }
+                                                    console.log("Continuing setup ...")
+
+                                                    if (!answeredYes) {
+                                                        continue
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        const mixinItem = await FileSystem.info(eachPath)
+                                        if (mixinItem.isFile) {
+                                            // TODO: this could technically destroy a user-made file, if it was "thing/thing" in a "thing/thing/${mixinItem}" path
+                                            
+                                            // make sure it exists by this point
+                                            await FileSystem.ensureIsFolder(FileSystem.parentPath(mixinItem.path))
+                                            // create the shortcut
+                                            await FileSystem.relativeLink({
+                                                existingItem: mixinItem.path,
+                                                newItem: targetLocation.path,
+                                                overwrite: true,
+                                            })
+                                        }
+                                        // TODO: consider another edgecase of mixin item being a file, but existing item being a folder
+                                    }
+                                }
+
+                            }))
                         })()),
                         
                     ])
@@ -678,9 +673,14 @@ export const createVirkshop = async (arg)=>{
                     // 
                     await Promise.all(virkshop._internal.deadlines.beforeEnteringVirkshop)
                     // make all commands executable
+                    
+                    const permissionPromises = []
                     for await (const eachCommandPath of FileSystem.recursivelyIteratePathsIn(virkshop.pathTo.commands)) {
-                        await FileSystem.addPermissions({path: eachCommandPath, permissions: { owner: {canExecute: true} }})
+                        permissionPromises.push(
+                            FileSystem.addPermissions({path: eachCommandPath, permissions: { owner: {canExecute: true} }})
+                        )
                     }
+                    await Promise.all(permissionPromises)
                     
                     
                     // 
@@ -694,16 +694,18 @@ export const createVirkshop = async (arg)=>{
                         VIRKSHOP_USERS_HOME: virkshop.pathTo.realHome,
                         VIRKSHOP_DEBUG: `${debuggingMode}`,
                         NIX_SSL_CERT_FILE: Console.env.NIX_SSL_CERT_FILE,
+                        NIX_BUILD_SHELL: virkshop.pathTo._nixBuildShell, // TODO: clean this up (hardcoded to ZSH, and ignores nix-shell arguments)
                         HOME: virkshop.pathTo.fakeHome,
+                        PATH: Console.env.PATH,
                     }
                     await run(
                         "nix-shell",
                         "--pure",
-                        "--command", "zsh",
+                        "--command", shellApi.startCommand,
                         ...Object.keys(envVars).map(
                             name=>["--keep", name]
                         ).flat(),
-                        `${virkshop.pathTo._tempShellFile}`,
+                        `${virkshop.pathTo._tempNixShellFile}`,
                         "-I", `nixpkgs=${defaultWarehouse.tarFileUrl}`,
                         Env(envVars),
                     )
@@ -727,7 +729,7 @@ export const createVirkshop = async (arg)=>{
                     }
                 }
             },
-            async runDenoImport({path, mixinName, eventName, source }) {
+            async importDeadlinesFrom({path, mixinName, eventName, source }) {
                 const escapedPath = `${encodeURIComponent(path).replace(/%2F/g,'/')}`
                 const {deadlines} = await import(escapedPath) || {}
                 for (const eachDeadlineName of Object.keys(virkshop._internal.deadlines)) {
@@ -757,32 +759,53 @@ export const createVirkshop = async (arg)=>{
             },
         },
     )
-
+    
     debuggingMode = virkshop.options.debuggingMode
     return virkshop
 }
-
 export const virkshop = await createVirkshop()
 
-function pathOfCaller() {
-    const err = new Error()
-    const filePaths = findAll(/^.+file:\/\/(\/[\w\W]*?):/gm, err.stack).map(each=>each[1])
-    
-    // if valid file
-    // TODO: make sure this works inside of anonymous functions (not sure if error stack handles that well)
-    const secondPath = filePaths[1]
-    if (secondPath) {
-        try {
-            if (Deno.statSync(secondPath).isFile) {
-                return secondPath
-            }
-        } catch (error) {
-        }
-    }
-    // if in an interpreter
-    return Deno.cwd()
-}
+// 
+// shellApi
+// 
+const shellApi = Object.defineProperties(
+    {
+        autogeneratedProfile: `.zshrc.autogenerated.ignore`,
+        startCommand: "zsh --no-globalrcs",
+    },
+    {
+        profilePath:         { get() { return `${virkshop.pathTo.fakeHome}/.zshrc` } },
+    },
+)
 
+
+// 
+// 
+// Helpers
+// 
+// 
+    function escapeShellArgument(string) {
+        return string.replace(/'/g, `'"'"'`)
+    }
+
+    function pathOfCaller() {
+        const err = new Error()
+        const filePaths = findAll(/^.+file:\/\/(\/[\w\W]*?):/gm, err.stack).map(each=>each[1])
+        
+        // if valid file
+        // TODO: make sure this works inside of anonymous functions (not sure if error stack handles that well)
+        const secondPath = filePaths[1]
+        if (secondPath) {
+            try {
+                if (Deno.statSync(secondPath).isFile) {
+                    return secondPath
+                }
+            } catch (error) {
+            }
+        }
+        // if in an interpreter
+        return Deno.cwd()
+    }
 
 // 
 // 
@@ -1030,7 +1053,7 @@ function pathOfCaller() {
 // fornixToNix
 // 
 export const fornixToNix = async function(yamlString) {
-    // FIXME: add support for overwriting values (saveAs: python, then saveAs: python without breaking)
+    // TODO: add support for overwriting values (saveAs: python, then saveAs: python without breaking)
     // TODO: make __core__ not be a name, just insert it everywhere using "let,in"
     const start = (new Date()).getTime()
     const dataStructure = yaml.parse(yamlString, {schema: yaml.DEFAULT_SCHEMA,},)
@@ -1339,5 +1362,4 @@ export const fornixToNix = async function(yamlString) {
             }
         `.replace(/\n        /g,"\n"),
     }
-    
 }
