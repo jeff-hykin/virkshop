@@ -3,6 +3,7 @@
 - have home folder generated, and treated differently
 - linkRealHomeFor()
 - allow loading advanced nix code
+
 - pad out numbers and auto-rename them
 - get git ignore to work
 - purge/clean event
