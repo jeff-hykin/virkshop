@@ -1,7 +1,7 @@
 
 # pre-alpha:
 - have home folder generated, and treated differently
-- have .zshrc source a generated file
+- DONE: have .zshrc source a generated file
 - allow loading advanced nix code
 - DONE: stop bash from loading a profile (--norc --noprofile)
 - linkRealHomeFor()
