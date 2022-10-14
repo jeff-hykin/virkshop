@@ -712,23 +712,6 @@ export const createVirkshop = async (arg)=>{
                     // TODO: call all the on_quit scripts
                 },
             },
-            async trigger(eventPath) {
-                let promises = []
-                const eventPathInfo = await FileSystem.info(eventPath)
-                if (eventPathInfo.isFolder) {
-                    const paths = await FileSystem.recursivelyListPathsIn(eventPath)
-                    paths.sort((each1, each2) => each1.localeCompare(each2))
-                    // FIXME: pad out the 0's to make the numbers equal lengths
-                    for (const eachPath of paths) {
-                        // FIXME: import the .deno.js files instead of executing them
-                        // if (eachPath.endsWith(".deno.js")) {
-                        //     // convert them to a hex string then put them in a import statement and eval it
-                        //     FileSystem.read(eachPath)
-                        // }
-                        await run`${eachPath}`
-                    }
-                }
-            },
             async importDeadlinesFrom({path, mixinName, eventName, source }) {
                 const escapedPath = `${encodeURIComponent(path).replace(/%2F/g,'/')}`
                 const {deadlines} = await import(escapedPath) || {}

@@ -1,14 +1,15 @@
 
 # pre-alpha:
 - have home folder generated, and treated differently
-- DONE: have .zshrc source a generated file
-- allow loading advanced nix code
-- DONE: stop bash from loading a profile (--norc --noprofile)
 - linkRealHomeFor()
+- allow loading advanced nix code
 - pad out numbers and auto-rename them
 - get git ignore to work
 - purge/clean event
-- clear out the dead code
+
+- DONE: clear out the dead code
+- DONE: have .zshrc source a generated file
+- DONE: stop bash from loading a profile (--norc --noprofile)
 
 # beta
 - cli "virkshop/install [package name]"
