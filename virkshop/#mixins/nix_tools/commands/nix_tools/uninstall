@@ -21,6 +21,7 @@ fi
 if [ "$(uname)" = "Darwin" ] 
 then
     # TODO: make sure this fully removes LaunchDaemon: org.nixos.darwin-store
+    sudo launchctl bootout system/org.nixos.darwin-store
     
     # check if file exists
     if [ -f "/Library/LaunchDaemon/org.nixos.nix-daemon.plist" ]
@@ -29,6 +30,7 @@ then
         sudo launchctl unload /Library/LaunchDaemon/org.nixos.nix-daemon.plist
         sudo rm /Library/LaunchDaemons/org.nixos.nix-daemon.plist
     fi
+    
     
     # check if file exists
     if [ -f "/Library/LaunchDaemons/org.nixos.activate-system.plist" ]
@@ -192,6 +194,9 @@ then
     sudo rm -f "$NIX_ROOT" &>/dev/null
     if [ -e "$NIX_ROOT" ]
     then
+        echo 
+        echo 
+        echo 
         echo "Because your system mounted /nix during boot"
         echo "I believe you'll need to restart for changes to take affect"
     fi
