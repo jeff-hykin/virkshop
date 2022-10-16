@@ -175,7 +175,18 @@ ll () {
             ls -lAF --group-directories-first --color "$@"
         fi
     else
-        # | tac # <- is for getting folders at the bottom
-        exa --color=always -lF --sort extension --group-directories-first --git --all  "$@" | tac
+        # if tac exists
+        if [ -n "$(command -v "tac")" ]
+        then
+            # | tac # <- is for getting folders at the bottom
+            exa --color=always -lF --sort extension --group-directories-first --git --all  "$@" | tac
+        elif [ -n "$(command -v "tail")" ]
+        then
+            # | tail -r # <- is for getting folders at the bottom
+            exa --color=always -lF --sort extension --group-directories-first --git --all  "$@" | tail -r
+        else
+            # | tail -r # <- is for getting folders at the bottom
+            exa --color=always -lF --sort extension --group-directories-first --git --all  "$@"
+        fi
     fi
 }
