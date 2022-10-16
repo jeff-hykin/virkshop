@@ -34,7 +34,7 @@ import { virkshop } from "./core.js"
 // 
     async function installNix() {
         const nixVersion = `nix-2.11.1`
-        const urlSource = `https://releases.nixos.org/nix/nix-${nixVersion}`
+        const urlSource = `https://releases.nixos.org/nix/${nixVersion}`
         const nixScriptLocalCopy = `#!/bin/sh
 
             # This script installs the Nix package manager on your system by
@@ -127,6 +127,7 @@ import { virkshop } from "./core.js"
             fi
 
             echo "downloading ${nixVersion} binary tarball for $system from '$url' to '$tmpDir'..."
+            echo "download path: $tarball"
             fetch "$url" "$tarball" || oops "failed to download '$url'"
 
             if command -v sha256sum > /dev/null 2>&1; then
@@ -278,13 +279,39 @@ import { virkshop } from "./core.js"
         // 
         let nixStoreFolderInfo = await FileSystem.info(`/nix/store`)
         if (!nixStoreFolderInfo.isFolder) {
-            console.log("|------------------------------------------------------|")
-            console.log("|                                                      |")
-            console.log("|    I'll try to install nix for you                   |")
-            console.log("|    (since I don't see nix yet)                       |")
-            console.log("|                                                      |")
-            console.log("|------------------------------------------------------|")
+            // start downloading since its almost certainly going to be needed
+            const urlToLatestInstallScript = `https://nixos.org/nix/install`
+            const urlPromiseVersionSpecific = curlString(`${urlSource}/install`).catch(
+                ()=>{ console.log(`Note: was unable to download: ${urlSource}/install\nFalling back on local script instead`);
+                return nixScriptLocalCopy
+            })
+            const urlPromiseLatestVersion = curlString(urlToLatestInstallScript)
+
+            console.log("|--------------------------------------------------------|")
+            console.log("|                                                        |")
+            console.log("|    I'll try to install nix for you                     |")
+            console.log("|    (since I don't see nix yet)                         |")
+            console.log("|                                                        |")
+            console.log("|--------------------------------------------------------|")
             console.log("")
+            console.log("      Are you the only user who will EVER need nix?       ")
+            console.log("")
+            console.log("      if YES => I will make you the owner BUT be aware    ")
+            console.log("                if other users TRY to install nix they    ")
+            console.log("                will not be able to because all the nix   ")
+            console.log("                files will be owned by you                ")
+            console.log("")
+            console.log("      if NO => I will do the more complicated/slower      ")
+            console.log("               work of creating a share-able nix install  ")
+            console.log("")
+            const saidYesToSingleUserInstall = await Console.askFor.yesNo("")
+            if (saidYesToSingleUserInstall) {
+                console.log("    Got it, performing a single-user install")
+            } else {
+                console.log("    Got it, performing a multi-user install")
+            }
+            console.log("")
+            
             // check if root user
             const username = await run`whoami ${Stdout(returnAsString)}`
             if (username == "root") {
@@ -295,6 +322,12 @@ import { virkshop } from "./core.js"
                 // TODO: check the available users for whoever is trying to setup as root
             }
 
+            async function runPureBash(script, ...args) {
+                console.debug(`args is:`,args)
+                var {success} = await run(`/bin/bash`, `-c`, "sudo echo\n"+script, "--", ...args, Env({PATH: "/sbin:/bin:/usr/local/bin:/usr/bin:/usr/sbin"}))
+                return success
+            }
+            
             if (OperatingSystem.commonChecks.isMac) {
                 // make sure xcode tools are installed
                 let result = await run("xcode-select", "--install", Out(returnAsString))
@@ -317,7 +350,7 @@ import { virkshop } from "./core.js"
                     // fi
                 
                 const version = await run`sw_vers -productVersion ${Stdout(returnAsString)}`
-                const versionMatch = version.match(/([0-9]+)\.([0-9]+)\.([0-9]+)?/g)
+                const versionMatch = version.match(/([0-9]+)\.([0-9]+)(\.([0-9]+))?/)
                 let [majorVersion, minorVersion, patchVersion] = [ 12, 4, 0 ]
                 if (!versionMatch) {
                     console.log(red`There was a bit of a problem :/                                         `)
@@ -325,7 +358,7 @@ import { virkshop } from "./core.js"
                     console.log(`     I ran this command:  sw_vers -productVersion                          `)
                     console.log(`                                                                           `)
                     console.log(`     Which should return the MacOS version                                 `)
-                    console.log(`     And it should be in the format [number].[number].[number]             `)
+                    console.log(`     And it should be in the format [number].[number]                      `)
                     console.log(`     But it appears this is not the case, instead it returned this:        `)
                     console.log(`         ${version}                                                        `)
                     console.log(`     And this script doesn't know how to handle that                       `)
@@ -340,42 +373,75 @@ import { virkshop } from "./core.js"
                     patchVersion = versionMatch[3]-0 || 0 // convert NaN to 0 if needed
                 }
                 
+                // 
+                // restore
+                // 
+                if ((await FileSystem.info("/etc/zshrc.backup-before-nix")).exists) {
+                    console.log("Restoring /etc/zshrc")
+                    var {success} = await run`sudo mv /etc/zshrc.backup-before-nix /etc/zshrc`
+                    console.debug(`success is:`,success)
+                }
+                if ((await FileSystem.info("/etc/bashrc.backup-before-nix")).exists) {
+                    console.log("Restoring /etc/bashrc")
+                    var {success} = await run`sudo mv /etc/bashrc.backup-before-nix /etc/bashrc`
+                    console.debug(`success is:`,success)
+                }
+                if ((await FileSystem.info("/etc/bash.bashrc.backup-before-nix")).exists) {
+                    console.log("Restoring /etc/bash.bashrc")
+                    var {success} = await run`sudo mv /etc/bash.bashrc.backup-before-nix /etc/bash.bashrc`
+                    console.debug(`success is:`,success)
+                }
+                
                 // Catalina, Big Sur, Monterey, and beyond
                 if (majorVersion > 10 || (majorVersion == 10 && minorVersion >= 15)) {
-                    var { success } = await run`bash -c ${`yes | bash <(curl -Lk ${urlSource}/install) --darwin-use-unencrypted-nix-store-volume`}`
-                    if (!success) {
-                        // fallback
-                        var { success } = await run`bash -c ${`bash <(curl -L https://nixos.org/nix/install)`}`
+                    // Run it in a bash instance that isnt effected by the users modifications to path
+                    if (!await runPureBash(await urlPromiseVersionSpecific, ...saidYesToSingleUserInstall?["--no-daemon"]:[], Stdin("yes\nyes\nyes\nyes\nyes\nyes\nyes\nyes\n"))) {
+                        console.log(`The script for ${nixVersion} didn't seem to work => falling back on latest script: ${urlToLatestInstallScript}`)
+                        if (!await runPureBash(await urlPromiseLatestVersion, ...saidYesToSingleUserInstall?["--no-daemon"]:[])) {
+                            console.log(red`There was a bit of a problem :/                                                      `)
+                            console.log(`----------------------------------------------------------------------------------------`)
+                            console.log(`What happened?                                                                          `)
+                            console.log(`     The nix install command ended in an error                                          `)
+                            console.log(`     (the error text is probably printed out above)                                     `)
+                            console.log(`How to Fix it                                                                           `)
+                            console.log(`     1. Pure any half-completed values by following these instructions:                 `)
+                            console.log(`        https://nixos.org/manual/nix/stable/installation/installing-binary.html#macos   `)
+                            console.log(`     2. See if you can follow the normal instructions for installing nix                `)
+                            console.log(`        https://nixos.org/manual/nix/stable/#chap-installation                          `)
+                            console.log(`----------------------------------------------------------------------------------------`)
+                            console.log(``)
+                            Deno.exit(1)
+                        }
                     }
                 // Older than Catalina (Mojave, High Siera, Siera, Yosemite, Mavericks, etc)
                 } else {
-                    var { success } = await run`curl -Lk ${urlSource}/install | sh -s -- --daemon`
-                }
-
-            } else if (OperatingSystem.commonChecks.isLinux) {
-                var nixScript
-                try {
-                    nixScript = await curlString`${urlSource}/install`
-                // if host is down, or fails for some other reason, use the locally stored copy (which may be out of date)
-                } catch (error) {
-                    nixScript = nixScriptLocalCopy
-                }
-                
-                if (await hasCommand("pidof")) {
-                    var { success } = await run`pidof systemd`
-                    if (success) {
-                        await run`bash -c ${`yes | bash <(curl -Lk ${urlSource}/install) --daemon`}`
-                    } else {
-                        // fallback on single user installation
-                        await run("sh", "-s", Stdin(nixScript))
+                    // FIXME: this probably doesn't work with newer nixpkgs versions
+                    if (!await runPureBash(await urlPromiseVersionSpecific, ...saidYesToSingleUserInstall?["--no-daemon"]:[])) {
+                        Deno.exit(1)
                     }
-                } else {
-                    // fallback on single user installation
-                    await run("sh", "-s", Stdin(nixScript))
+                }
+            } else if (OperatingSystem.commonChecks.isLinux) {
+                if (!await runPureBash(await urlPromiseVersionSpecific, ...saidYesToSingleUserInstall?["--no-daemon"]:[], Stdin("yes\nyes\nyes\nyes\nyes\nyes\nyes\nyes\n"))) {
+                    // try forcing single-user if multi-user fails (probably due to not having systemd)
+                    if (!await runPureBash(await urlPromiseVersionSpecific, "--no-daemon")) {
+                        console.log(red`There was a bit of a problem :/                                                      `)
+                        console.log(`----------------------------------------------------------------------------------------`)
+                        console.log(`What happened?                                                                          `)
+                        console.log(`     The nix install command ended in an error                                          `)
+                        console.log(`     (the error text is probably printed out above)                                     `)
+                        console.log(`How to Fix it                                                                           `)
+                        console.log(`     1. Pure any half-completed values by following these instructions:                 `)
+                        console.log(`        https://nixos.org/manual/nix/stable/installation/installing-binary.html#linux   `)
+                        console.log(`     2. See if you can follow the normal instructions for installing nix                `)
+                        console.log(`        https://nixos.org/manual/nix/stable/#chap-installation                          `)
+                        console.log(`----------------------------------------------------------------------------------------`)
+                        console.log(``)
+                        Deno.exit(1)
+                    }
                 }
             }
         }
-
+        
         nixStoreFolderInfo = await FileSystem.info(`/nix/store`)
         if (!nixStoreFolderInfo.isFolder) {
             console.log(red`There was a bit of a problem :/                                         `)
@@ -394,7 +460,7 @@ import { virkshop } from "./core.js"
         // add nix certificate file
         // 
             // make sure MacOS has cert files
-            const certFilePath = "/etc/ssl/certs/ca-certificates.crt"
+            const certFilePath = FileSystem.makeAbsolutePath("/etc/ssl/certs/ca-certificates.crt")
             const certParentFolder = FileSystem.parentPath(certFilePath)
             const certFileInfo = await FileSystem.info(certFilePath)
             if (!certFileInfo.isFile) {
@@ -408,8 +474,23 @@ import { virkshop } from "./core.js"
                 console.log("")
                 console.log("Creating certificate file because MacOS doesn't follow other OS's")
                 console.log("")
-                await run`sudo security export -t certs -f pemseq -k /System/Library/Keychains/SystemRootCertificates.keychain -o /etc/ssl/certs/ca-certificates.crt`
                 // TODO: add a check encase /System/Library/Keychains/SystemRootCertificates.keychain doesnt exist
+                var {success} = await run`sudo security export -t certs -f pemseq -k /System/Library/Keychains/SystemRootCertificates.keychain -o ${certFilePath}`
+                if (!success) {
+                    console.error(`There was a problem creating: ${certFilePath}\n(error text likely above)`)
+                } else {
+                    // everyone can read, only superuser can write
+                    await run`sudo chmod u=rw,g=r,o=r ${certFilePath}`
+                    // set correct permissions for parent folders
+                    let path = FileSystem.parentPath(certFilePath)
+                    let prevParentPath = null
+                    while (path != "/" && prevParentPath !== path) {
+                        var {success} = await run`sudo chown root ${path}`
+                        var {success} = await run`sudo chmod u=rwx,g=rx,o=rx ${path}`
+                        prevParentPath = path
+                        path = FileSystem.parentPath(path)
+                    }
+                }
             }
             
             // 
@@ -426,6 +507,21 @@ import { virkshop } from "./core.js"
                 if (file.isFile) {
                     Console.env.NIX_SSL_CERT_FILE = eachCertificatePath
                 }
+            }
+            if (Console.env.NIX_SSL_CERT_FILE) {
+                const profileFolderInfo = await FileSystem.info(`/nix/var/nix/profiles/default/etc/`)
+                if (profileFolderInfo.isFolder) {
+                    const nixCertPath = `/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt`
+                    const nixCertPathInfo = await FileSystem.info(nixCertPath)
+                    if (!nixCertPathInfo.isFile) {
+                        // forcefully link
+                        var {success} = await run`sudo /bin/mkdir -p ${FileSystem.parentPath(nixCertPath)}`
+                        var {success} = await run`sudo /bin/ln -s ${Console.env.NIX_SSL_CERT_FILE} ${nixCertPath}`
+                        // FIXME: report errors if not successful
+                    }
+                }
+            } else {
+                // FIXME: report about cert file problems
             }
         // 
         // nix profiles
@@ -455,7 +551,12 @@ import { virkshop } from "./core.js"
     }
 
     async function curlString(url) {
-        return  new TextDecoder().decode(
-            new Uint8Array(await (await fetch(url)).arrayBuffer())
-        )
+        try {
+            return  new TextDecoder().decode(
+                new Uint8Array(await (await fetch(url)).arrayBuffer())
+            )
+        } catch (error) {
+            console.error(`Issue downloading ${url}`)
+            console.log(error)
+        }
     }

@@ -697,6 +697,7 @@ export const createVirkshop = async (arg)=>{
                         NIX_BUILD_SHELL: virkshop.pathTo._nixBuildShell, // TODO: clean this up (hardcoded to ZSH, and ignores nix-shell arguments)
                         HOME: virkshop.pathTo.fakeHome,
                         PATH: Console.env.PATH,
+                        TMPDIR: "/tmp", // fixes some build problems (workaround for a bug in Nix)
                     }
                     await run(
                         "nix-shell",
