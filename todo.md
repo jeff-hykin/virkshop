@@ -1,6 +1,7 @@
 
 # pre-alpha:
 - allow loading advanced nix code
+- prevent mixins adding zshrc, zlogin, etc by anything other than the masterMixin
 
 - create clean command
 - create purge command
@@ -14,7 +15,9 @@
 
 # beta
 - cli "virkshop/install [package name]"
+- virkshop update (wrapper around git mixin)
 - git hook events
+- make sure master mixin runs last for commands/documentation etc
 - get auto-add to git ignore to work
 - add basic documentation
 - create branches like `pure` `standard`, squash all the commits

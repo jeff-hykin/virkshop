@@ -175,7 +175,7 @@ export const createVirkshop = async (arg)=>{
                                     if (absolutePathToCommand) {
                                         await FileSystem.write({
                                             path: pathThatIsHopefullyGitIgnored,
-                                            data: `#!/usr/bin/env bash\nHOME='${escapeShellArgument(virkshop.pathTo.realHome)}' PATH='${escapeShellArgument(Console.env.PATH)}' ${absolutePathToCommand} "$@"`,
+                                            data: `#!/usr/bin/env bash\n`+`HOME='${escapeShellArgument(virkshop.pathTo.realHome)}' PATH='${escapeShellArgument(Console.env.PATH)}' ${absolutePathToCommand} "$@"`.replace(/\n/g, ""),
                                             overwrite: true,
                                         })
                                     }
@@ -282,7 +282,6 @@ export const createVirkshop = async (arg)=>{
                                     // everything for this mixin has been added to homeMappingPriorities
                                     resolve()
                                 }))
-                                // FIXME: home folder needs to be treated differently
                                 continue
                             }
 
@@ -1159,7 +1158,6 @@ export const fornixToNix = async function(yamlString) {
     // TODO: make __core__ not be a name, just insert it everywhere using "let,in"
     const start = (new Date()).getTime()
     const dataStructure = yaml.parse(yamlString, {schema: yaml.DEFAULT_SCHEMA,},)
-    let indentLevel = 3
     let nixCode = `
     `
     const varNames = []
