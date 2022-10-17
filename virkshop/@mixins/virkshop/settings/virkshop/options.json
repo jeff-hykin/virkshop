@@ -1,0 +1,9 @@
+{
+    "debuggingMode": true,
+    "linkToProject": {
+        "./commands":      "$VIRKSHOP_FOLDER/@mixture/commands",
+        "./documentation": "$VIRKSHOP_FOLDER/@mixture/documentation",
+        "./events":        "$VIRKSHOP_FOLDER/@mixture/events",
+        "./settings":      "$VIRKSHOP_FOLDER/@mixture/settings"
+    }
+}

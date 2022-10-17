@@ -20,7 +20,7 @@ zsh__path="$(                    system_tools nix_path_for package zsh)"
 # 
 # set fpath for zsh
 # 
-local_zsh="$VIRKSHOP_FOLDER/#mixture/temporary/long_term/home/.cache/zsh.ignore/site-functions/"
+local_zsh="$VIRKSHOP_FOLDER/@mixture/temporary/long_term/home/.cache/zsh.ignore/site-functions/"
 mkdir -p "$local_zsh"
 
 export fpath=("$local_zsh")

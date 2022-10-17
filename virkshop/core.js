@@ -12,8 +12,8 @@ import { zip } from "https://deno.land/x/good@0.7.6/array.js"
 // 
 // 
 let debuggingMode = false
-const virkshopIdentifierPath = `#mixins/virkshop/settings/virkshop/` // The only thing that can basically never change
-const masterMixin = "#project" // TODO: make this configurable
+const virkshopIdentifierPath = `@mixins/virkshop/settings/virkshop/` // The only thing that can basically never change
+const masterMixin = "@project" // TODO: make this configurable
 export const createVirkshop = async (arg)=>{
     var { virkshopPath, projectPath } = {...arg}
     virkshopPath = virkshopPath || Console.env.VIRKSHOP_FOLDER         // env var is used when already inside of the virkshop
@@ -74,8 +74,8 @@ export const createVirkshop = async (arg)=>{
                     project: FileSystem.makeAbsolutePath(projectPath || FileSystem.parentPath(virkshopPath)),
                 },
                 {
-                    mixins:           { get() { return `${virkshop.pathTo.virkshop}/#mixins` }},
-                    mixture:          { get() { return `${virkshop.pathTo.virkshop}/#mixture` }},
+                    mixins:           { get() { return `${virkshop.pathTo.virkshop}/@mixins` }},
+                    mixture:          { get() { return `${virkshop.pathTo.virkshop}/@mixture` }},
                     settings:         { get() { return `${virkshop.pathTo.mixture}/settings` }},
                     temporary:        { get() { return `${virkshop.pathTo.mixture}/temporary` }},
                     fakeHome:         { get() { return `${virkshop.pathTo.mixture}/home` }},
