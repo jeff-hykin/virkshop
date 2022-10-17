@@ -1,0 +1,1 @@
+../../../../#project/events/virkshop/during_setup/001_010_enable_globbing.zsh

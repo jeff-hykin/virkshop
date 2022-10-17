@@ -1,1 +1,0 @@
-../../../../project/events/zsh_tools/before_login/004_000_add_system_bin.zsh

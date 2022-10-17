@@ -1,0 +1,1 @@
+../../../../#project/events/virkshop/before_setup/inject_vim_nano_etc.deno.js

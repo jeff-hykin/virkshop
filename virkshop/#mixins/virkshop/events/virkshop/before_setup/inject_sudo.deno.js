@@ -1,0 +1,1 @@
+../../../../#project/events/virkshop/before_setup/inject_sudo.deno.js
