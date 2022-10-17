@@ -1,1 +1,0 @@
-../../../../#project/events/virkshop/before_setup/inject_logger.deno.js

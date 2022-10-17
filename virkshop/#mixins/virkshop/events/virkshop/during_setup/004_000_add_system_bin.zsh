@@ -1,1 +1,0 @@
-../../../../#project/events/virkshop/during_setup/004_000_add_system_bin.zsh
