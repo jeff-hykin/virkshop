@@ -1,7 +1,9 @@
-import { FileSystem } from "https://deno.land/x/quickr@0.4.2/main/file_system.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.4.3/main/file_system.js"
 import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.4.1/main/run.js"
 import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.4.1/main/console.js"
-import { indent, findAll } from "https://deno.land/x/good@0.5.1/string.js"
+import { indent, findAll } from "https://deno.land/x/good@0.7.6/string.js"
+import { intersection, subtract } from "https://deno.land/x/good@0.7.6/set.js"
+import { zip } from "https://deno.land/x/good@0.7.6/array.js"
 
 
 // 
@@ -11,6 +13,7 @@ import { indent, findAll } from "https://deno.land/x/good@0.5.1/string.js"
 // 
 let debuggingMode = false
 const virkshopIdentifierPath = `#mixins/virkshop/settings/virkshop/` // The only thing that can basically never change
+const masterMixin = "#project" // TODO: make this configurable
 export const createVirkshop = async (arg)=>{
     var { virkshopPath, projectPath } = {...arg}
     virkshopPath = virkshopPath || Console.env.VIRKSHOP_FOLDER         // env var is used when already inside of the virkshop
@@ -75,7 +78,7 @@ export const createVirkshop = async (arg)=>{
                     mixture:          { get() { return `${virkshop.pathTo.virkshop}/#mixture` }},
                     settings:         { get() { return `${virkshop.pathTo.mixture}/settings` }},
                     temporary:        { get() { return `${virkshop.pathTo.mixture}/temporary` }},
-                    fakeHome:         { get() { return `${virkshop.pathTo.temporary}/long_term/home` }},
+                    fakeHome:         { get() { return `${virkshop.pathTo.mixture}/home` }},
                     virkshopOptions:  { get() { return `${virkshop.pathTo.mixins}/virkshop/settings/virkshop/options.json` }},
                     systemTools:      { get() { return `${virkshop.pathTo.mixins}/nix_tools/settings/system_tools.yaml` }},
                     commands:         { get() { return `${virkshop.pathTo.mixture}/commands` }},
@@ -93,7 +96,7 @@ export const createVirkshop = async (arg)=>{
                 ],
             },
             _internal: {
-                homeMappingObject: {},
+                homeMappingPriorities: [],
                 shellSetupPriorities: [],
                 deadlines: {
                     beforeSetup: [],
@@ -163,7 +166,7 @@ export const createVirkshop = async (arg)=>{
                                         force: true,
                                     })
                                 } catch (error) {
-                                    
+                                    console.error(error)
                                 }
                                 
                                 // TODO: there's a lot that could be optimized here since system commands are slow.
@@ -179,12 +182,23 @@ export const createVirkshop = async (arg)=>{
                                 })
                             })()))
                         },
-                        linkRealHomeFor(path) {
-                            // use this:
-                            virkshop._internal.homeMappingObject
-                            
-                            // FIXME: implement
-                                // create path in real home folder if it doesn't exist
+                        linkRealHomeFolder(path) {
+                            virkshop._internal.homeMappingPriorities.push({
+                                relativePathFromHome: path,
+                                target: FileSystem.makeAbsolutePath(`${virkshop.pathTo.realHome}/${path}`),
+                                targetIsFile: false, // TODO: add a check/warning if home-thing exists and disagrees
+                                mixinName,
+                                source,
+                            })
+                        },
+                        linkRealHomeFile(path) {
+                            virkshop._internal.homeMappingPriorities.push({
+                                relativePathFromHome: path,
+                                target: FileSystem.makeAbsolutePath(`${virkshop.pathTo.realHome}/${path}`),
+                                targetIsFile: true, // TODO: add a check/warning if home-thing exists and disagrees
+                                mixinName,
+                                source,
+                            })
                         },
                     }
                 },
@@ -237,17 +251,6 @@ export const createVirkshop = async (arg)=>{
                     debuggingMode && console.log("[Phase0: Establishing/Verifying Structure]")
                     mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
                     
-                    // 
-                    // find hard home files (so they can be protected)
-                    // 
-                    for await (const eachHomePath of FileSystem.recursivelyIteratePathsIn(virkshop.pathTo.fakeHome, { dontFollowSymlinks: true, onlyHardlinks: true, })) {
-                        const shortButUnique = FileSystem.normalize(FileSystem.makeRelativePath({
-                            from: virkshop.pathTo.fakeHome,
-                            to:eachHomePath,
-                        }))
-                        virkshop._internal.homeMappingObject[shortButUnique] = { isHardpath: true }
-                    }
-                    
                     // TODO: purge broken system links more
                     
                     // 
@@ -256,10 +259,36 @@ export const createVirkshop = async (arg)=>{
                     await Promise.all(mixinPaths.map(async eachPath=>{
                         const mixinName = FileSystem.basename(eachPath)
                         for (const eachSpecialFolder of virkshop.structure.specialMixinFolders) {
+                            // 
+                            // home is extra special
+                            // 
                             if (FileSystem.basename(eachSpecialFolder) == 'home') {
+                                const mixinsHome = `${eachPath}/${eachSpecialFolder}`
+                                const homeMappingPriorities = virkshop._internal.homeMappingPriorities
+                                virkshop._internal.deadlines.beforeSetup.push(new Promise(async (resolve, reject)=>{
+                                    for (const eachHomePathInfo of await FileSystem.recursivelyListItemsIn(mixinsHome)) {
+                                        const relativeHomePath = FileSystem.makeRelativePath({
+                                            from: mixinsHome,
+                                            to: eachHomePathInfo.path,
+                                        })
+                                        homeMappingPriorities.push({
+                                            relativePathFromHome: relativeHomePath,
+                                            target: eachHomePathInfo.path,
+                                            targetIsFile: !eachHomePathInfo.isFolder,
+                                            mixinName,
+                                            source: `home/${relativeHomePath}`,
+                                        })
+                                    }
+                                    // everything for this mixin has been added to homeMappingPriorities
+                                    resolve()
+                                }))
                                 // FIXME: home folder needs to be treated differently
                                 continue
                             }
+
+                            // 
+                            // all other folders
+                            // 
                             const mixinFolder                      = `${eachPath}/${eachSpecialFolder}/${mixinName}`
                             const commonFolderReservedForThisMixin = `${virkshop.pathTo.mixture}/${eachSpecialFolder}/${mixinName}`
 
@@ -333,7 +362,6 @@ export const createVirkshop = async (arg)=>{
                     debuggingMode && console.log("[Phase1: Mixins Setup]")
                     mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
                     const alreadExecuted = new Set()
-                    const phase1Promises = []
                     for (const eachMixinPath of mixinPaths) {
                         const mixinName = FileSystem.basename(eachMixinPath)
                         const eventName = "before_setup"
@@ -358,8 +386,8 @@ export const createVirkshop = async (arg)=>{
                                                     // puts things inside of virkshop._internal.deadlines
                                                     await virkshop.importDeadlinesFrom({
                                                         path: eachItem.path,
-                                                        source: eachItem.path.slice(parentFolderString.length),
                                                         mixinName,
+                                                        source: eachItem.path.slice(parentFolderString.length),
                                                         eventName,
                                                     })
                                                 }
@@ -376,7 +404,7 @@ export const createVirkshop = async (arg)=>{
                                 debuggingMode && console.log(`     [${duration}ms: setting up ${mixinName}]`)
                             }
                         )
-                        phase1Promises.push(selfSetupPromise)
+                        virkshop._internal.deadlines.beforeSetup.push(selfSetupPromise)
                         
                         // 
                         // kick-off work for phase2 so that it runs ASAP
@@ -391,8 +419,8 @@ export const createVirkshop = async (arg)=>{
                                     // puts things inside of virkshop._internal.deadlines
                                     await virkshop.importDeadlinesFrom({
                                         path: eachPath,
-                                        source: eachPath.slice(parentFolderString.length),
                                         mixinName,
+                                        source: eachPath.slice(parentFolderString.length),
                                         eventName,
                                     })
                                 } else if (eachPath.match(/\.zsh$/)) {
@@ -412,7 +440,76 @@ export const createVirkshop = async (arg)=>{
                     // 
                     // let the mixins set themselves up before starting phase2
                     // 
-                    await Promise.all(phase1Promises.concat(virkshop._internal.deadlines.beforeSetup))
+                    await Promise.all(virkshop._internal.deadlines.beforeSetup)
+
+                    // 
+                    // start linking home together right after
+                    // 
+                    virkshop._internal.deadlines.beforeEnteringVirkshop.push(
+                        ((async ()=>{
+                            const homeMappingPriorities = virkshop._internal.homeMappingPriorities.map(
+                                each=>({
+                                    ...each,
+                                    isMasterMixin: each.mixinName == masterMixin,
+                                    relativePathFromHome: FileSystem.normalize(each.relativePathFromHome),
+                                })
+                            )
+                            // FIXME: prevent touching of zshrc,zlogin, etc by anything other than the masterMixin
+                            debuggingMode && console.log("Here are the priority mappings for home")
+                            debuggingMode && console.log(homeMappingPriorities.sort((a,b)=>a.relativePathFromHome.localeCompare(b.relativePathFromHome)))
+                            const lowPriorityHomeAspects = homeMappingPriorities.filter(each=>!each.isMasterMixin)
+                            const highPriorityHomeAspects = homeMappingPriorities.filter(each=>each.isMasterMixin)
+                            // do low priority stuff first because its going to be overwritten by higher priority
+                            for (const eachListOfItems of [lowPriorityHomeAspects, highPriorityHomeAspects]) {
+                                const pathsToCreate = {}
+
+                                // put longest paths at the end of the list
+                                eachListOfItems.sort((a,b)=>a.relativePathFromHome.length - b.relativePathFromHome.length)
+                                // resolve as many overlaps here before actual file operations happen
+                                for (const each of eachListOfItems) {
+                                    pathsToCreate[each.relativePathFromHome] = each
+                                }
+
+                                // 
+                                // create items
+                                // 
+                                for (const [eachPath, eachItem] of Object.entries(pathsToCreate)) {
+                                    // FIXME: detect conflicts/overwrites and schedule them to be mentioned (so long as theyre not resovled by the masterMixin)
+                                    // in masterMixin the conflicts need to be reported because they're likely non-obvious even if they're rare
+                                    
+                                    // make sure target exists
+                                    if (eachItem.targetIsFile) {
+                                        await FileSystem.ensureIsFile(eachItem.target)
+                                        await FileSystem.info(eachItem.target)
+                                    } else {
+                                        await FileSystem.ensureIsFolder(eachItem.target)
+                                    }
+                                    
+                                    // clear a path
+                                    const newHomePath = `${virkshop.pathTo.fakeHome}/${eachItem.relativePathFromHome}`
+                                    await FileSystem.remove(newHomePath)
+                                    
+                                    // relative link
+                                    if (FileSystem.isRelativePath(eachItem.target)) {
+                                        await FileSystem.relativeLink({
+                                            existingItem: eachItem.target,
+                                            newItem: newHomePath,
+                                            overwrite: true,
+                                            force: true,
+                                        })
+                                    // absolute link
+                                    } else {
+                                        await FileSystem.absoluteLink({
+                                            existingItem: eachItem.target,
+                                            newItem: newHomePath,
+                                            overwrite: true,
+                                            force: true,
+                                        })
+                                    }
+                                }
+                            }
+                        })())
+                    )
                 },
                 // 
                 // 
@@ -678,13 +775,17 @@ export const createVirkshop = async (arg)=>{
                     // make all commands executable
                     
                     const permissionPromises = []
-                    for await (const eachCommandPath of FileSystem.recursivelyIteratePathsIn(virkshop.pathTo.commands)) {
-                        permissionPromises.push(
-                            FileSystem.addPermissions({path: eachCommandPath, permissions: { owner: {canExecute: true} }})
-                        )
+                    for await (const eachCommand of FileSystem.recursivelyIterateItemsIn(virkshop.pathTo.commands)) {
+                        if (eachCommand.isFile) {
+                            permissionPromises.push(
+                                await FileSystem.addPermissions({path: eachCommand.path, permissions: { owner: {canExecute: true} }})
+                            )
+                        }
                     }
                     await Promise.all(permissionPromises)
                     
+                    var duration = (new Date()).getTime() - startTime; var startTime = (new Date()).getTime()
+                    debuggingMode && console.log(`     [${duration}ms creating mixture]`)
                     
                     // 
                     // run nix-shell
@@ -739,8 +840,8 @@ export const createVirkshop = async (arg)=>{
                             // start the function, and we'll await it at the respective deadline
                             deadlines[eachDeadlineName](
                                 virkshop._internal.createApi({
-                                    source,
                                     mixinName,
+                                    source,
                                     eventName,
                                     deadlineName: eachDeadlineName,
                                 })
