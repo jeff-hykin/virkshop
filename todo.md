@@ -1,24 +1,30 @@
 
 # pre-alpha:
-- have home folder generated, and treated differently
-- linkRealHomeFor()
 - allow loading advanced nix code
 
+- create clean command
+- create purge command
 - pad out numbers and auto-rename them
-- get git ignore to work
-- purge/clean event
+- create virkshop trigger for purge/clean
 
 - DONE: clear out the dead code
 - DONE: have .zshrc source a generated file
 - DONE: stop bash from loading a profile (--norc --noprofile)
+- DONE: get home folder linking working
 
 # beta
 - cli "virkshop/install [package name]"
+- git hook events
+- get auto-add to git ignore to work
 - add basic documentation
 - create branches like `pure` `standard`, squash all the commits
 - make a way to change shells (implement a javascript API for Zsh shell)
-old todo:
+- mention when there are home-folder conflicts between mixins
 
+# delta
+- tutorializer
+
+old todo:
 - create `virkshop.appendToEnvVar`
     - will need a way to save/seralize data
         - add a hidden getter that maps to a json file inside of short term temp
