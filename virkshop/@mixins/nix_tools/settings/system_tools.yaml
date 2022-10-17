@@ -55,8 +55,6 @@
     builtinDenoEval: Deno.build.os == 'linux'
     saveAs: isLinux
 
-
-
 # 
 # 
 # 
@@ -105,23 +103,23 @@
     asNativeBuildInput: true
     onlyIf: !!computed isMac
 
-# - (package):
-#     asBuildInput: true
-#     load: [ "darwin", "libobjc", ]
-#     asNativeBuildInput: true
-#     onlyIf: !!computed isMac
+- (package):
+    asBuildInput: true
+    load: [ "darwin", "libobjc", ]
+    asNativeBuildInput: true
+    onlyIf: !!computed isMac
 
-# - (package):
-#     asBuildInput: true
-#     load: [ "darwin", "apple_sdk", "frameworks", "CoreServices" ]
-#     asNativeBuildInput: true
-#     onlyIf: !!computed isMac
+- (package):
+    asBuildInput: true
+    load: [ "darwin", "apple_sdk", "frameworks", "CoreServices" ]
+    asNativeBuildInput: true
+    onlyIf: !!computed isMac
 
-# - (package):
-#     asBuildInput: true
-#     load: [ "darwin", "apple_sdk", "frameworks", "CoreFoundation" ]
-#     asNativeBuildInput: true
-#     onlyIf: !!computed isMac
+- (package):
+    asBuildInput: true
+    load: [ "darwin", "apple_sdk", "frameworks", "CoreFoundation" ]
+    asNativeBuildInput: true
+    onlyIf: !!computed isMac
 
 - (package):
     asBuildInput: true
