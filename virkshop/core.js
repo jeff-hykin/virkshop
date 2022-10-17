@@ -82,7 +82,6 @@ export const createVirkshop = async (arg)=>{
                     virkshopOptions:  { get() { return `${virkshop.pathTo.mixins}/virkshop/settings/virkshop/options.json` }},
                     systemTools:      { get() { return `${virkshop.pathTo.mixins}/nix_tools/settings/system_tools.yaml` }},
                     commands:         { get() { return `${virkshop.pathTo.mixture}/commands` }},
-                    _nixBuildShell:   { get() { return `${virkshop.pathTo.mixins}/virkshop/commands/virkshop/nix_build_shell` }},
                     _tempNixShellFile:{ get() { return `${virkshop.pathTo.fakeHome}/shell.nix` }},
                 }
             ),
@@ -178,6 +177,8 @@ export const createVirkshop = async (arg)=>{
                                             data: `#!/usr/bin/env bash\n`+`HOME='${escapeShellArgument(virkshop.pathTo.realHome)}' PATH='${escapeShellArgument(Console.env.PATH)}' ${absolutePathToCommand} "$@"`.replace(/\n/g, ""),
                                             overwrite: true,
                                         })
+                                    } else {
+                                        await FileSystem.remove(pathThatIsHopefullyGitIgnored)
                                     }
                                 })
                             })()))

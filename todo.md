@@ -7,6 +7,8 @@
 - create purge command
 - pad out numbers and auto-rename them
 - create virkshop trigger for purge/clean
+- make nix_tools, os_mac, etc unnecessary. Put everything inside @virkshop
+- make linking nix cache controllable through options.json
 
 - DONE: clear out the dead code
 - DONE: have .zshrc source a generated file
