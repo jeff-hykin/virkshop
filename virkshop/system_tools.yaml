@@ -68,27 +68,35 @@
 # 
 - (package):
     load: [ "python38",]
+    asBuildInput: true
 
 - (package):
     load: [ "python38Packages", "setuptools",]
+    asBuildInput: true
 
 - (package):
     load: [ "python38Packages", "pip",]
+    asBuildInput: true
 
 - (package):
     load: [ "python38Packages", "virtualenv",]
+    asBuildInput: true
 
 - (package):
     load: [ "python38Packages", "wheel",]
+    asBuildInput: true
 
 - (package):
     load: [ "cmake",]
+    asBuildInput: true
 
 - (package):
     load: [ "pkg-config",]
+    asBuildInput: true
 
 - (package):
     load: [ "libffi",]
+    asBuildInput: true
 
 
 # 
