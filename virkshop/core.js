@@ -163,7 +163,6 @@ export const createVirkshop = async (arg)=>{
                                 
                                 try {
                                     await FileSystem.remove(commandPath)
-                                    // FIXME: relativeLink isnt actually being forceful
                                     await FileSystem.relativeLink({
                                         existingItem: pathThatIsHopefullyGitIgnored,
                                         newItem: commandPath,
@@ -489,7 +488,6 @@ export const createVirkshop = async (arg)=>{
                                     relativePathFromHome: FileSystem.normalize(each.relativePathFromHome),
                                 })
                             )
-                            // FIXME: prevent touching of zshrc,zlogin, etc by anything other than the masterMixin
                             debuggingLevel && console.log("Here are the priority mappings for home")
                             debuggingLevel && console.log(homeMappingPriorities.sort((a,b)=>a.relativePathFromHome.localeCompare(b.relativePathFromHome)))
                             const lowPriorityHomeAspects = homeMappingPriorities.filter(each=>!each.isMasterMixin)
@@ -1382,7 +1380,7 @@ export const fornixToNix = async function(yamlString) {
                     continue
                 }
             } else if (values.onlyIf instanceof NixValue) {
-                // FIXME values.onlyIf  !!nix
+                // TODO values.onlyIf  !!nix
                 throw Error(`
                     Sorry the !!nix part isn't supported yet in the beta
                     For this value:
