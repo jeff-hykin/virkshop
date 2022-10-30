@@ -1,11 +1,14 @@
 
 # pre-alpha:
-- create clean command
-- create purge command
+- create deno library for virkshop
+
 - pad out numbers and auto-rename them
-- create virkshop trigger for purge/clean
 - make linking nix cache controllable through options.json
 - add a check to make sure the virkshop folder doesnt contain non-necessary items
+
+- DONE: create virkshop trigger for purge/clean
+- DONE: create clean command
+- DONE: create purge command
 
 - DONE: allow loading advanced nix code
 - DONE: make nix_tools, os_mac, etc unnecessary. Put everything inside @virkshop
@@ -28,6 +31,9 @@
 
 # delta
 - tutorializer
+- nix-based if statements
+- generic nix variables
+- only load executable names that are directly mentioned (no extra/overflow binaries in path)
 
 old todo:
 - create `virkshop.appendToEnvVar`

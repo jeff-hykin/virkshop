@@ -1,0 +1,4 @@
+#!/usr/bin/env -S deno run --allow-all
+import { virkshop } from "../../../core"
+
+await virkshop.trigger(`@project/clean`) // run all the files inside virkshop/mixture/@project/clean
