@@ -51,7 +51,7 @@ export PATH='/Users/jeffhykin/repos/virkshop/virkshop/mixture/commands:'"$PATH"
 # AVAILABLE ENV VARS:
 #     VIRKSHOP_FOLDER
 #     VIRKSHOP_HOME # same as HOME 
-#     VIRKSHOP_PROJECT_FOLDER
+#     PROJECT_FOLDER
 #     NIX_SSL_CERT_FILE
 
 # 
