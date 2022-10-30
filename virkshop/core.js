@@ -381,7 +381,7 @@ export const createVirkshop = async (arg)=>{
                         // 
                         // let the mixin link everything within itself
                         // 
-                        const parentFolderString = `${eachMixinPath}/events/virkshop/${eventName}`
+                        const parentFolderString = `${eachMixinPath}/events/@virkshop/${eventName}`
                         const selfSetupPromise = FileSystem.recursivelyListItemsIn(parentFolderString).then(
                             async (phase1Items)=>{
                                 virkshop._internal.sortPrioitiesByPath(phase1Items, (each)=>each.path.slice(parentFolderString.length))
@@ -425,7 +425,7 @@ export const createVirkshop = async (arg)=>{
                         virkshop._internal.deadlines.beforeShellScripts.push(selfSetupPromise.then(async ()=>{
                             // read the the before_login files as soon as possible
                             const eventName = `during_setup`
-                            const parentFolderString = `${eachMixinPath}/events/virkshop/${eventName}/`
+                            const parentFolderString = `${eachMixinPath}/events/@virkshop/${eventName}/`
                             const files = await FileSystem.listFilePathsIn(parentFolderString)
                             await Promise.all(files.map(async eachPath=>{
                                 if (eachPath.match(/\.deno\.js$/)) {
@@ -1326,7 +1326,7 @@ export const fornixToNix = async function(yamlString) {
             let nixValue
             if (values.load instanceof NixValue) {
                 nixValue = `(${values.load.asString})`
-            } else if (obj instanceof WarehouseVar || obj instanceof ComputedVar || obj instanceof PackageVar) {
+            } else if (source instanceof WarehouseVar || source instanceof ComputedVar || source instanceof PackageVar) {
                 const loadAttribute = values.load.map(each=>escapeNixString(each)).join(".")
                 nixValue = `${source.name}.${loadAttribute}`
             // from a hash/url directly
@@ -1376,7 +1376,7 @@ export const fornixToNix = async function(yamlString) {
             const source = values.from || defaultWarehouse
             const loadAttribute = values.load.map(each=>escapeNixString(each)).join(".")
             let nixValue
-            if (obj instanceof WarehouseVar || obj instanceof ComputedVar || obj instanceof PackageVar) {
+            if (source instanceof WarehouseVar || source instanceof ComputedVar || source instanceof PackageVar) {
                 nixValue = `${source.name}.${loadAttribute}`
             // from a hash/url directly
             } else {

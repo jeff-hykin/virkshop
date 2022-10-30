@@ -1,7 +1,5 @@
 
 # pre-alpha:
-- allow loading advanced nix code
-
 - create clean command
 - create purge command
 - pad out numbers and auto-rename them
@@ -9,6 +7,7 @@
 - make linking nix cache controllable through options.json
 - add a check to make sure the virkshop folder doesnt contain non-necessary items
 
+- DONE: allow loading advanced nix code
 - DONE: make nix_tools, os_mac, etc unnecessary. Put everything inside @virkshop
 - DONE: prevent mixins adding zshrc, zlogin, etc by anything other than the masterMixin
 - DONE: clear out the dead code
