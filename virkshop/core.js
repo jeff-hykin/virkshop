@@ -1,18 +1,47 @@
-import { FileSystem } from "https://deno.land/x/quickr@0.4.3/main/file_system.js"
-import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.4.1/main/run.js"
-import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.4.1/main/console.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.4.4/main/file_system.js"
+import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.4.4/main/run.js"
+import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.4.4/main/console.js"
 import { indent, findAll } from "https://deno.land/x/good@0.7.6/string.js"
 import { intersection, subtract } from "https://deno.land/x/good@0.7.6/set.js"
 import { zip } from "https://deno.land/x/good@0.7.6/array.js"
+import { Type } from "https://deno.land/std@0.82.0/encoding/_yaml/type.ts"
+import * as yaml from "https://deno.land/std@0.82.0/encoding/yaml.ts"
+import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
 
+async function relativeLink({existingItem, newItem, force=true, overwrite=false}) {
+    const existingItemPath = (existingItem.path || existingItem).replace(/\/+$/, "") // the replace is to remove trailing slashes, which will cause painful nonsensical errors if not done
+    const newItemPath = (newItem.path || newItem).replace(/\/+$/, "") // if given ItemInfo object
+    
+    const existingItemDoesntExist = (await Deno.lstat(existingItemPath).catch(()=>({doesntExist: true}))).doesntExist
+    // if the item doesnt exists
+    if (existingItemDoesntExist) {
+        throw Error(`\nTried to create a relativeLink between existingItem:${existingItemPath}, newItem:${newItemPath}\nbut existingItem didn't actually exist`)
+    } else {
+        const parentOfNewItem = FileSystem.parentPath(newItemPath)
+        await FileSystem.ensureIsFolder(parentOfNewItem)
+        const hardPathToNewItem = `${await FileSystem.makeHardPathTo(parentOfNewItem)}/${FileSystem.basename(newItemPath)}`
+        const hardPathToExistingItem = await FileSystem.makeHardPathTo(existingItemPath)
+        const pathFromNewToExisting = Path.relative(hardPathToNewItem, hardPathToExistingItem).replace(/^\.\.\//,"") // all paths should have the "../" at the begining
+        if (force || overwrite) {
+            FileSystem.sync.clearAPathFor(hardPathToNewItem, {overwrite})
+            if (overwrite) {
+                await FileSystem.remove(hardPathToNewItem)
+            }
+        }
+        return Deno.symlink(
+            pathFromNewToExisting,
+            hardPathToNewItem,
+        )
+    }
+}
 
 // 
 // 
 // Main
 // 
 // 
-let debuggingMode = false
-const virkshopIdentifierPath = `@mixins/virkshop/settings/virkshop/` // The only thing that can basically never change
+let debuggingLevel = false
+const virkshopIdentifierPath = `mixins/@virkshop/events/@virkshop/` // The only thing that can basically never change
 const masterMixin = "@project" // TODO: make this configurable
 export const createVirkshop = async (arg)=>{
     var { virkshopPath, projectPath } = {...arg}
@@ -65,6 +94,7 @@ export const createVirkshop = async (arg)=>{
         }
     }
     
+    const virkshopCache = {}
     const virkshop = Object.defineProperties(
         {
             pathTo: Object.defineProperties(
@@ -74,13 +104,13 @@ export const createVirkshop = async (arg)=>{
                     project: FileSystem.makeAbsolutePath(projectPath || FileSystem.parentPath(virkshopPath)),
                 },
                 {
-                    mixins:           { get() { return `${virkshop.pathTo.virkshop}/@mixins` }},
-                    mixture:          { get() { return `${virkshop.pathTo.virkshop}/@mixture` }},
+                    mixins:           { get() { return `${virkshop.pathTo.virkshop}/mixins` }},
+                    mixture:          { get() { return `${virkshop.pathTo.virkshop}/mixture` }},
                     settings:         { get() { return `${virkshop.pathTo.mixture}/settings` }},
                     temporary:        { get() { return `${virkshop.pathTo.mixture}/temporary` }},
                     fakeHome:         { get() { return `${virkshop.pathTo.mixture}/home` }},
-                    virkshopOptions:  { get() { return `${virkshop.pathTo.mixins}/virkshop/settings/virkshop/options.json` }},
-                    systemTools:      { get() { return `${virkshop.pathTo.mixins}/nix_tools/settings/system_tools.yaml` }},
+                    virkshopOptions:  { get() { return `${virkshop.pathTo.virkshop}/settings.yaml` }},
+                    systemTools:      { get() { return `${virkshop.pathTo.virkshop}/system_tools.yaml` }},
                     commands:         { get() { return `${virkshop.pathTo.mixture}/commands` }},
                     _tempNixShellFile:{ get() { return `${virkshop.pathTo.fakeHome}/shell.nix` }},
                 }
@@ -249,7 +279,7 @@ export const createVirkshop = async (arg)=>{
                 // 
                 // 
                 async phase0(mixinPaths) {
-                    debuggingMode && console.log("[Phase0: Establishing/Verifying Structure]")
+                    debuggingLevel && console.log("[Phase0: Establishing/Verifying Structure]")
                     mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
                     
                     // TODO: purge broken system links more
@@ -336,9 +366,11 @@ export const createVirkshop = async (arg)=>{
                     // rule1: never overwrite non-symlink files (in commands/ settings/ etc)
                     //        hardlink files are presumably created by the user, not a mixin
                     // link virkshop folders up-and-out into the project folder
-                    await Promise.all(Object.entries(virkshop.options.linkToProject).map(async ([whereInProject, whereInVirkshop])=>{
-                        
-                        const sourcePath = `${virkshop.pathTo.virkshop}/${whereInVirkshop.replace(/^\$VIRKSHOP_FOLDER/g,"./")}`
+                    await Promise.all(Object.entries(virkshop.options.projectLinks).map(async ([whereInProject, whereInVirkshop])=>{
+                        // TODO: make $VIRKSHOP_FOLDER and $PROJECT_FOLDER required at the front
+                        whereInProject = whereInProject.replace(/^\$PROJECT_FOLDER\//, "./")
+                        whereInVirkshop = whereInVirkshop.replace(/^\$VIRKSHOP_FOLDER\//, "./")
+                        const sourcePath = `${virkshop.pathTo.virkshop}/${whereInVirkshop}`
                         const target = await FileSystem.info(`${virkshop.pathTo.project}/${whereInProject}`)
                         if (target.isBrokenLink) {
                             await FileSystem.remove(target.path)
@@ -359,7 +391,7 @@ export const createVirkshop = async (arg)=>{
                 // 
                 // 
                 async phase1(mixinPaths) {
-                    debuggingMode && console.log("[Phase1: Mixins Setup]")
+                    debuggingLevel && console.log("[Phase1: Mixins Setup]")
                     mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
                     const alreadExecuted = new Set()
                     for (const eachMixinPath of mixinPaths) {
@@ -401,7 +433,7 @@ export const createVirkshop = async (arg)=>{
                                     }
                                 }
                                 const duration = (new Date()).getTime() - startTime
-                                debuggingMode && console.log(`     [${duration}ms: setting up ${mixinName}]`)
+                                debuggingLevel && console.log(`     [${duration}ms: setting up ${mixinName}]`)
                             }
                         )
                         virkshop._internal.deadlines.beforeSetup.push(selfSetupPromise)
@@ -455,8 +487,8 @@ export const createVirkshop = async (arg)=>{
                                 })
                             )
                             // FIXME: prevent touching of zshrc,zlogin, etc by anything other than the masterMixin
-                            debuggingMode && console.log("Here are the priority mappings for home")
-                            debuggingMode && console.log(homeMappingPriorities.sort((a,b)=>a.relativePathFromHome.localeCompare(b.relativePathFromHome)))
+                            debuggingLevel && console.log("Here are the priority mappings for home")
+                            debuggingLevel && console.log(homeMappingPriorities.sort((a,b)=>a.relativePathFromHome.localeCompare(b.relativePathFromHome)))
                             const lowPriorityHomeAspects = homeMappingPriorities.filter(each=>!each.isMasterMixin)
                             const highPriorityHomeAspects = homeMappingPriorities.filter(each=>each.isMasterMixin)
                             // do low priority stuff first because its going to be overwritten by higher priority
@@ -499,12 +531,18 @@ export const createVirkshop = async (arg)=>{
                                         })
                                     // absolute link
                                     } else {
-                                        await FileSystem.absoluteLink({
-                                            existingItem: eachItem.target,
-                                            newItem: newHomePath,
-                                            overwrite: true,
-                                            force: true,
-                                        })
+                                        try {
+                                            await FileSystem.absoluteLink({
+                                                existingItem: eachItem.target,
+                                                newItem: newHomePath,
+                                                overwrite: true,
+                                                force: true,
+                                            })
+                                        } catch (error) {
+                                            console.debug(`eachItem.target is:`,eachItem.target)
+                                            console.debug(`newHomePath is:`,newHomePath)
+                                            throw error
+                                        }
                                     }
                                 }
                             }
@@ -521,7 +559,7 @@ export const createVirkshop = async (arg)=>{
                     // 
                     // the three operations below can be done in any order, which is why they're in this Promise.all
                     // 
-                    debuggingMode && console.log("[Phase2: Nix+Zsh Setup]")
+                    debuggingLevel && console.log("[Phase2: Nix+Zsh Setup]")
                     var startTime = (new Date()).getTime()
                     var defaultWarehouse
                     await Promise.all([
@@ -567,7 +605,7 @@ export const createVirkshop = async (arg)=>{
                             await Promise.all(virkshop._internal.deadlines.beforeShellScripts)
                             virkshop._internal.sortPrioitiesByPath(virkshop._internal.shellSetupPriorities , ([eachSource, ...otherData])=>eachSource)
                             for (const [eachSource, eachContent] of virkshop._internal.shellSetupPriorities) {
-                                // TODO: add a debugging echo here if debuggingMode
+                                // TODO: add a debugging echo here if debuggingLevel
                                 shellProfileString += `\n#\n# ${eachSource}\n#\n${eachContent}\n`
                             }
 
@@ -750,12 +788,18 @@ export const createVirkshop = async (arg)=>{
                                             
                                             // make sure it exists by this point
                                             await FileSystem.ensureIsFolder(FileSystem.parentPath(mixinItem.path))
-                                            // create the shortcut
-                                            await FileSystem.relativeLink({
-                                                existingItem: mixinItem.path,
-                                                newItem: targetLocation.path,
-                                                overwrite: true,
-                                            })
+                                            try {
+                                                // create the shortcut
+                                                await relativeLink({
+                                                    existingItem: mixinItem.path,
+                                                    newItem: targetLocation.path,
+                                                    overwrite: true,
+                                                })
+                                            } catch (error) {
+                                                console.debug(`mixinItem.path is:`,mixinItem.path)
+                                                console.debug(`targetLocation.path is:`,targetLocation.path)
+                                                throw error
+                                            }
                                         }
                                         // TODO: consider another edgecase of mixin item being a file, but existing item being a folder
                                     }
@@ -766,7 +810,7 @@ export const createVirkshop = async (arg)=>{
                         
                     ])
                     var duration = (new Date()).getTime() - startTime; var startTime = (new Date()).getTime()
-                    debuggingMode && console.log(`     [${duration}ms creating shell profile and shell.nix]`)
+                    debuggingLevel && console.log(`     [${duration}ms creating shell profile and shell.nix]`)
                     
                     // 
                     // finish dynamic setup
@@ -785,7 +829,7 @@ export const createVirkshop = async (arg)=>{
                     await Promise.all(permissionPromises)
                     
                     var duration = (new Date()).getTime() - startTime; var startTime = (new Date()).getTime()
-                    debuggingMode && console.log(`     [${duration}ms creating mixture]`)
+                    debuggingLevel && console.log(`     [${duration}ms creating mixture]`)
                     
                     // 
                     // run nix-shell
@@ -797,7 +841,7 @@ export const createVirkshop = async (arg)=>{
                         VIRKSHOP_PROJECT_FOLDER: virkshop.pathTo.project,
                         VIRKSHOP_HOME: virkshop.pathTo.fakeHome,
                         VIRKSHOP_USERS_HOME: virkshop.pathTo.realHome,
-                        VIRKSHOP_DEBUG: `${debuggingMode}`,
+                        VIRKSHOP_DEBUG: `${debuggingLevel}`,
                         NIX_SSL_CERT_FILE: Console.env.NIX_SSL_CERT_FILE,
                         NIXPKGS_ALLOW_UNFREE: "1",
                         NIX_PROFILES: Console.env.NIX_PROFILES,
@@ -856,13 +900,40 @@ export const createVirkshop = async (arg)=>{
             projectName: { get() { return FileSystem.basename(virkshop.pathTo.project)   } },
             options: { 
                 get() {
-                    return JSON.parse(Deno.readTextFileSync(virkshop.pathTo.virkshopOptions))
+                    if (virkshopCache.options) {
+                        return virkshopCache.options
+                    }
+
+                    let yamlString
+                    try {
+                        yamlString = Deno.readTextFileSync(virkshop.pathTo.virkshopOptions)
+                    } catch (error) {
+                        console.log(`Couldn't find the ${FileSystem.basename(virkshop.pathTo.virkshopOptions)} file, so one will be created`)
+                        yamlString = `
+                            virkshop:
+                                projectLinks:
+                                    "$PROJECT_FOLDER/commands":      "$VIRKSHOP_FOLDER/mixture/commands"
+                                    "$PROJECT_FOLDER/documentation": "$VIRKSHOP_FOLDER/mixture/documentation"
+                                    "$PROJECT_FOLDER/events":        "$VIRKSHOP_FOLDER/mixture/events"
+                                    "$PROJECT_FOLDER/settings":      "$VIRKSHOP_FOLDER/mixture/settings"
+                                
+                                debuggingLevel: 1
+                        `.replace(/\n                            /g,"\n")
+                        // async write is not awaited because this is inside a getter
+                        FileSystem.write({
+                            data: yamlString,
+                            path: virkshop.pathTo.virkshopOptions,
+                        })
+                    }
+                    virkshopCache.options = yaml.parse(yamlString).virkshop
+                    console.debug(`virkshopCache.options is:`,virkshopCache.options)
+                    return virkshopCache.options
                 },
             },
         },
     )
     
-    debuggingMode = virkshop.options.debuggingMode
+    debuggingLevel = virkshop.options.debuggingLevel
     return virkshop
 }
 export const virkshop = await createVirkshop()
@@ -914,9 +985,6 @@ const shellApi = Object.defineProperties(
 // Yaml support
 // 
 // 
-    import { Type } from "https://deno.land/std@0.82.0/encoding/_yaml/type.ts"
-    import * as yaml from "https://deno.land/std@0.82.0/encoding/yaml.ts";
-    
     class NixValue {}
 
     // 

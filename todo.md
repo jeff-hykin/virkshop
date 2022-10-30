@@ -2,6 +2,7 @@
 # pre-alpha:
 - allow loading advanced nix code
 - prevent mixins adding zshrc, zlogin, etc by anything other than the masterMixin
+- add a check to make sure the virkshop folder doesnt contain non-necessary items
 
 - create clean command
 - create purge command

@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+HOME='/Users/jeffhykin' PATH='/Users/jeffhykin/Commands/:/Users/jeffhykin/.nix-profile/bin:/nix/var/nix/profiles/default/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/jeffhykin/Personal/Commands:/Users/jeffhykin/Commands/:/Users/jeffhykin/.local/bin:/nix/var/nix/profiles/per-user/jeffhykin/profile/bin/:/Users/jeffhykin/.nix-profile/bin/:/nix/var/nix/profiles/default/bin/' /usr/bin/nano "$@"
