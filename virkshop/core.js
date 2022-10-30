@@ -1,39 +1,12 @@
-import { FileSystem } from "https://deno.land/x/quickr@0.4.4/main/file_system.js"
-import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.4.4/main/run.js"
-import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.4.4/main/console.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.4.5/main/file_system.js"
+import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.4.5/main/run.js"
+import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.4.5/main/console.js"
 import { indent, findAll } from "https://deno.land/x/good@0.7.6/string.js"
 import { intersection, subtract } from "https://deno.land/x/good@0.7.6/set.js"
 import { zip } from "https://deno.land/x/good@0.7.6/array.js"
 import { Type } from "https://deno.land/std@0.82.0/encoding/_yaml/type.ts"
 import * as yaml from "https://deno.land/std@0.82.0/encoding/yaml.ts"
 import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
-
-async function relativeLink({existingItem, newItem, force=true, overwrite=false}) {
-    const existingItemPath = (existingItem.path || existingItem).replace(/\/+$/, "") // the replace is to remove trailing slashes, which will cause painful nonsensical errors if not done
-    const newItemPath = (newItem.path || newItem).replace(/\/+$/, "") // if given ItemInfo object
-    
-    const existingItemDoesntExist = (await Deno.lstat(existingItemPath).catch(()=>({doesntExist: true}))).doesntExist
-    // if the item doesnt exists
-    if (existingItemDoesntExist) {
-        throw Error(`\nTried to create a relativeLink between existingItem:${existingItemPath}, newItem:${newItemPath}\nbut existingItem didn't actually exist`)
-    } else {
-        const parentOfNewItem = FileSystem.parentPath(newItemPath)
-        await FileSystem.ensureIsFolder(parentOfNewItem)
-        const hardPathToNewItem = `${await FileSystem.makeHardPathTo(parentOfNewItem)}/${FileSystem.basename(newItemPath)}`
-        const hardPathToExistingItem = await FileSystem.makeHardPathTo(existingItemPath)
-        const pathFromNewToExisting = Path.relative(hardPathToNewItem, hardPathToExistingItem).replace(/^\.\.\//,"") // all paths should have the "../" at the begining
-        if (force || overwrite) {
-            FileSystem.sync.clearAPathFor(hardPathToNewItem, {overwrite})
-            if (overwrite) {
-                await FileSystem.remove(hardPathToNewItem)
-            }
-        }
-        return Deno.symlink(
-            pathFromNewToExisting,
-            hardPathToNewItem,
-        )
-    }
-}
 
 // 
 // 
@@ -293,15 +266,23 @@ export const createVirkshop = async (arg)=>{
                             // 
                             // home is extra special
                             // 
-                            if (FileSystem.basename(eachSpecialFolder) == 'home') {
+                            if (FileSystem.basename(eachSpecialFolder) == "home") {
                                 const mixinsHome = `${eachPath}/${eachSpecialFolder}`
                                 const homeMappingPriorities = virkshop._internal.homeMappingPriorities
                                 virkshop._internal.deadlines.beforeSetup.push(new Promise(async (resolve, reject)=>{
                                     for (const eachHomePathInfo of await FileSystem.recursivelyListItemsIn(mixinsHome)) {
-                                        const relativeHomePath = FileSystem.makeRelativePath({
+                                        const relativeHomePath = FileSystem.normalize(FileSystem.makeRelativePath({
                                             from: mixinsHome,
                                             to: eachHomePathInfo.path,
-                                        })
+                                        })).replace(/^\.\//, "")
+                                        if (mixinName != masterMixin) {
+                                            // if any non-master mixin tries to set a protected path, ban it
+                                            if (shellApi.protectedPaths.includes(relativeHomePath)) {
+                                                console.warn(`The ${mixinName} mixin tried to set this file: $HOME/${relativeHomePath}. However only the master mixin (${masterMixin}) is allowed to set this file.\nThis issue can likely be solved by deleting: ${eachHomePathInfo}`)
+                                                // skip adding this to homeMappingPriorities
+                                                continue
+                                            }
+                                        }
                                         homeMappingPriorities.push({
                                             relativePathFromHome: relativeHomePath,
                                             target: eachHomePathInfo.path,
@@ -790,14 +771,17 @@ export const createVirkshop = async (arg)=>{
                                             await FileSystem.ensureIsFolder(FileSystem.parentPath(mixinItem.path))
                                             try {
                                                 // create the shortcut
-                                                await relativeLink({
+                                                await FileSystem.relativeLink({
                                                     existingItem: mixinItem.path,
                                                     newItem: targetLocation.path,
                                                     overwrite: true,
                                                 })
                                             } catch (error) {
-                                                console.debug(`mixinItem.path is:`,mixinItem.path)
-                                                console.debug(`targetLocation.path is:`,targetLocation.path)
+                                                // can remove this try-catch once 1.0 is published
+                                                console.debug(`relativeLink failed: `,)
+                                                console.debug(`    mixinItem.path is:`,mixinItem.path)
+                                                console.debug(`    targetLocation.path is:`,targetLocation.path)
+                                                console.debug(`    error is:`, error)
                                                 throw error
                                             }
                                         }
@@ -945,6 +929,7 @@ const shellApi = Object.defineProperties(
     {
         autogeneratedProfile: `.zshrc.autogenerated.ignore`,
         startCommand: "zsh --no-globalrcs",
+        protectedPaths: [ ".zshrc", ".zshenv", ".zlogin", ".zlogout", ".zprofile" ] // TODO: check that zlogout zprofile are correct
     },
     {
         profilePath:         { get() { return `${virkshop.pathTo.fakeHome}/.zshrc` } },

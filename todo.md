@@ -1,16 +1,16 @@
 
 # pre-alpha:
 - allow loading advanced nix code
-- prevent mixins adding zshrc, zlogin, etc by anything other than the masterMixin
-- add a check to make sure the virkshop folder doesnt contain non-necessary items
 
 - create clean command
 - create purge command
 - pad out numbers and auto-rename them
 - create virkshop trigger for purge/clean
-- make nix_tools, os_mac, etc unnecessary. Put everything inside @virkshop
 - make linking nix cache controllable through options.json
+- add a check to make sure the virkshop folder doesnt contain non-necessary items
 
+- DONE: make nix_tools, os_mac, etc unnecessary. Put everything inside @virkshop
+- DONE: prevent mixins adding zshrc, zlogin, etc by anything other than the masterMixin
 - DONE: clear out the dead code
 - DONE: have .zshrc source a generated file
 - DONE: stop bash from loading a profile (--norc --noprofile)
