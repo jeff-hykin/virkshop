@@ -6,6 +6,8 @@
 - make linking nix cache controllable through options.json
 - maybe have a mixture.yaml for things like the gitignore settings
 
+- try getting super_map to work with virkshop
+
 - DONE: create virkshop trigger for purge/clean
 - DONE: create clean command
 - DONE: create purge command

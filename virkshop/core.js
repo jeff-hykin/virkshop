@@ -1,9 +1,9 @@
 import { FileSystem } from "https://deno.land/x/quickr@0.4.5/main/file_system.js"
 import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.4.5/main/run.js"
 import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.4.5/main/console.js"
-import { indent, findAll } from "https://deno.land/x/good@0.7.6/string.js"
-import { intersection, subtract } from "https://deno.land/x/good@0.7.6/set.js"
-import { zip } from "https://deno.land/x/good@0.7.6/array.js"
+import { indent, findAll } from "https://deno.land/x/good@0.7.7/string.js"
+import { intersection, subtract } from "https://deno.land/x/good@0.7.7/set.js"
+import { zip } from "https://deno.land/x/good@0.7.7/array.js"
 import { Type } from "https://deno.land/std@0.82.0/encoding/_yaml/type.ts"
 import * as yaml from "https://deno.land/std@0.82.0/encoding/yaml.ts"
 import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
@@ -991,6 +991,43 @@ const shellApi = Object.defineProperties(
         }
         // if in an interpreter
         return Deno.cwd()
+    }
+
+    function numberPrefixRenameList(filepaths) {
+        let largestNumber = -Infinity
+        const items = []
+        const basenames = filepaths.map(eachPath=>FileSystem.basename(eachPath))
+        for (const each of basenames) {
+            const matchData = basenames.match(/^([0-9_]*[0-9])?_?(.*)/)
+            const digits = matchData[1].replace(/_/g, "")
+            const name = matchData[2]
+            const number = `${digits || 0}`-0
+            items.push({
+                name,
+                number
+            })
+            if (number > largestNumber) {
+                largestNumber = number
+            }
+        }
+        const numberOfDigits = `${largestNumber}`.length
+        const roundedToNearestThree = numberOfDigits + (numberOfDigits % 3)
+        const newBasenames = []
+        for (const each of items) {
+            const newDigits = `${each.number}`.padEnd(roundedToNearestThree, "0")
+            const newPrefix = newDigits.replace(/(\d\d\d)/g, "$1_")
+            newBasenames.push(`${newPrefix}${each.name}`)
+        }
+        const thingsToRename = []
+        for (const [ path, oldBasename, newBasename ] of zip(filepaths, basenames, newBasenames)) {
+            if (oldBasename != newBasename) {
+                thingsToRename.push({
+                    oldPath: path,
+                    newPath: `${FileSystem.parentPath(path)}/${newBasename}`,
+                })
+            }
+        }
+        return thingsToRename
     }
 
 // 
