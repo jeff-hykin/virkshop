@@ -1,17 +1,15 @@
 
 # pre-alpha:
-- create deno library for virkshop
-
-- pad out numbers and auto-rename them
-- make linking nix cache controllable through options.json
-- maybe have a mixture.yaml for things like the gitignore settings
-
 - try getting super_map to work with virkshop
+
+- create deno library for virkshop
+- maybe have a mixture.yaml for things like the gitignore settings
 
 - DONE: create virkshop trigger for purge/clean
 - DONE: create clean command
 - DONE: create purge command
 
+- DONE: pad out numbers and auto-rename them
 - DONE: allow loading advanced nix code
 - DONE: make nix_tools, os_mac, etc unnecessary. Put everything inside @virkshop
 - DONE: prevent mixins adding zshrc, zlogin, etc by anything other than the masterMixin
@@ -21,6 +19,7 @@
 - DONE: get home folder linking working
 
 # beta
+- make linking nix cache controllable through options.json
 - cli "virkshop/install [package name]"
 - virkshop update (wrapper around git mixin)
 - git hook events

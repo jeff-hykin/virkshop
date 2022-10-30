@@ -1,12 +1,14 @@
-import { FileSystem } from "https://deno.land/x/quickr@0.4.5/main/file_system.js"
-import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.4.5/main/run.js"
-import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.4.5/main/console.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.4.6/main/file_system.js"
+import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.4.6/main/run.js"
+import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.4.6/main/console.js"
 import { indent, findAll } from "https://deno.land/x/good@0.7.7/string.js"
 import { intersection, subtract } from "https://deno.land/x/good@0.7.7/set.js"
+import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
 import { zip } from "https://deno.land/x/good@0.7.7/array.js"
 import { Type } from "https://deno.land/std@0.82.0/encoding/_yaml/type.ts"
 import * as yaml from "https://deno.land/std@0.82.0/encoding/yaml.ts"
 import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
+import { stats, sum, spread, normalizeZeroToOne, roundedUpToNearest, roundedDownToNearest } from "https://deno.land/x/good@0.7.8/math.js"
 
 // 
 // 
@@ -375,6 +377,25 @@ export const createVirkshop = async (arg)=>{
                 async phase1(mixinPaths) {
                     debuggingLevel && console.log("[Phase1: Mixins Setup]")
                     mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
+
+                    // 
+                    // make all the numbers correct
+                    // 
+                    const promises = []
+                    for (const eachMixinPath of mixinPaths) {
+                        promises.push(FileSystem.listFilePathsIn(`${eachMixinPath}/events/`, {recursively:true}))
+                    }
+                    const paths = (await Promise.all(promises)).flat(1)
+                    const pathsThatNeedRenaming = numberPrefixRenameList(paths)
+                    promises.length = 0 // clear contents
+                    for (const { oldPath, newPath } of pathsThatNeedRenaming) {
+                        promises.push(moveAndRename(oldPath, newPath))
+                    }
+                    await Promise.all(promises)
+                    
+                    // 
+                    // let mixins set themselves up
+                    // 
                     const alreadExecuted = new Set()
                     for (const eachMixinPath of mixinPaths) {
                         const mixinName = FileSystem.basename(eachMixinPath)
@@ -937,7 +958,6 @@ export const createVirkshop = async (arg)=>{
                         })
                     }
                     virkshopCache.options = yaml.parse(yamlString).virkshop
-                    console.debug(`virkshopCache.options is:`,virkshopCache.options)
                     return virkshopCache.options
                 },
             },
@@ -998,28 +1018,35 @@ const shellApi = Object.defineProperties(
         const items = []
         const basenames = filepaths.map(eachPath=>FileSystem.basename(eachPath))
         for (const each of basenames) {
-            const matchData = basenames.match(/^([0-9_]*[0-9])?_?(.*)/)
+            const matchData = each.match(/^((?:[0-9_]*[0-9])?)_?(.*)/)
             const digits = matchData[1].replace(/_/g, "")
             const name = matchData[2]
             const number = `${digits || 0}`-0
+            const padding = digits.match(/^0*/)[0]
             items.push({
                 name,
-                number
+                number,
+                padding,
+                noDigits: digits.length == 0,
             })
             if (number > largestNumber) {
                 largestNumber = number
             }
         }
         const numberOfDigits = `${largestNumber}`.length
-        const roundedToNearestThree = numberOfDigits + (numberOfDigits % 3)
+        const roundedToNearestThree = roundedUpToNearest({value: numberOfDigits, factor: 3})
         const newBasenames = []
         for (const each of items) {
-            const newDigits = `${each.number}`.padEnd(roundedToNearestThree, "0")
-            const newPrefix = newDigits.replace(/(\d\d\d)/g, "$1_")
-            newBasenames.push(`${newPrefix}${each.name}`)
+            if (each.noDigits) {
+                newBasenames.push(each.name)
+            } else {
+                const newDigits = `${each.padding}${each.number}`.padEnd(roundedToNearestThree, "0")
+                const newPrefix = newDigits.replace(/(\d\d\d)/g, "$1_")
+                newBasenames.push(`${newPrefix}${each.name}`)
+            }
         }
         const thingsToRename = []
-        for (const [ path, oldBasename, newBasename ] of zip(filepaths, basenames, newBasenames)) {
+        for (const [ path, oldBasename, newBasename, item] of zip(filepaths, basenames, newBasenames, items)) {
             if (oldBasename != newBasename) {
                 thingsToRename.push({
                     oldPath: path,
