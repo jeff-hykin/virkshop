@@ -4,7 +4,7 @@
 
 - pad out numbers and auto-rename them
 - make linking nix cache controllable through options.json
-- add a check to make sure the virkshop folder doesnt contain non-necessary items
+- maybe have a mixture.yaml for things like the gitignore settings
 
 - DONE: create virkshop trigger for purge/clean
 - DONE: create clean command
@@ -28,6 +28,7 @@
 - create branches like `pure` `standard`, squash all the commits
 - make a way to change shells (implement a javascript API for Zsh shell)
 - mention when there are home-folder conflicts between mixins
+- add a check to make sure the virkshop folder doesnt contain non-necessary items
 
 # delta
 - tutorializer
