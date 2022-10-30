@@ -970,161 +970,110 @@ const shellApi = Object.defineProperties(
 // Yaml support
 // 
 // 
-    class NixValue {}
+    class CustomYamlType {
+        asString = null
+    }
+    function createCustomTag({tagName, javascriptValueisACustomType, yamlNodeIsValidACustomTyp, createJavasriptValueFromYamlString, customValueToYamlString, kind="scalar", }) {
+        if (kind != "scalar") {
+            throw Error(`Sorry in createCustomTag({ kind: '${kind}' }), the only valid kind (currently) is scalar`)
+        }
+        const universalTag = `tag:yaml.org,2002:${tagName}`
+        class ACustomType extends CustomYamlType {}
+
+        const validVariableNameRegex = /^ *\b[a-zA-Z_][a-zA-Z_0-9]*\b *$/
+        const customValueSupport = new Type(universalTag, {
+            kind: "scalar",
+            predicate: javascriptValueisACustomType || function(object) {
+                return object instanceof ACustomType
+            },
+            resolve: yamlNodeIsValidACustomTyp || function(data) {
+                return true
+            },
+            construct: createJavasriptValueFromYamlString || function(data) {
+                const customValue = new ACustomType()
+                customValue.asString = data
+                return customValue
+            },
+            represent: customValueToYamlString || function(object /*, style*/) {
+                return customValue.asString
+            },
+        })
+
+        // hack it into the default schema (cause .extend() isnt available)
+        yaml.DEFAULT_SCHEMA.explicit.push(customValueSupport)
+        yaml.DEFAULT_SCHEMA.compiledTypeMap.fallback[universalTag] = customValueSupport
+        yaml.DEFAULT_SCHEMA.compiledTypeMap.scalar[universalTag] = customValueSupport
+
+        return ACustomType
+    }
 
     // 
     // !!nix support
     // 
-        class NixVar extends NixValue {
-            name = null
-        }
-
         const validVariableNameRegex = /^ *\b[a-zA-Z_][a-zA-Z_0-9]*\b *$/
-        const nixVarSupport = new Type("tag:yaml.org,2002:nix", {
-            kind: "scalar",
-            predicate: function javascriptValueisNixVar(object) {
-                return object instanceof NixVar
-            },
-            resolve: function yamlNodeIsValidNixVar(data) {
-                if (typeof data !== 'string') return false
-                if (data.length === 0) return false
-                
-                data = data.trim()
-                // if its a variable name
-                if (data.match(validVariableNameRegex)) {
-                    return true
-                } else {
-                    return false
-                }
-            },
-            construct: function createJavasriptValueFromYamlString(data) {
-                const nixVar = new NixVar()
-                nixVar.name = data.trim()
-                return nixVar
-            },
-            represent: function nixVarValueToYamlString(object /*, style*/) {
-                return object.name
-            },
+        const NixValue = createCustomTag({
+            tagName: "nix",
         })
-
-        // hack it into the default schema (cause .extend() isnt available)
-        yaml.DEFAULT_SCHEMA.explicit.push(nixVarSupport)
-        yaml.DEFAULT_SCHEMA.compiledTypeMap.fallback["tag:yaml.org,2002:nix"] = nixVarSupport
-        yaml.DEFAULT_SCHEMA.compiledTypeMap.scalar["tag:yaml.org,2002:nix"] = nixVarSupport
     // 
     // !!warehouse support
     // 
-        class WarehouseVar extends NixValue {
-            name = null
-        }
-
-        const warehouseVarSupport = new Type("tag:yaml.org,2002:warehouse", {
-            kind: "scalar",
-            predicate: function javascriptValueisNixVar(object) {
-                return object instanceof WarehouseVar
-            },
-            resolve: function yamlNodeIsValidNixVar(data) {
+        const WarehouseVar = createCustomTag({
+            tagName: "warehouse",
+            yamlNodeIsValidNixVar(data) {
                 if (typeof data !== 'string') return false
                 if (data.length === 0) return false
                 
                 data = data.trim()
                 // if its a variable name
-                if (data.match(validVariableNameRegex)) {
-                    return true
-                } else {
-                    return false
-                }
+                return !!data.match(validVariableNameRegex)
             },
-            construct: function createJavasriptValueFromYamlString(data) {
+            createJavasriptValueFromYamlString(data) {
                 const nixVar = new WarehouseVar()
+                nixVar.asString = data
                 nixVar.name = data.trim()
                 return nixVar
-            },
-            represent: function nixVarValueToYamlString(object /*, style*/) {
-                return object.name
-            },
+            }
         })
-
-        // hack it into the default schema (cause .extend() isnt available)
-        yaml.DEFAULT_SCHEMA.explicit.push(warehouseVarSupport)
-        yaml.DEFAULT_SCHEMA.compiledTypeMap.fallback["tag:yaml.org,2002:warehouse"] = warehouseVarSupport
-        yaml.DEFAULT_SCHEMA.compiledTypeMap.scalar["tag:yaml.org,2002:warehouse"] = warehouseVarSupport
     // 
     // !!computed support
     // 
-        class ComputedVar extends NixValue {
-            name = null
-        }
-
-        const computedVarSupport = new Type("tag:yaml.org,2002:computed", {
-            kind: "scalar",
-            predicate: function javascriptValueisNixVar(object) {
-                return object instanceof ComputedVar
-            },
-            resolve: function yamlNodeIsValidNixVar(data) {
+        const ComputedVar = createCustomTag({
+            tagName: "computed",
+            yamlNodeIsValidNixVar(data) {
                 if (typeof data !== 'string') return false
                 if (data.length === 0) return false
                 
                 data = data.trim()
                 // if its a variable name
-                if (data.match(validVariableNameRegex)) {
-                    return true
-                } else {
-                    return false
-                }
+                return !!data.match(validVariableNameRegex)
             },
-            construct: function createJavasriptValueFromYamlString(data) {
+            createJavasriptValueFromYamlString(data) {
                 const nixVar = new ComputedVar()
+                nixVar.asString = data
                 nixVar.name = data.trim()
                 return nixVar
-            },
-            represent: function nixVarValueToYamlString(object /*, style*/) {
-                return object.name
-            },
+            }
         })
-
-        // hack it into the default schema (cause .extend() isnt available)
-        yaml.DEFAULT_SCHEMA.explicit.push(computedVarSupport)
-        yaml.DEFAULT_SCHEMA.compiledTypeMap.fallback["tag:yaml.org,2002:computed"] = computedVarSupport
-        yaml.DEFAULT_SCHEMA.compiledTypeMap.scalar["tag:yaml.org,2002:computed"] = computedVarSupport
     // 
     // !!package support
     // 
-        class PackageVar extends NixValue {
-            name = null
-        }
-
-        const packageVarSupport = new Type("tag:yaml.org,2002:package", {
-            kind: "scalar",
-            predicate: function javascriptValueisNixVar(object) {
-                return object instanceof PackageVar
-            },
-            resolve: function yamlNodeIsValidNixVar(data) {
+        const PackageVar = createCustomTag({
+            tagName: "package",
+            yamlNodeIsValidNixVar(data) {
                 if (typeof data !== 'string') return false
                 if (data.length === 0) return false
                 
                 data = data.trim()
                 // if its a variable name
-                if (data.match(validVariableNameRegex)) {
-                    return true
-                } else {
-                    return false
-                }
+                return !!data.match(validVariableNameRegex)
             },
-            construct: function createJavasriptValueFromYamlString(data) {
+            createJavasriptValueFromYamlString(data) {
                 const nixVar = new PackageVar()
+                nixVar.asString = data
                 nixVar.name = data.trim()
                 return nixVar
-            },
-            represent: function nixVarValueToYamlString(object /*, style*/) {
-                return object.name
-            },
+            }
         })
-
-        // hack it into the default schema (cause .extend() isnt available)
-        yaml.DEFAULT_SCHEMA.explicit.push(packageVarSupport)
-        yaml.DEFAULT_SCHEMA.compiledTypeMap.fallback["tag:yaml.org,2002:package"] = packageVarSupport
-        yaml.DEFAULT_SCHEMA.compiledTypeMap.scalar["tag:yaml.org,2002:package"] = packageVarSupport
 
 // 
 // javascript to Nix
@@ -1153,7 +1102,7 @@ const shellApi = Object.defineProperties(
             // 
             // Variable
             // 
-            if (obj instanceof NixValue) {
+            if (obj instanceof WarehouseVar || obj instanceof ComputedVar || obj instanceof PackageVar) {
                 return obj.name
             // 
             // Array
@@ -1340,13 +1289,13 @@ export const fornixToNix = async function(yamlString) {
                 if (!computed[values.onlyIf.name]) {
                     continue
                 }
-            } else if (values.onlyIf instanceof NixVar) {
+            } else if (values.onlyIf instanceof NixValue) {
                 // FIXME values.onlyIf  !!nix
                 throw Error(`
                     Sorry the !!nix part isn't supported yet in the beta
                     For this value:
                         - ${kind}:
-                            onlyIf: !!nix ${values.onlyIf.name}
+                            onlyIf: !!nix ${values.onlyIf.asString}
                 `)
             // string 
             } else if (values.onlyIf) {
@@ -1374,12 +1323,15 @@ export const fornixToNix = async function(yamlString) {
             // get nix-value
             // 
             const source = values.from || defaultWarehouse
-            const loadAttribute = values.load.map(each=>escapeNixString(each)).join(".")
-            let nixValue 
-            if (source instanceof NixValue) {
+            let nixValue
+            if (values.load instanceof NixValue) {
+                nixValue = `(${values.load.asString})`
+            } else if (obj instanceof WarehouseVar || obj instanceof ComputedVar || obj instanceof PackageVar) {
+                const loadAttribute = values.load.map(each=>escapeNixString(each)).join(".")
                 nixValue = `${source.name}.${loadAttribute}`
             // from a hash/url directly
             } else {
+                const loadAttribute = values.load.map(each=>escapeNixString(each)).join(".")
                 if (source instanceof Object) {
                     nixValue = `${warehouseAsNixValue(source)}.${loadAttribute}`
                 } else if (typeof source == "string") {
@@ -1424,7 +1376,7 @@ export const fornixToNix = async function(yamlString) {
             const source = values.from || defaultWarehouse
             const loadAttribute = values.load.map(each=>escapeNixString(each)).join(".")
             let nixValue
-            if (source instanceof NixValue) {
+            if (obj instanceof WarehouseVar || obj instanceof ComputedVar || obj instanceof PackageVar) {
                 nixValue = `${source.name}.${loadAttribute}`
             // from a hash/url directly
             } else {
