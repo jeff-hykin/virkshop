@@ -64,6 +64,34 @@
 # 
 
 # 
+# Python
+# 
+- (package):
+    load: [ "python38",]
+
+- (package):
+    load: [ "python38Packages", "setuptools",]
+
+- (package):
+    load: [ "python38Packages", "pip",]
+
+- (package):
+    load: [ "python38Packages", "virtualenv",]
+
+- (package):
+    load: [ "python38Packages", "wheel",]
+
+- (package):
+    load: [ "cmake",]
+
+- (package):
+    load: [ "pkg-config",]
+
+- (package):
+    load: [ "libffi",]
+
+
+# 
 # Linux
 # 
 - (package):

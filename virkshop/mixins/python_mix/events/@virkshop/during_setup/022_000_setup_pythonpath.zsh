@@ -1,0 +1,4 @@
+# 
+# add pythonpath
+# 
+export PYTHONPATH="$PYTHONPATH:$PROJECT_FOLDER:$PROJECT_FOLDER/main"

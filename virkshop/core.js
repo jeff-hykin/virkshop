@@ -21,7 +21,7 @@ const masterMixin = "@project" // TODO: make this configurable
 export const createVirkshop = async (arg)=>{
     var { virkshopPath, projectPath } = {...arg}
     virkshopPath = virkshopPath || Console.env.VIRKSHOP_FOLDER         // env var is used when already inside of the virkshop
-    projectPath  = projectPath  || Console.env.VIRKSHOP_PROJECT_FOLDER // env var is used when already inside of the virkshop
+    projectPath  = projectPath  || Console.env.PROJECT_FOLDER // env var is used when already inside of the virkshop
 
     const realHome = Console.env.VIRKSHOP_USERS_HOME || Console.env.HOME
     
@@ -838,7 +838,7 @@ export const createVirkshop = async (arg)=>{
                     const envVars = {
                         _shell_start_time: `${startTime}`,
                         VIRKSHOP_FOLDER: virkshop.pathTo.virkshop,
-                        VIRKSHOP_PROJECT_FOLDER: virkshop.pathTo.project,
+                        PROJECT_FOLDER: virkshop.pathTo.project,
                         VIRKSHOP_HOME: virkshop.pathTo.fakeHome,
                         VIRKSHOP_USERS_HOME: virkshop.pathTo.realHome,
                         VIRKSHOP_DEBUG: `${debuggingLevel}`,
