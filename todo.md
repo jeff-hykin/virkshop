@@ -2,11 +2,11 @@
 # pre-alpha:
 - try getting super_map to work with virkshop
 
-- organize fornixToNix into its own file
 - consider allowing env vars to be set inside system_tools
+- organize fornixToNix into its own file
+- allow specify binary names from particular packages
 - create CLI interface to access library path of a package `JSON.parse(Deno.env.get("VIRKSHOP_NIX_SHELL_DATA")).packagePaths[Deno.args[0]]`
 - create JS interface to access library path of a package `JSON.parse(Deno.env.get("VIRKSHOP_NIX_SHELL_DATA")).packagePaths[Deno.args[0]]`
-- allow specify binary names from particular packages
 - remove relative paths to virkshop.js, use URL instead, maybe have a walk-up importer from URL and everything else local
 - maybe have a mixture.yaml for things like the gitignore settings
 
@@ -25,17 +25,19 @@
 - DONE: get home folder linking working
 
 # beta
+- create branches like `pure` `standard`
+- add back TLDR cache linking
 - make linking nix cache controllable through options.json
-- cli "virkshop/install [package name]"
+- DONE: cli "virkshop/install [package name]"
 - virkshop update (wrapper around git mixin)
 - git hook events
 - make sure master mixin runs last for commands/documentation etc
 - get auto-add to git ignore to work
 - add basic documentation
-- create branches like `pure` `standard`, squash all the commits
 - make a way to change shells (implement a javascript API for Zsh shell)
 - mention when there are home-folder conflicts between mixins
 - add a check to make sure the virkshop folder doesnt contain non-necessary items
+- squash all the commits
 
 # delta
 - tutorializer
