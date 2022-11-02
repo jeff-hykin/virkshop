@@ -1189,15 +1189,27 @@ export const shellApi = Object.defineProperties(
 
 export const parsePackageTools = async (pathToPackageTools)=>{
     // in the future their may be some extra logic here
-    const dataStructure = yaml.parse(await FileSystem.read(pathToPackageTools), {schema: yaml.DEFAULT_SCHEMA,},)
+    const asString = await FileSystem.read(pathToPackageTools)
+    const dataStructure = yaml.parse(asString, {schema: yaml.DEFAULT_SCHEMA,},)
     const allSaveAsValues = dataStructure.map(each=>each[Object.keys(each)[0]].saveAs)
     const illegalNames = allSaveAsValues.filter(each=>`${each}`.startsWith("_-"))
     if (illegalNames.length > 0) {
         throw Error(`Inside ${pathToPackageTools}, there are some illegal saveAs names (names that start with "_-")\nPlease rename these values:${illegalNames.map(each=>`\n    saveAs: ${each}`).join("")}`)
     }
+    dataStructure.asString = asString
     dataStructure.packages = dataStructure.map(each=>each["(package)"]).filter(each=>each instanceof Object)
     dataStructure.warehouses = dataStructure.map(each=>each["(warehouse)"] || each["(defaultWarehouse)"]).filter(each=>each instanceof Object)
+    dataStructure.defaultWarehouse = dataStructure.map(each=>each["(defaultWarehouse)"]).filter(each=>each instanceof Object).slice(-1)[0]
     dataStructure.directPackages = dataStructure.packages.filter(each=>each.asBuildInput&&(each.load instanceof Array))
+    
+    // TODO: add validation (better error messages) for missing warehouse attributes
+    for (const each of dataStructure.warehouses) {
+        const nixCommitHash = each.createWarehouseFrom.nixCommitHash
+        const tarFileUrl = each.createWarehouseFrom.tarFileUrl || `https://github.com/NixOS/nixpkgs/archive/${nixCommitHash}.tar.gz`
+        // ensure each has a tarFileUrl
+        each.createWarehouseFrom.tarFileUrl = tarFileUrl
+    }
+
     return dataStructure
 }
 

@@ -29,6 +29,7 @@ import { nix } from "./nix_tools.js"
 // 
     const packageName = Deno.args[0]
     console.log()
+    // TODO: pull from default warehouse (converted to a -I string)
     // TODO: add argument for specifying where the package came from
     const currentSystemTools = await currentSystemToolsPromise
     const packageAttributeStrings = currentSystemTools.directPackages.map(each=>each.load.join("."))
@@ -41,22 +42,27 @@ import { nix } from "./nix_tools.js"
             Deno.exit(1)
         }
         console.log(`Okay`)
-    } 
-    console.log("... waiting on response from nix ...")
-    const resultString =  await run('nix-env', '-qa', packageName, "--json", Stdout(returnAsString))
+    }
+    console.log("... searching defaultWarehouse, waiting on response from nix ...")
+    const resultString =  await run('nix-env', '-qa', packageName, "--json", "-f", currentSystemTools.defaultWarehouse.createWarehouseFrom.tarFileUrl, Stdout(returnAsString))
     if (resultString) {
         const results = JSON.parse(resultString)
         const packageAttributeNames = Object.entries(results).map(([key, value])=>key.replace(/^nixpkgs\.(.+)/,"$1"))
         const packageCommonNames = Object.entries(results).map(([key, value])=>value.pname)
         const packageVersions = Object.entries(results).map(([key, value])=>value.version)
         if (packageAttributeNames.includes(packageName)) {
-            console.log("found exact match on nixpkgs")
-            const currentSystemTools = await currentSystemToolsPromise
+            const index = packageAttributeNames.indexOf(packageName)
+            const version = packageVersions[index]
+            console.log(`... found exact match`)
+            if (version) {
+                console.log(`... version: ${version}`)
+            }
+            const versionComment = version ? `\n    # version at time of install: ${version}` : ""
             await FileSystem.write({
                 path: virkshop.pathTo.systemTools,
-                data: currentSystemTools+`
+                data: currentSystemTools.asString+`
                     
-                    - (package):
+                    - (package):${versionComment}
                         asBuildInput: true
                         load: [ ${JSON.stringify(packageName)},]
                 `.replace(/\n                    /g, "\n"),
