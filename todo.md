@@ -2,10 +2,12 @@
 # pre-alpha:
 - try getting super_map to work with virkshop
 
-- maybe have a mixture.yaml for things like the gitignore settings
-- allow specify binary names from particular packages
 - consider allowing env vars to be set inside system_tools
+- allow specify binary names from particular packages
+- create CLI interface to access library path of a package `JSON.parse(Deno.env.get("VIRKSHOP_NIX_SHELL_DATA")).packagePaths[Deno.args[0]]`
+- create JS interface to access library path of a package `JSON.parse(Deno.env.get("VIRKSHOP_NIX_SHELL_DATA")).packagePaths[Deno.args[0]]`
 - remove core.js and references to core.js
+- maybe have a mixture.yaml for things like the gitignore settings
 
 - DONE: create deno library for virkshop
 - DONE: create virkshop trigger for purge/clean
