@@ -2,9 +2,12 @@
 # pre-alpha:
 - try getting super_map to work with virkshop
 
-- create deno library for virkshop
 - maybe have a mixture.yaml for things like the gitignore settings
+- allow specify binary names from particular packages
+- consider allowing env vars to be set inside system_tools
+- remove core.js and references to core.js
 
+- DONE: create deno library for virkshop
 - DONE: create virkshop trigger for purge/clean
 - DONE: create clean command
 - DONE: create purge command

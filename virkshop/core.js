@@ -17,7 +17,7 @@ import { stats, sum, spread, normalizeZeroToOne, roundedUpToNearest, roundedDown
 // 
 let debuggingLevel = false
 const virkshopIdentifierPath = `mixins/@virkshop/events/@virkshop/` // The only thing that can basically never change
-const masterMixin = "@project" // TODO: make this configurable
+const masterMixin = "@project"
 export const createVirkshop = async (arg)=>{
     var { virkshopPath, projectPath } = {...arg}
     virkshopPath = virkshopPath || Console.env.VIRKSHOP_FOLDER         // env var is used when already inside of the virkshop
@@ -152,7 +152,7 @@ export const createVirkshop = async (arg)=>{
                                 `.replace(/\n                                /g,"\n"))
                             }
                             
-                            virkshop._internal.shellSetupPriorities.push([ this.source, `${name}='${escapeShellArgument(value)}'` ])
+                            virkshop._internal.shellSetupPriorities.push([ this.source, `${name}='${shellApi.escapeShellArgument(value)}'` ])
                         },
                         injectUsersCommand(commandName) {
                             virkshop._internal.deadlines.beforeEnteringVirkshop.push(((async ()=>{
@@ -179,7 +179,7 @@ export const createVirkshop = async (arg)=>{
                                     if (absolutePathToCommand) {
                                         await FileSystem.write({
                                             path: pathThatIsHopefullyGitIgnored,
-                                            data: `#!/usr/bin/env bash\n`+`HOME='${escapeShellArgument(virkshop.pathTo.realHome)}' PATH='${escapeShellArgument(Console.env.PATH)}' ${absolutePathToCommand} "$@"`.replace(/\n/g, ""),
+                                            data: `#!/usr/bin/env bash\n`+`HOME='${shellApi.escapeShellArgument(virkshop.pathTo.realHome)}' PATH='${shellApi.escapeShellArgument(Console.env.PATH)}' ${absolutePathToCommand} "$@"`.replace(/\n/g, ""),
                                             overwrite: true,
                                         })
                                     } else {
@@ -208,44 +208,6 @@ export const createVirkshop = async (arg)=>{
                         },
                     }
                 },
-                shellProfileString: `
-                    cd "$_PWD" # go back to real location
-                    unset _PWD
-
-                    # don't let zsh update itself without telling all the other packages 
-                    # instead use nix to update zsh
-                    DISABLE_AUTO_UPDATE="true"
-                    DISABLE_UPDATE_PROMPT="true"
-
-                    if [ "$VIRKSHOP_DEBUG" = "true" ]
-                    then
-                        deno eval 'console.log(\`     [\${(new Date()).getTime()-Deno.env.get("_shell_start_time")}ms nix-shell]\`)'
-                    fi
-                    unset _shell_start_time
-
-                    # This is runtime-faster than creating/calling several individual commands
-                    system_tools () {
-                        sub_command="$1"
-                        shift
-                        if [ "$sub_command" = "nix_path_for" ]
-                        then
-                            sub_command="$1"
-                            shift
-                            if [ "$sub_command" = "package" ]
-                            then
-                                deno eval 'console.log(JSON.parse(Deno.env.get("VIRKSHOP_NIX_SHELL_DATA")).packagePaths[Deno.args[0]])' "$@"
-                            fi
-                        elif [ "$sub_command" = "nix_lib_path_for" ]
-                        then
-                            sub_command="$1"
-                            shift
-                            if [ "$sub_command" = "package" ]
-                            then
-                                deno eval 'console.log(JSON.parse(Deno.env.get("VIRKSHOP_NIX_SHELL_DATA")).libraryPaths[Deno.args[0]])' "$@"
-                            fi
-                        fi
-                    }
-                `,
             },
             _stages: {
                 // 
@@ -556,7 +518,6 @@ export const createVirkshop = async (arg)=>{
                 // 
                 // 
                 async phase2(mixinPaths) {
-                    
                     // 
                     // the three operations below can be done in any order, which is why they're in this Promise.all
                     // 
@@ -588,7 +549,7 @@ export const createVirkshop = async (arg)=>{
                         // create the zshrc file
                         // 
                         ((async ()=>{
-                            let shellProfileString = virkshop._internal.shellProfileString
+                            let shellProfileString = shellApi.shellProfileString
                             
                             // 
                             // add project commands
@@ -597,7 +558,7 @@ export const createVirkshop = async (arg)=>{
                                 #
                                 # inject project's virkshop commands
                                 #
-                                export PATH='${escapeShellArgument(virkshop.pathTo.commands)}:'"$PATH"
+                                export PATH='${shellApi.escapeShellArgument(virkshop.pathTo.commands)}:'"$PATH"
                             `.replace(/\n */g,"\n")
 
                             // 
@@ -609,7 +570,7 @@ export const createVirkshop = async (arg)=>{
                                 // TODO: add a debugging echo here if debuggingLevel
                                 shellProfileString += `\n#\n# ${eachSource}\n#\n${eachContent}\n`
                             }
-
+                            
                             // 
                             // add project commands again
                             // 
@@ -617,89 +578,13 @@ export const createVirkshop = async (arg)=>{
                                 #
                                 # inject project's virkshop commands
                                 #
-                                export PATH='${escapeShellArgument(virkshop.pathTo.commands)}:'"$PATH"
+                                ${shellApi.generatePrependToPathString(virkshop.pathTo.commands)}
                             `.replace(/\n */g,"\n")
                             // 
                             // make folders work as recursive commands
                             // 
                             for (const eachFolderPath of await FileSystem.listFolderPathsIn(virkshop.pathTo.commands)) {
-                                const name = escapeShellArgument(FileSystem.basename(eachFolderPath))
-                                shellProfileString += `
-                                    # 
-                                    # command for ${name} folder
-                                    # 
-                                        '${name}' () {
-                                            # enable globbing
-                                            setopt extended_glob &>/dev/null
-                                            shopt -s globstar &>/dev/null
-                                            shopt -s dotglob &>/dev/null
-                                            local search_path='${escapeShellArgument(FileSystem.makeAbsolutePath(eachFolderPath))}'
-                                            local argument_combination="$search_path/$1"
-                                            while [[ -n "$@" ]]
-                                            do
-                                                shift 1
-                                                for each in "$search_path/"**/*
-                                                do
-                                                    if [[ "$argument_combination" = "$each" ]]
-                                                    then
-                                                        # if its a folder, then we need to go deeper
-                                                        if [[ -d "$each" ]]
-                                                        then
-                                                            search_path="$each"
-                                                            argument_combination="$argument_combination/$1"
-                                                            
-                                                            # if there is no next argument
-                                                            if [[ -z "$1" ]]
-                                                            then
-                                                                printf "\\nThat is a sub folder, not a command\\nValid sub-commands are\\n" 1>&2
-                                                                ls -1FL --group-directories-first --color "$each" | sed 's/^/    /' | sed -E 's/(\\*|@)$/ /' 1>&2
-                                                                return 1 # error, no command
-                                                            fi
-                                                            
-                                                            break
-                                                        # if its a file, run it with the remaining arguments
-                                                        elif [[ -f "$each" ]]
-                                                        then
-                                                            "$each" "$@"
-                                                            # make exit status identical to executed program
-                                                            return $?
-                                                        fi
-                                                    fi
-                                                done
-                                            done
-                                            # if an option was given
-                                            if ! [ -z "$each" ]
-                                            then
-                                                echo "$each"
-                                                printf "\\nI could not find that sub-command\\n" 1>&2
-                                            fi
-                                            printf "Valid next-arguments would be:\\n" 1>&2
-                                            ls -1FL --group-directories-first --color "$search_path" | sed 's/^/    /' | sed -E 's/(\\*|@)$/ /' 1>&2
-                                            return 1 # error, no command
-                                        }
-                                        '__autocomplete_for__${name}' () {
-                                            local commands_path='${escapeShellArgument(virkshop.pathTo.commands)}'
-                                            # TODO: make this space friendly
-                                            # TODO: make this do partial-word complete 
-                                            function join_by { local d=\${1-} f=\${2-}; if shift 2; then printf %s "$f" "\${@/#/$d}"; fi; }
-                                            local item_path="$(join_by "/" $words)"
-                                            if [ -d "$commands_path/$item_path" ]
-                                            then
-                                                compadd $(ls "$commands_path/$item_path")
-                                            elif [ -d "$(dirname "$commands_path/$item_path")" ]
-                                            then
-                                                # check if file exists (finished completion)
-                                                if ! [ -f "$commands_path/$item_path" ]
-                                                then
-                                                    # TODO: add a better check for sub-matches "java" [tab] when "java" and "javascript" exist
-                                                    compadd $(ls "$(dirname "$commands_path/$item_path")")
-                                                fi
-                                            fi
-                                            # echo "$(dirname "$commands_path/$item_path")"
-                                        }
-                                        compdef '__autocomplete_for__${name}' '${name}'
-                                `.replace(/\n                                    /g, "\n")
-                                
+                                shellProfileString += shellApi.createHierarchicalCommandFor(eachFolderPath)
                             }
                             
                             const autogeneratedPath = `${virkshop.pathTo.fakeHome}/${shellApi.autogeneratedProfile}`
@@ -708,7 +593,7 @@ export const createVirkshop = async (arg)=>{
                                     await FileSystem.write({
                                         path: shellApi.profilePath,
                                         data: `
-                                            . './${escapeShellArgument(shellApi.autogeneratedProfile)}'
+                                            . './${shellApi.escapeShellArgument(shellApi.autogeneratedProfile)}'
                                         `.replace(/\n                                            /g, "\n"),
                                     })
                                 }
@@ -970,12 +855,135 @@ export const virkshop = await createVirkshop()
 // 
 // shellApi
 // 
-const shellApi = Object.defineProperties(
+export const shellApi = Object.defineProperties(
     {
         autogeneratedProfile: `.zshrc.autogenerated.ignore`,
         startCommand: "zsh --no-globalrcs",
         protectedPaths: [ ".zshrc", ".zshenv", ".zlogin", ".zlogout", ".zprofile" ], // TODO: check that zlogout zprofile are correct
         fileExtensions: [ `.zsh` ],
+        shellProfileString: `
+            cd "$_PWD" # go back to real location
+            unset _PWD
+
+            # don't let zsh update itself without telling all the other packages 
+            # instead use nix to update zsh
+            DISABLE_AUTO_UPDATE="true"
+            DISABLE_UPDATE_PROMPT="true"
+
+            if [ "$VIRKSHOP_DEBUG" = "true" ]
+            then
+                deno eval 'console.log(\`     [\${(new Date()).getTime()-Deno.env.get("_shell_start_time")}ms nix-shell]\`)'
+            fi
+            unset _shell_start_time
+
+            # This is runtime-faster than creating/calling several individual commands
+            system_tools () {
+                sub_command="$1"
+                shift
+                if [ "$sub_command" = "nix_path_for" ]
+                then
+                    sub_command="$1"
+                    shift
+                    if [ "$sub_command" = "package" ]
+                    then
+                        deno eval 'console.log(JSON.parse(Deno.env.get("VIRKSHOP_NIX_SHELL_DATA")).packagePaths[Deno.args[0]])' "$@"
+                    fi
+                elif [ "$sub_command" = "nix_lib_path_for" ]
+                then
+                    sub_command="$1"
+                    shift
+                    if [ "$sub_command" = "package" ]
+                    then
+                        deno eval 'console.log(JSON.parse(Deno.env.get("VIRKSHOP_NIX_SHELL_DATA")).libraryPaths[Deno.args[0]])' "$@"
+                    fi
+                fi
+            }
+        `,
+        escapeShellArgument(string) {
+            return string.replace(/'/g, `'"'"'`)
+        },
+        generatePrependToPathString(newPath) {
+            return `export PATH='${this.escapeShellArgument(newPath)}:'"$PATH"`
+        },
+        createHierarchicalCommandFor(folderPath) {
+            const name = this.escapeShellArgument(FileSystem.basename(folderPath))
+            folderPath = FileSystem.makeAbsolutePath(folderPath)
+            shellProfileString += `
+                # 
+                # command for ${name} folder
+                # 
+                    '${name}' () {
+                        # enable globbing
+                        setopt extended_glob &>/dev/null
+                        shopt -s globstar &>/dev/null
+                        shopt -s dotglob &>/dev/null
+                        local search_path='${this.escapeShellArgument(folderPath)}'
+                        local argument_combination="$search_path/$1"
+                        while [[ -n "$@" ]]
+                        do
+                            shift 1
+                            for each in "$search_path/"**/*
+                            do
+                                if [[ "$argument_combination" = "$each" ]]
+                                then
+                                    # if its a folder, then we need to go deeper
+                                    if [[ -d "$each" ]]
+                                    then
+                                        search_path="$each"
+                                        argument_combination="$argument_combination/$1"
+                                        
+                                        # if there is no next argument
+                                        if [[ -z "$1" ]]
+                                        then
+                                            printf "\\nThat is a sub folder, not a command\\nValid sub-commands are\\n" 1>&2
+                                            ls -1FL --group-directories-first --color "$each" | sed 's/^/    /' | sed -E 's/(\\*|@)$/ /' 1>&2
+                                            return 1 # error, no command
+                                        fi
+                                        
+                                        break
+                                    # if its a file, run it with the remaining arguments
+                                    elif [[ -f "$each" ]]
+                                    then
+                                        "$each" "$@"
+                                        # make exit status identical to executed program
+                                        return $?
+                                    fi
+                                fi
+                            done
+                        done
+                        # if an option was given
+                        if ! [ -z "$each" ]
+                        then
+                            echo "$each"
+                            printf "\\nI could not find that sub-command\\n" 1>&2
+                        fi
+                        printf "Valid next-arguments would be:\\n" 1>&2
+                        ls -1FL --group-directories-first --color "$search_path" | sed 's/^/    /' | sed -E 's/(\\*|@)$/ /' 1>&2
+                        return 1 # error, no command
+                    }
+                    '__autocomplete_for__${name}' () {
+                        local commands_path='${this.escapeShellArgument(FileSystem.parentPath(folderPath))}'
+                        # TODO: make this space friendly
+                        # TODO: make this do partial-word complete 
+                        function join_by { local d=\${1-} f=\${2-}; if shift 2; then printf %s "$f" "\${@/#/$d}"; fi; }
+                        local item_path="$(join_by "/" $words)"
+                        if [ -d "$commands_path/$item_path" ]
+                        then
+                            compadd $(ls "$commands_path/$item_path")
+                        elif [ -d "$(dirname "$commands_path/$item_path")" ]
+                        then
+                            # check if file exists (finished completion)
+                            if ! [ -f "$commands_path/$item_path" ]
+                            then
+                                # TODO: add a better check for sub-matches "java" [tab] when "java" and "javascript" exist
+                                compadd $(ls "$(dirname "$commands_path/$item_path")")
+                            fi
+                        fi
+                        # echo "$(dirname "$commands_path/$item_path")"
+                    }
+                    compdef '__autocomplete_for__${name}' '${name}'
+            `.replace(/\n                /g, "\n")
+        }
     },
     {
         profilePath:         { get() { return `${virkshop.pathTo.mixins}/${masterMixin}/home/.zshrc` } },
@@ -988,10 +996,6 @@ const shellApi = Object.defineProperties(
 // Helpers
 // 
 // 
-    function escapeShellArgument(string) {
-        return string.replace(/'/g, `'"'"'`)
-    }
-
     function pathOfCaller() {
         const err = new Error()
         const filePaths = findAll(/^.+file:\/\/(\/[\w\W]*?):/gm, err.stack).map(each=>each[1])
@@ -1243,16 +1247,28 @@ const shellApi = Object.defineProperties(
         }
     }
 
+export const parsePackageTools = (pathToPackageTools)=>{
+    // in the future their may be some extra logic here
+    const dataStructure = yaml.parse(await FileSystem.read(pathToPackageTools), {schema: yaml.DEFAULT_SCHEMA,},)
+    const illegalNames = allSaveAsValues.filter(each=>each.startsWith("_-"))
+    if (illegalNames.length > 0) {
+        throw Error(`Inside ${pathToPackageTools}, there are some illegal saveAs names (names that start with "_-")\nPlease rename these values:${illegalNames.map(each=>`\n    saveAs: ${each}`).join("")}`)
+    }
+    dataStructure.packages = dataStructure.map(each=>each["(package)"]).filter(each=>each instanceof Object)
+    dataStructure.warehouses = dataStructure.map(each=>each["(warehouse)"] || each["(defaultWarehouse)"]).filter(each=>each instanceof Object)
+    dataStructure.directPackages = dataStructure.packages.filter(each=>each.asBuildInput&&(each.load instanceof Array))
+    return dataStructure
+}
+
 // 
 // fornixToNix
 // 
 export const fornixToNix = async function(yamlString) {
     // TODO: add support for overwriting values (saveAs: python, then saveAs: python without breaking)
-    // TODO: make __core__ not be a name, just insert it everywhere using "let,in"
     const start = (new Date()).getTime()
     const dataStructure = yaml.parse(yamlString, {schema: yaml.DEFAULT_SCHEMA,},)
-    let nixCode = `
-    `
+    const allSaveAsValues = dataStructure.map(each=>each.saveAs)
+    const frequencyCountOfVarNames = allSaveAsValues.reduce((frequency, item)=>(frequency[item]?frequency[item]=1:frequency[item]++, frequency))
     const varNames = []
     let defaultWarehouse = null
     let defaultWarehouseName = ""
@@ -1262,17 +1278,34 @@ export const fornixToNix = async function(yamlString) {
     const nixValues = {}
     const warehouses = {}
     const packages = {}
+
+    const uniqueVarValues = Object.fromEntries(Object.entries(frequencyCountOfVarNames).filter(([eachName, eachCount])=>eachCount==1))
+    const nonUniqueVarNames = Object.entries(frequencyCountOfVarNames).filter(([eachName, eachCount])=>eachCount!=1).map((eachName, eachCount)=>eachName)
+    const nonUniqueVarValuesSoFar = {}
+    const nixVarsAtThisPoint = ()=>`\n${Object.entries(nonUniqueVarValuesSoFar).map(([eachVarName, eachNixString])=>`${eachVarName} = ${indent({ string: eachNixString, by: "    ", noLead: true })};`)}`
+    const saveNixVar = (varName, varNixValue)=>{
+        varNames.push(varName)
+        // if its going to end up unique, store it in the uniqueVarValues
+        const storageLocation = uniqueVarValues[varName] ? uniqueVarValues : nonUniqueVarValuesSoFar
+        storageLocation[varName] = `(
+            let
+                ${indent({ string: nixVarsAtThisPoint(), by: "                    ", noLead: true })}
+            in
+                ${varNixValue}
+        )`.replace(/\n                /g,"\n")
+    }
     const warehouseAsNixValue = (values)=> {
         const nixCommitHash = values.createWarehouseFrom.nixCommitHash
         const tarFileUrl = values.createWarehouseFrom.tarFileUrl || `https://github.com/NixOS/nixpkgs/archive/${nixCommitHash}.tar.gz`
         const warehouseArguments = values.arguments || {}
-        return `(__core__.import
-            (__core__.fetchTarball
+        return `(_-_core.import
+            (_-_core.fetchTarball
                 ({url=${JSON.stringify(tarFileUrl)};})
             )
             (${indent({ string: escapeNixObject(warehouseArguments), by: "            ", noLead: true})})
         )`
     }
+
     for (const eachEntry of dataStructure) {
         const kind = Object.keys(eachEntry)[0]
         // 
@@ -1309,10 +1342,8 @@ export const fornixToNix = async function(yamlString) {
             warehouses[varName].name = varName
             warehouses[varName].tarFileUrl = tarFileUrl
             warehouses[varName].arguments = warehouseArguments
-            varNames.push(varName)
-            nixCode += `
-                ${varName} = ${indent({ string: warehouseAsNixValue(values), by: "        ", noLead: true })};
-            `
+            // if is will end up being a unique name
+            saveNixVar(varName, warehouseAsNixValue(values))
             // save defaultWarehouse name
             if (kind == "(defaultWarehouse)") {
                 defaultWarehouseName = varName
@@ -1334,7 +1365,7 @@ export const fornixToNix = async function(yamlString) {
                 const packages = values.withPackages || []
                 const whichWarehouse = values.fromWarehouse || defaultWarehouse
                 const tarFileUrl = warehouses[whichWarehouse.name].tarFileUrl // TODO: there's a lot of things that could screw up here, add checks/warnings for them
-                const escapedArguments = 'NO_COLOR=true '+values.runCommand.map(each=>`'${escapeShellArgument(each)}'`).join(" ")
+                const escapedArguments = 'NO_COLOR=true '+values.runCommand.map(each=>`'${shellApi.escapeShellArgument(each)}'`).join(" ")
                 const fullCommand = ["nix-shell", "--pure", "--packages", ...packages, "-I", "nixpkgs="+tarFileUrl, "--run",  escapedArguments,]
                 
                 const commandForDebugging = fullCommand.join(" ")
@@ -1357,10 +1388,7 @@ export const fornixToNix = async function(yamlString) {
                 }
             }
             computed[varName] = resultAsValue
-            varNames.push(varName)
-            nixCode += `
-                ${varName} = (${indent({ string: escapeNixObject(resultAsValue), by: "                        ", noLead: true})});
-            `
+            saveNixVar(varName, escapeNixObject(resultAsValue))
         // 
         // (package)
         // 
@@ -1445,11 +1473,8 @@ export const fornixToNix = async function(yamlString) {
             // 
             if (values.saveAs) {
                 const varName = values.saveAs
-                varNames.push(varName)
                 packages[varName] = values
-                nixCode += `
-                ${varName} = ${nixValue};
-                `
+                saveNixVar(varName, nixValue)
             }
         // 
         // (nix)
@@ -1482,11 +1507,8 @@ export const fornixToNix = async function(yamlString) {
             // create name if needed
             // 
             const varName = values.saveAs
-            varNames.push(varName)
             nixValues[varName] = values
-            nixCode += `
-                ${varName} = ${nixValue};
-            `
+            saveNixVar(varName, nixValue)
         }
     }
     
@@ -1498,31 +1520,9 @@ export const fornixToNix = async function(yamlString) {
     let libraryPathsString = ""
     let packagePathStrings = ""
     for (const [varName, value] of Object.entries(packages)) {
-        libraryPathsString += `"${varName}" = __core__.lib.makeLibraryPath [ ${varName} ];\n`
+        libraryPathsString += `"${varName}" = _-_core.lib.makeLibraryPath [ ${varName} ];\n`
         packagePathStrings += `"${varName}" = ${varName};\n`
     }
-    let nixShellData = `
-            __nixShellEscapedJsonData__ = (
-                let 
-                    nixShellDataJson = (__core__.toJSON {
-                        libraryPaths = {\n${indent({string:libraryPathsString, by: "                            ",})}
-                        };
-                        packagePaths = {\n${indent({string:packagePathStrings, by: "                            ",})}
-                        };
-                    });
-                    bashEscapedJson = (builtins.replaceStrings
-                        [
-                            "'"
-                        ]
-                        [
-                            ${escapeNixString(`'"'"'`)}
-                        ]
-                        nixShellDataJson
-                    );
-                in
-                    bashEscapedJson
-            );
-    `
     
     return {
         defaultWarehouse,
@@ -1535,7 +1535,7 @@ export const fornixToNix = async function(yamlString) {
             #
             # create a standard library for convienience 
             # 
-            __core__ = (
+            _-_core = (
                 let
                     frozenStd = (builtins.import 
                         (builtins.fetchTarball
@@ -1556,13 +1556,43 @@ export const fornixToNix = async function(yamlString) {
                     )
             );
             
+            #
             # 
             # Packages, Vars, and Compute
+            #
+            #
             # 
-            ${nixCode}
-            ${nixShellData}
+            \n${Object.entries(uniqueVarValues).map(
+                ([eachVarName, eachNixString])=>
+                    `                ${eachVarName} = ${indent({ string: eachNixString, by: "                    ", noLead: true })};`
+            )}
+            \n${indent({ string: nixVarsAtThisPoint(), by: "                ", noLead: true })}
+            
+            #
+            # nix shell data
+            #
+                _-_nixShellEscapedJsonData = (
+                    let 
+                        nixShellDataJson = (_-_core.toJSON {
+                            libraryPaths = {\n${indent({string:libraryPathsString, by: "                            ",})}
+                            };
+                            packagePaths = {\n${indent({string:packagePathStrings, by: "                            ",})}
+                            };
+                        });
+                        bashEscapedJson = (builtins.replaceStrings
+                            [
+                                "'"
+                            ]
+                            [
+                                ${escapeNixString(`'"'"'`)}
+                            ]
+                            nixShellDataJson
+                        );
+                    in
+                        bashEscapedJson
+                );
         in
-            __core__.mkShell {
+            _-_core.mkShell {
                 # inside that shell, make sure to use these packages
                 buildInputs =  [\n${indent({
                         string:buildInputStrings.join("\n"),
@@ -1578,7 +1608,7 @@ export const fornixToNix = async function(yamlString) {
                 
                 # run some bash code before starting up the shell
                 shellHook = "
-                    export VIRKSHOP_NIX_SHELL_DATA='\${__nixShellEscapedJsonData__}'
+                    export VIRKSHOP_NIX_SHELL_DATA='\${_-_nixShellEscapedJsonData}'
                 ";
             }
         `.replace(/\n        /g,"\n"),

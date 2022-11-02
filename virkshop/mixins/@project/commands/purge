@@ -1,5 +1,5 @@
 #!/usr/bin/env -S deno run --allow-all
-import { virkshop } from "../../../core"
+import { virkshop } from "../../../virkshop.js
 import "./clean" // first clean
 
 await virkshop.trigger(`@project/purge`) // run all the files inside virkshop/mixture/@project/purge
