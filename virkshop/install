@@ -10,8 +10,8 @@ import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan,
 import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
 import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
 import { zip } from "https://deno.land/x/good@0.7.7/array.js"
-import { virkshop, parsePackageTools } from "https://deno.land/x/virkshop_metatools@0.0.2/main/virkshop.js"
-import { installNix, sourceNixSetup } from "https://deno.land/x/virkshop_metatools@0.0.2/main/nix_tools.js"
+import { virkshop, parsePackageTools } from "./virkshop.js"
+import { nix } from "./nix_tools.js"
 
 // 
 // start some async ops
@@ -22,9 +22,8 @@ import { installNix, sourceNixSetup } from "https://deno.land/x/virkshop_metatoo
 // 
 // pre-check
 // 
-    console.log("checking on nix")
-    await installNix()
-    await sourceNixSetup()
+    console.log("checking nix installation")
+    await nix.ensureInstalled()
 
 // 
 // main code

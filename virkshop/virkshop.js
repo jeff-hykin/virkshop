@@ -9,6 +9,9 @@ import { Type } from "https://deno.land/std@0.82.0/encoding/_yaml/type.ts"
 import * as yaml from "https://deno.land/std@0.82.0/encoding/yaml.ts"
 import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
 import { stats, sum, spread, normalizeZeroToOne, roundedUpToNearest, roundedDownToNearest } from "https://deno.land/x/good@0.7.8/math.js"
+import { nix } from "./nix_tools.js"
+
+console.debug(`nix is:`,nix)
 
 // 
 // 
@@ -450,7 +453,7 @@ export const createVirkshop = async (arg)=>{
                                     relativePathFromHome: FileSystem.normalize(each.relativePathFromHome),
                                 })
                             )
-                            debuggingLevel && console.log("Here are the priority mappings for home")
+                            debuggingLevel > 1 && console.log("Here are the priority mappings for home")
                             debuggingLevel && console.log(homeMappingPriorities.sort((a,b)=>a.relativePathFromHome.localeCompare(b.relativePathFromHome)))
                             const lowPriorityHomeAspects = homeMappingPriorities.filter(each=>!each.isMasterMixin)
                             const highPriorityHomeAspects = homeMappingPriorities.filter(each=>each.isMasterMixin)
@@ -469,7 +472,7 @@ export const createVirkshop = async (arg)=>{
                                 // create items
                                 // 
                                 for (const [eachPath, eachItem] of Object.entries(pathsToCreate)) {
-                                    // FIXME: detect conflicts/overwrites and schedule them to be mentioned (so long as theyre not resovled by the masterMixin)
+                                    // TODO: detect conflicts/overwrites and schedule them to be mentioned (so long as theyre not resovled by the masterMixin)
                                     // in masterMixin the conflicts need to be reported because they're likely non-obvious even if they're rare
                                     
                                     // make sure target exists
@@ -715,6 +718,7 @@ export const createVirkshop = async (arg)=>{
                     
                     var duration = (new Date()).getTime() - startTime; var startTime = (new Date()).getTime()
                     debuggingLevel && console.log(`     [${duration}ms creating mixture]`)
+                    console.log(`     [starting nix-shell (note: this step can take a while)]`)
                     
                     // 
                     // run nix-shell
@@ -759,6 +763,12 @@ export const createVirkshop = async (arg)=>{
                     )
                     // TODO: call all the on_quit scripts
                 },
+            },
+            async enter() {
+                const mixinPaths = await FileSystem.listPathsIn(virkshop.pathTo.mixins)
+                await virkshop._stages.phase0(mixinPaths) // phase 0: creates/discovers basic virkshop structure (establish linked files/folders, clean broken links)
+                await virkshop._stages.phase1(mixinPaths) // phase 1: lets all the mixin's set themselves up (but other mixins are not guarenteed to be setup)
+                await virkshop._stages.phase2(mixinPaths) // phase 2: enters the virkshop, and runs zsh login scripts created by the mixins
             },
             async trigger(eventPath) {
                 const alreadExecuted = new Set()
@@ -869,8 +879,8 @@ export const shellApi = Object.defineProperties(
             # instead use nix to update zsh
             DISABLE_AUTO_UPDATE="true"
             DISABLE_UPDATE_PROMPT="true"
-
-            if [ "$VIRKSHOP_DEBUG" = "true" ]
+            
+            if [ -n "$VIRKSHOP_DEBUG" ]
             then
                 deno eval 'console.log(\`     [\${(new Date()).getTime()-Deno.env.get("_shell_start_time")}ms nix-shell]\`)'
             fi
@@ -899,7 +909,7 @@ export const shellApi = Object.defineProperties(
                 fi
             }
         `,
-        escapeShellArgument(string) {
+        escapeShellArgument(string) { // TODO: make this include outside wrapping quotes
             return string.replace(/'/g, `'"'"'`)
         },
         generatePrependToPathString(newPath) {
@@ -1168,84 +1178,16 @@ export const shellApi = Object.defineProperties(
                 return nixVar
             }
         })
-
-// 
-// javascript to Nix
-// 
-    export const escapeNixString = (string)=>{
-        return `"${string.replace(/\$\{|[\\"]/g, '\\$&').replace(/\u0000/g, '\\0')}"`
-    }
     
-    export const escapeNixObject = (obj)=> {
-        const objectType = typeof obj
-        if (obj == null) {
-            return `null`
-        } else if (objectType == 'boolean') {
-            return `${obj}`
-        } else if (objectType == 'number') {
-            // Infinity or Nan
-            if (obj !== obj || obj+1 === obj) {
-                return `"${obj}"`
-            // floats and decimals
-            } else {
-                return `${obj}`
-            }
-        } else if (objectType == 'string') {
-            return escapeNixString(obj)
-        } else if (obj instanceof Object) {
-            // 
-            // Variable
-            // 
-            if (obj instanceof WarehouseVar || obj instanceof ComputedVar || obj instanceof PackageVar) {
-                return obj.name
-            // 
-            // Array
-            // 
-            } else if (obj instanceof Array) {
-                if (obj.length == 0) {
-                    return `[]`
-                } else {
-                    return `[\n${
-                        obj.map(
-                            each=>indent({string:escapeNixObject(each)})
-                        ).join("\n")
-                    }\n]`
-                }
-            // 
-            // Plain Object
-            // 
-            } else {
-                const entries = Object.entries(obj)
-                if (entries.length == 0) {
-                    return `{}`
-                } else {
-                    let string = "{\n"
-                    for (const [key, value] of entries) {
-                        const valueAsString = escapeNixObject(value)
-                        const valueIsSingleLine = !valueAsString.match(/\n/)
-                        if (valueIsSingleLine) {
-                            string += indent({
-                                string: `${escapeNixString(key)} = ${escapeNixObject(value)};`
-                            }) + "\n"
-                        } else {
-                            string += indent({
-                                string: `${escapeNixString(key)} = (\n${
-                                    indent({
-                                        string: escapeNixObject(value)
-                                    })
-                                });`
-                            })+"\n"
-                        }
-                    }
-                    string += "}"
-                    return string
-                }
-            }
-        // } else { // TODO: add regex support (hard because of escaping)
-        } else {
-            throw Error(`Unable to convert this value to a Nix representation: ${obj}`)
-        }
-    }
+    // tell nix how to serialize these values
+    nix.addCustomJsConverter({
+        checker: (obj)=>obj instanceof CustomYamlType,
+        converter: (obj)=>obj.asString,
+    })
+    nix.addCustomJsConverter({
+        checker: (obj)=>obj instanceof WarehouseVar || obj instanceof ComputedVar || obj instanceof PackageVar,
+        converter: (obj)=>obj.name,
+    })
 
 export const parsePackageTools = async (pathToPackageTools)=>{
     // in the future their may be some extra logic here
@@ -1308,7 +1250,7 @@ export const fornixToNix = async function(yamlString) {
             (_-_core.fetchTarball
                 ({url=${JSON.stringify(tarFileUrl)};})
             )
-            (${indent({ string: escapeNixObject(warehouseArguments), by: "            ", noLead: true})})
+            (${indent({ string: nix.escapeJsValue(warehouseArguments), by: "            ", noLead: true})})
         )`.replace(/\n        /g,"\n")
     }
 
@@ -1394,7 +1336,7 @@ export const fornixToNix = async function(yamlString) {
                 }
             }
             computed[varName] = resultAsValue
-            saveNixVar(varName, escapeNixObject(resultAsValue))
+            saveNixVar(varName, nix.escapeJsValue(resultAsValue))
         // 
         // (package)
         // 
@@ -1451,11 +1393,11 @@ export const fornixToNix = async function(yamlString) {
             if (values.load instanceof NixValue) {
                 nixValue = `(${values.load.asString})`
             } else if (source instanceof WarehouseVar || source instanceof ComputedVar || source instanceof PackageVar) {
-                const loadAttribute = values.load.map(each=>escapeNixString(each)).join(".")
+                const loadAttribute = values.load.map(each=>nix.escapeJsValue(`${each}`)).join(".")
                 nixValue = `${source.name}.${loadAttribute}`
             // from a hash/url directly
             } else {
-                const loadAttribute = values.load.map(each=>escapeNixString(each)).join(".")
+                const loadAttribute = values.load.map(each=>nix.escapeJsValue(`${each}`)).join(".")
                 if (source instanceof Object) {
                     nixValue = `${warehouseAsNixValue(source)}.${loadAttribute}`
                 } else if (typeof source == "string") {
@@ -1495,7 +1437,7 @@ export const fornixToNix = async function(yamlString) {
             // get nix-value
             // 
             const source = values.from || defaultWarehouse
-            const loadAttribute = values.load.map(each=>escapeNixString(each)).join(".")
+            const loadAttribute = values.load.map(each=>nix.escapeJsValue(`${each}`)).join(".")
             let nixValue
             if (source instanceof WarehouseVar || source instanceof ComputedVar || source instanceof PackageVar) {
                 nixValue = `${source.name}.${loadAttribute}`
@@ -1589,7 +1531,7 @@ export const fornixToNix = async function(yamlString) {
                                 "'"
                             ]
                             [
-                                ${escapeNixString(`'"'"'`)}
+                                ${nix.escapeJsValue(`'"'"'`)}
                             ]
                             nixShellDataJson
                         );
