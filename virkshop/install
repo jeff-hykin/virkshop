@@ -22,18 +22,27 @@ import { nix } from "./nix_tools.js"
 // 
 // pre-check
 // 
-    console.log("checking nix installation")
     await nix.ensureInstalled()
 
 // 
 // main code
 // 
     const packageName = Deno.args[0]
-    // TODO: check if package was already in the yaml file
+    console.log()
     // TODO: add argument for specifying where the package came from
     const currentSystemTools = await currentSystemToolsPromise
-    yaml.parse(yamlString)
-    console.log("waiting on response from nix...")
+    const packageAttributeStrings = currentSystemTools.directPackages.map(each=>each.load.join("."))
+    const relativePathToSystemTools = FileSystem.makeRelativePath({from: FileSystem.pwd, to: virkshop.pathTo.systemTools})
+    if (packageAttributeStrings.includes(packageName)) {
+        // TODO: could improve this message, e.g. "Did you want to install a different version?"
+        console.log(`It looks like ${packageName} is already inside ${relativePathToSystemTools}`)
+        if (! await Console.askFor.yesNo(`\nDo you want to add it anyways?`)) {
+            console.log(`Okay`)
+            Deno.exit(1)
+        }
+        console.log(`Okay`)
+    } 
+    console.log("... waiting on response from nix ...")
     const resultString =  await run('nix-env', '-qa', packageName, "--json", Stdout(returnAsString))
     if (resultString) {
         const results = JSON.parse(resultString)
@@ -41,7 +50,7 @@ import { nix } from "./nix_tools.js"
         const packageCommonNames = Object.entries(results).map(([key, value])=>value.pname)
         const packageVersions = Object.entries(results).map(([key, value])=>value.version)
         if (packageAttributeNames.includes(packageName)) {
-            console.log("found exact match")
+            console.log("found exact match on nixpkgs")
             const currentSystemTools = await currentSystemToolsPromise
             await FileSystem.write({
                 path: virkshop.pathTo.systemTools,
@@ -52,8 +61,7 @@ import { nix } from "./nix_tools.js"
                         load: [ ${JSON.stringify(packageName)},]
                 `.replace(/\n                    /g, "\n"),
             })
-            const relativePath = FileSystem.makeRelativePath({from: FileSystem.pwd, to: virkshop.pathTo.systemTools})
-            console.log(`Package successfully added to ${relativePath.path||relativePath}`)
+            console.log(`Package successfully added to ${relativePathToSystemTools}`)
         } else {
             console.log("Here are some similar names, re-run with one of them")
             for (const [ attribute, commonName, version ] of zip(packageAttributeNames, packageCommonNames, packageVersions)) {

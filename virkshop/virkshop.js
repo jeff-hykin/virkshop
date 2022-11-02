@@ -11,8 +11,6 @@ import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
 import { stats, sum, spread, normalizeZeroToOne, roundedUpToNearest, roundedDownToNearest } from "https://deno.land/x/good@0.7.8/math.js"
 import { nix } from "./nix_tools.js"
 
-console.debug(`nix is:`,nix)
-
 // 
 // 
 // Main
@@ -1193,7 +1191,7 @@ export const parsePackageTools = async (pathToPackageTools)=>{
     // in the future their may be some extra logic here
     const dataStructure = yaml.parse(await FileSystem.read(pathToPackageTools), {schema: yaml.DEFAULT_SCHEMA,},)
     const allSaveAsValues = dataStructure.map(each=>each[Object.keys(each)[0]].saveAs)
-    const illegalNames = allSaveAsValues.filter(each=>each.startsWith("_-"))
+    const illegalNames = allSaveAsValues.filter(each=>`${each}`.startsWith("_-"))
     if (illegalNames.length > 0) {
         throw Error(`Inside ${pathToPackageTools}, there are some illegal saveAs names (names that start with "_-")\nPlease rename these values:${illegalNames.map(each=>`\n    saveAs: ${each}`).join("")}`)
     }
