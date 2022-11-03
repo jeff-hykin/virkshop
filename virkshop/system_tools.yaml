@@ -55,6 +55,24 @@
     value: !!deno Deno.build.os == 'linux'
     saveAs: isLinux
 
+# available/magic tags:
+    # !!deno
+    # !!absolute_path
+    # !!nix
+    # !!computed
+    # !!package
+    # !!warehouse
+
+# 
+# 
+# env vars
+# 
+# 
+- (env):
+    var: PATH
+    prepend: !!absolute_path "./mixture/commands"
+
+
 # 
 # 
 # 

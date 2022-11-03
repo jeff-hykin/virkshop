@@ -536,7 +536,7 @@ export const createVirkshop = async (arg)=>{
                             
                             const yamlString = await FileSystem.read(virkshop.pathTo.systemTools)
                             // TODO: get a hash of this and see if nix-shell should even be regenerated or not (as an optimization)
-                            const result = await fornixToNix(yamlString)
+                            const result = await fornixToNix({string: yamlString, path: virkshop.pathTo.systemTools})
                             defaultWarehouse = result.defaultWarehouse
                             // TODO: add error for no default warehouse
                             await FileSystem.write({
@@ -1075,14 +1075,21 @@ export const shellApi = Object.defineProperties(
     class CustomYamlType {
         asString = null
     }
-    function createCustomTag({tagName, javascriptValueisACustomType, yamlNodeIsValidACustomType, createJavasriptValueFromYamlString, customValueToYamlString, kind="scalar", }) {
+    
+    const SchemaClass = Object.getPrototypeOf(yaml.DEFAULT_SCHEMA).constructor
+    const duplicateSchema = (schema)=>new SchemaClass({
+        explicit: [...schema.explicit],
+        implicit: [...schema.implicit],
+        include: [...schema.include],
+    })
+    const extendedSchema = duplicateSchema(yaml.DEFAULT_SCHEMA)
+    function createCustomTag({tagName, javascriptValueisACustomType, yamlNodeIsValidACustomType, createJavasriptValueFromYamlString, customValueToYamlString, kind="scalar", schema=extendedSchema}) {
         if (kind != "scalar") {
             throw Error(`Sorry in createCustomTag({ kind: '${kind}' }), the only valid kind (currently) is scalar`)
         }
         const universalTag = `tag:yaml.org,2002:${tagName}`
         class ACustomType extends CustomYamlType {}
 
-        const validVariableNameRegex = /^ *\b[a-zA-Z_][a-zA-Z_0-9]*\b *$/
         const customValueSupport = new Type(universalTag, {
             kind: "scalar",
             predicate: javascriptValueisACustomType || function(object) {
@@ -1102,9 +1109,9 @@ export const shellApi = Object.defineProperties(
         })
 
         // hack it into the default schema (cause .extend() isnt available)
-        yaml.DEFAULT_SCHEMA.explicit.push(customValueSupport)
-        yaml.DEFAULT_SCHEMA.compiledTypeMap.fallback[universalTag] = customValueSupport
-        yaml.DEFAULT_SCHEMA.compiledTypeMap.scalar[universalTag] = customValueSupport
+        schema.explicit.push(customValueSupport)
+        schema.compiledTypeMap.fallback[universalTag] = customValueSupport
+        schema.compiledTypeMap.scalar[universalTag] = customValueSupport
 
         return ACustomType
     }
@@ -1182,7 +1189,6 @@ export const shellApi = Object.defineProperties(
         const DenoExecutePromise = createCustomTag({
             tagName: "deno",
             createJavasriptValueFromYamlString(data) {
-                const returnValue = new DenoExecutePromise()
                 // if there is a default export somewhere, its very likely not in a string (so try NOT prepending default export)
                 if (data.match(/export default/)) {
                     return import(`data:text/javascript;base64, ${btoa(data)}`).catch(()=>import(`data:text/javascript;base64, ${btoa(`export default ${data}`)}`)).then((value)=>value.default)
@@ -1193,6 +1199,34 @@ export const shellApi = Object.defineProperties(
             }
         })
     
+    const readExtendedYaml = async ({path, string})=>{
+        const locallyHandledSchema = duplicateSchema(extendedSchema)
+        const folderOfYamlFile = path && FileSystem.parentPath(path)
+        // 
+        // !!absolute_path support
+        // 
+        const AbsolutePathTag = createCustomTag({
+            tagName: "absolute_path",
+            schema: locallyHandledSchema,
+            createJavasriptValueFromYamlString(data) {
+                const relativePathString = data
+                if (!folderOfYamlFile) {
+                    // relative to CWD if there was no file
+                    return FileSystem.makeAbsolutePath(relativePathString)
+                } else {
+                    return FileSystem.normalize(
+                        FileSystem.makeAbsolutePath(
+                            FileSystem.makeRelativePath({from: folderOfYamlFile, to: relativePathString })
+                        )
+                    )
+                }
+            }
+        })
+        string = string || await FileSystem.read(path)
+        const dataStructure = await recursivePromiseAll(yaml.parse(string, {schema: locallyHandledSchema,}))
+        return dataStructure
+    }
+
     // tell nix how to serialize these values
     nix.addCustomJsConverter({
         checker: (obj)=>obj instanceof CustomYamlType,
@@ -1255,7 +1289,7 @@ const recursivePromiseAll = (object, alreadySeen=new Map()) => {
 export const parsePackageTools = async (pathToPackageTools)=>{
     // in the future their may be some extra logic here
     const asString = await FileSystem.read(pathToPackageTools)
-    const dataStructure = await recursivePromiseAll(yaml.parse(asString, {schema: yaml.DEFAULT_SCHEMA,},))
+    const dataStructure = await readExtendedYaml({path: pathToPackageTools, string: asString})
     const allSaveAsValues = dataStructure.map(each=>each[Object.keys(each)[0]].saveAs)
     const illegalNames = allSaveAsValues.filter(each=>`${each}`.startsWith("_-"))
     if (illegalNames.length > 0) {
@@ -1281,10 +1315,10 @@ export const parsePackageTools = async (pathToPackageTools)=>{
 // 
 // fornixToNix
 // 
-export const fornixToNix = async function(yamlString) {
+export const fornixToNix = async function({string, path}) {
     // TODO: add error for trying to assign to a keyword (like "builtins", "rec", "let", etc)
     const start = (new Date()).getTime()
-    const dataStructure = await recursivePromiseAll(yaml.parse(yamlString, {schema: yaml.DEFAULT_SCHEMA,},))
+    const dataStructure = await readExtendedYaml({path, string})
     const allSaveAsValues = dataStructure.map(each=>each[Object.keys(each)[0]].saveAs)
     const frequencyCountOfVarNames = allSaveAsValues.filter(each=>each).reduce((frequency, item)=>(frequency[item]?frequency[item]++:frequency[item]=1, frequency), {})
     const varNames = []
