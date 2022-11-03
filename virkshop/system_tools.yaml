@@ -57,7 +57,7 @@
 
 # available/magic tags:
     # !!deno
-    # !!absolute_path
+    # !!as_absolute_path
     # !!nix
     # !!computed
     # !!package
@@ -68,10 +68,14 @@
 # env vars
 # 
 # 
-- (env):
-    var: PATH
-    prepend: !!absolute_path "./mixture/commands"
+- (environmentVariable):
+    var: HOWDY
+    overwriteAs: "Howdy"
 
+- (environmentVariable):
+    var: PATH
+    prepend: !!as_absolute_path "./mixture/commands"
+    joinUsing: ":"
 
 # 
 # 

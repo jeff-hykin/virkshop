@@ -104,6 +104,7 @@ export const createVirkshop = async (arg)=>{
             _internal: {
                 homeMappingPriorities: [],
                 shellSetupPriorities: [],
+                finalShellCode: "",
                 deadlines: {
                     beforeSetup: [],
                     beforeReadingSystemTools: [],
@@ -599,6 +600,8 @@ export const createVirkshop = async (arg)=>{
                                     })
                                 }
                             })
+
+                            shellProfileString += virkshop._internal.finalShellCode
                             
                             // write the new shell profile
                             await FileSystem.write({
@@ -991,6 +994,35 @@ export const shellApi = Object.defineProperties(
                     }
                     compdef '__autocomplete_for__${name}' '${name}'
             `.replace(/\n                /g, "\n")
+        },
+        modifyEnvVar({ name, overwriteAs, prepend, append, joinUsing="", }) {
+            name = name.trim()
+            if (overwriteAs) {
+                return `\nexport ${name}='${this.escapeShellArgument(overwriteAs)}'\n`
+            }
+            
+            let output = ""
+            if (prepend) {
+                output += `
+                    if [ -z "$${name}" ]; then
+                        export ${name}='${this.escapeShellArgument(prepend)}'
+                    else
+                        export ${name}='${this.escapeShellArgument(prepend)}${this.escapeShellArgument(joinUsing)}'"$${name}"
+                    fi
+                `.replace(/\n                    /,"\n")
+            }
+
+            if (append) {
+                output += `
+                    if [ -z "$${name}" ]; then
+                        export ${name}='${this.escapeShellArgument(append)}'
+                    else
+                        export ${name}="$${name}"'${this.escapeShellArgument(joinUsing)}${this.escapeShellArgument(append)}'
+                    fi
+                `.replace(/\n                    /,"\n")
+            }
+
+            return output
         }
     },
     {
@@ -1203,10 +1235,10 @@ export const shellApi = Object.defineProperties(
         const locallyHandledSchema = duplicateSchema(extendedSchema)
         const folderOfYamlFile = path && FileSystem.parentPath(path)
         // 
-        // !!absolute_path support
+        // !!as_absolute_path support
         // 
         const AbsolutePathTag = createCustomTag({
-            tagName: "absolute_path",
+            tagName: "as_absolute_path",
             schema: locallyHandledSchema,
             createJavasriptValueFromYamlString(data) {
                 const relativePathString = data
@@ -1447,6 +1479,12 @@ export const fornixToNix = async function({string, path}) {
             }
             computed[varName] = resultAsValue
             saveNixVar(varName, nix.escapeJsValue(resultAsValue))
+        // 
+        // (environmentVariable)
+        // 
+        } else if (kind == "(environmentVariable)") {
+            const values = eachEntry[kind]
+            virkshop._internal.finalShellCode += shellApi.modifyEnvVar({ ...values, name: values.var })
         // 
         // (package)
         // 
