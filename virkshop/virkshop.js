@@ -452,7 +452,7 @@ export const createVirkshop = async (arg)=>{
                                 })
                             )
                             debuggingLevel > 1 && console.log("Here are the priority mappings for home")
-                            debuggingLevel && console.log(homeMappingPriorities.sort((a,b)=>a.relativePathFromHome.localeCompare(b.relativePathFromHome)))
+                            debuggingLevel > 1 && console.log(homeMappingPriorities.sort((a,b)=>a.relativePathFromHome.localeCompare(b.relativePathFromHome)))
                             const lowPriorityHomeAspects = homeMappingPriorities.filter(each=>!each.isMasterMixin)
                             const highPriorityHomeAspects = homeMappingPriorities.filter(each=>each.isMasterMixin)
                             // do low priority stuff first because its going to be overwritten by higher priority
@@ -885,7 +885,7 @@ export const shellApi = Object.defineProperties(
             unset _shell_start_time
 
             # This is runtime-faster than creating/calling several individual commands
-            system_tools () {
+            virkshop_tools () {
                 sub_command="$1"
                 shift
                 if [ "$sub_command" = "nix_path_for" ]
@@ -1075,7 +1075,7 @@ export const shellApi = Object.defineProperties(
     class CustomYamlType {
         asString = null
     }
-    function createCustomTag({tagName, javascriptValueisACustomType, yamlNodeIsValidACustomTyp, createJavasriptValueFromYamlString, customValueToYamlString, kind="scalar", }) {
+    function createCustomTag({tagName, javascriptValueisACustomType, yamlNodeIsValidACustomType, createJavasriptValueFromYamlString, customValueToYamlString, kind="scalar", }) {
         if (kind != "scalar") {
             throw Error(`Sorry in createCustomTag({ kind: '${kind}' }), the only valid kind (currently) is scalar`)
         }
@@ -1088,7 +1088,7 @@ export const shellApi = Object.defineProperties(
             predicate: javascriptValueisACustomType || function(object) {
                 return object instanceof ACustomType
             },
-            resolve: yamlNodeIsValidACustomTyp || function(data) {
+            resolve: yamlNodeIsValidACustomType || function(data) {
                 return true
             },
             construct: createJavasriptValueFromYamlString || function(data) {
@@ -1121,7 +1121,7 @@ export const shellApi = Object.defineProperties(
     // 
         const WarehouseVar = createCustomTag({
             tagName: "warehouse",
-            yamlNodeIsValidNixVar(data) {
+            yamlNodeIsValidACustomType(data) {
                 if (typeof data !== 'string') return false
                 if (data.length === 0) return false
                 
@@ -1141,7 +1141,7 @@ export const shellApi = Object.defineProperties(
     // 
         const ComputedVar = createCustomTag({
             tagName: "computed",
-            yamlNodeIsValidNixVar(data) {
+            yamlNodeIsValidACustomType(data) {
                 if (typeof data !== 'string') return false
                 if (data.length === 0) return false
                 
@@ -1161,7 +1161,7 @@ export const shellApi = Object.defineProperties(
     // 
         const PackageVar = createCustomTag({
             tagName: "package",
-            yamlNodeIsValidNixVar(data) {
+            yamlNodeIsValidACustomType(data) {
                 if (typeof data !== 'string') return false
                 if (data.length === 0) return false
                 
@@ -1176,6 +1176,22 @@ export const shellApi = Object.defineProperties(
                 return nixVar
             }
         })
+    // 
+    // !!deno support
+    // 
+        const DenoExecutePromise = createCustomTag({
+            tagName: "deno",
+            createJavasriptValueFromYamlString(data) {
+                const returnValue = new DenoExecutePromise()
+                // if there is a default export somewhere, its very likely not in a string (so try NOT prepending default export)
+                if (data.match(/export default/)) {
+                    return import(`data:text/javascript;base64, ${btoa(data)}`).catch(()=>import(`data:text/javascript;base64, ${btoa(`export default ${data}`)}`)).then((value)=>value.default)
+                // otherwise we can be sure a default export is needed
+                } else {
+                    return import(`data:text/javascript;base64, ${btoa(`export default ${data}`)}`).then((value)=>value.default)
+                }
+            }
+        })
     
     // tell nix how to serialize these values
     nix.addCustomJsConverter({
@@ -1187,10 +1203,59 @@ export const shellApi = Object.defineProperties(
         converter: (obj)=>obj.name,
     })
 
+import { deferred as deferredPromise } from "https://deno.land/std@0.161.0/async/mod.ts"
+const objectPrototype = Object.getPrototypeOf({})
+
+/**
+ * Promise.allRecursively
+ *
+ * @example
+ *     await recursivePromiseAll({a:1, b: [ 1, 2, new Promise((resolve, reject)=>resolve(10))] })
+ *     // >>> { a: 1, b: [ 1, 2, 10 ] }
+ */
+const recursivePromiseAll = (object, alreadySeen=new Map()) => {
+    if (alreadySeen.has(object)) {
+        return alreadySeen.get(object)
+    }
+    if (object instanceof Promise) {
+        return object
+    } else if (object instanceof Array) {
+        const resolveLink = deferredPromise()
+        alreadySeen.set(object, resolveLink)
+        Promise.all(
+            object.map(each=>recursivePromiseAll(each, alreadySeen))
+        ).catch(
+            resolveLink.reject
+        ).then(
+            resolveLink.resolve
+        )
+        return resolveLink
+    // if pure object
+    } else if (Object.getPrototypeOf(object) == objectPrototype) {
+        const resolveLink = deferredPromise()
+        alreadySeen.set(object, resolveLink)
+        ;((async ()=>{
+            try {
+                const keysAndValues = await Promise.all(
+                    Object.entries(object).map(
+                        (keyAndValue)=>recursivePromiseAll(keyAndValue, alreadySeen)
+                    )
+                )
+                resolveLink.resolve(Object.fromEntries(keysAndValues))
+            } catch (error) {
+                resolveLink.reject(error)
+            }
+        })())
+        return resolveLink
+    // either a primitive or a custom object that doesnt inhert from a promise
+    } else {
+        return object
+    }
+}
 export const parsePackageTools = async (pathToPackageTools)=>{
     // in the future their may be some extra logic here
     const asString = await FileSystem.read(pathToPackageTools)
-    const dataStructure = yaml.parse(asString, {schema: yaml.DEFAULT_SCHEMA,},)
+    const dataStructure = await recursivePromiseAll(yaml.parse(asString, {schema: yaml.DEFAULT_SCHEMA,},))
     const allSaveAsValues = dataStructure.map(each=>each[Object.keys(each)[0]].saveAs)
     const illegalNames = allSaveAsValues.filter(each=>`${each}`.startsWith("_-"))
     if (illegalNames.length > 0) {
@@ -1219,7 +1284,7 @@ export const parsePackageTools = async (pathToPackageTools)=>{
 export const fornixToNix = async function(yamlString) {
     // TODO: add error for trying to assign to a keyword (like "builtins", "rec", "let", etc)
     const start = (new Date()).getTime()
-    const dataStructure = yaml.parse(yamlString, {schema: yaml.DEFAULT_SCHEMA,},)
+    const dataStructure = await recursivePromiseAll(yaml.parse(yamlString, {schema: yaml.DEFAULT_SCHEMA,},))
     const allSaveAsValues = dataStructure.map(each=>each[Object.keys(each)[0]].saveAs)
     const frequencyCountOfVarNames = allSaveAsValues.filter(each=>each).reduce((frequency, item)=>(frequency[item]?frequency[item]++:frequency[item]=1, frequency), {})
     const varNames = []
@@ -1317,8 +1382,9 @@ export const fornixToNix = async function(yamlString) {
             const values = eachEntry[kind]
             const varName = values.saveAs
             let resultAsValue
-            if (values.builtinDenoEval) {
-                resultAsValue = eval(values.builtinDenoEval)
+            if (Object.keys(values).includes('value')) {
+                // means it was a constant, or preprocessed via a !!deno tag
+                resultAsValue = values.value
             } else {
                 const packages = values.withPackages || []
                 const whichWarehouse = values.fromWarehouse || defaultWarehouse

@@ -3,13 +3,16 @@
 - try getting super_map to work with virkshop
 
 - consider allowing env vars to be set inside system_tools
-- organize fornixToNix into its own file
-- allow specify binary names from particular packages
-- create CLI interface to access library path of a package `JSON.parse(Deno.env.get("VIRKSHOP_NIX_SHELL_DATA")).packagePaths[Deno.args[0]]`
-- create JS interface to access library path of a package `JSON.parse(Deno.env.get("VIRKSHOP_NIX_SHELL_DATA")).packagePaths[Deno.args[0]]`
+    - prepend
+    - append
+    - if unset
+    - !!run
+- allow specifing binary names from particular packages
 - remove relative paths to virkshop.js, use URL instead, maybe have a walk-up importer from URL and everything else local
 - maybe have a mixture.yaml for things like the gitignore settings
+- organize fornixToNix into its own file
 
+- DONE: add `!!deno`
 - DONE: create deno library for virkshop
 - DONE: create virkshop trigger for purge/clean
 - DONE: create clean command

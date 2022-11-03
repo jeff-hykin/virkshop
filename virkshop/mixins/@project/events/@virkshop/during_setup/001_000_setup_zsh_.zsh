@@ -1,6 +1,6 @@
 # AVAILABLE TOOLS:
-#     system_tools nix_path_for package $PACKAGE_NAME
-#     system_tools nix_lib_path_for package $PACKAGE_NAME
+#     virkshop_tools nix_path_for package $PACKAGE_NAME
+#     virkshop_tools nix_lib_path_for package $PACKAGE_NAME
 #     deno
 # AVAILABLE ENV VARS:
 #     VIRKSHOP_FOLDER
@@ -11,11 +11,11 @@
 # 
 # import paths from nix
 # 
-zsh_syntax_highlighting__path="$(system_tools nix_path_for package zshSyntaxHighlighting)"
-zsh_auto_suggest__path="$(       system_tools nix_path_for package zshAutosuggestions)"
-spaceship_prompt__path="$(       system_tools nix_path_for package spaceshipPrompt)"
-oh_my_zsh__path="$(              system_tools nix_path_for package ohMyZsh)"
-zsh__path="$(                    system_tools nix_path_for package zsh)"
+zsh_syntax_highlighting__path="$(virkshop_tools nix_path_for package zshSyntaxHighlighting)"
+zsh_auto_suggest__path="$(       virkshop_tools nix_path_for package zshAutosuggestions)"
+spaceship_prompt__path="$(       virkshop_tools nix_path_for package spaceshipPrompt)"
+oh_my_zsh__path="$(              virkshop_tools nix_path_for package ohMyZsh)"
+zsh__path="$(                    virkshop_tools nix_path_for package zsh)"
 
 # 
 # set fpath for zsh

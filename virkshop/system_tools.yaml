@@ -45,14 +45,14 @@
 #     fromWarehouse: !!warehouse defaultWarehouse
 #     saveAs: isMac
 
-# example1: using builtinDenoEval
+# example1: using javascript (deno)
 - (compute): # approach is about 1000ms faster than the cli-approach above because the deno runtime is already instantiated (the deno runtime is parsing this file)
-    builtinDenoEval: Deno.build.os == 'darwin'
+    value: !!deno Deno.build.os == 'darwin'
     saveAs: isMac
 
 # isLinux
 - (compute):
-    builtinDenoEval: Deno.build.os == 'linux'
+    value: !!deno Deno.build.os == 'linux'
     saveAs: isLinux
 
 # 
