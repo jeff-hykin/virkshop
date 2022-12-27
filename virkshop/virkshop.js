@@ -1,10 +1,11 @@
-import { FileSystem } from "https://deno.land/x/quickr@0.4.6/main/file_system.js"
-import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.4.6/main/run.js"
-import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.4.6/main/console.js"
-import { indent, findAll } from "https://deno.land/x/good@0.7.7/string.js"
-import { intersection, subtract } from "https://deno.land/x/good@0.7.7/set.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.6.6/main/file_system.js"
+import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.6.6/main/run.js"
+import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.6.6/main/console.js"
+import { indent, findAll } from "https://deno.land/x/good@0.7.8/string.js"
+import { intersection, subtract } from "https://deno.land/x/good@0.7.8/set.js"
 import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
-import { zip } from "https://deno.land/x/good@0.7.7/array.js"
+import { zip } from "https://deno.land/x/good@0.7.8/array.js"
+import { recursivelyAllKeysOf, get, set, remove, merge, compareProperty } from "https://deno.land/x/good@0.7.8/object.js"
 import { Type } from "https://deno.land/std@0.82.0/encoding/_yaml/type.ts"
 import * as yaml from "https://deno.land/std@0.82.0/encoding/yaml.ts"
 import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
@@ -30,8 +31,7 @@ export const createVirkshop = async (arg)=>{
     // auto-detect a virkshop path
     // 
     if (!virkshopPath) {
-        const callerPath = pathOfCaller()
-        const walkUpPath = await FileSystem.walkUpUntil(virkshopIdentifierPath, callerPath)
+        const walkUpPath = await FileSystem.walkUpUntil(virkshopIdentifierPath, FileSystem.pathOfCaller())
         if (walkUpPath) {
             virkshopPath = walkUpPath
         // fallback case, caller must be in project, try looking for top level virkshop
@@ -73,6 +73,7 @@ export const createVirkshop = async (arg)=>{
     const virkshopCache = {}
     const virkshop = Object.defineProperties(
         {
+            settings: {}, // this is not valid until after phase1
             pathTo: Object.defineProperties(
                 {
                     realHome,
@@ -93,6 +94,9 @@ export const createVirkshop = async (arg)=>{
                 }
             ),
             structure: {
+                specialFiles: {
+                    settings: 'settings.yaml',
+                },
                 specialMixinFolders: [
                     'commands',
                     'documentation',
@@ -310,8 +314,6 @@ export const createVirkshop = async (arg)=>{
                         }
                     }))
                     
-                    // rule1: never overwrite non-symlink files (in commands/ settings/ etc)
-                    //        hardlink files are presumably created by the user, not a mixin
                     // link virkshop folders up-and-out into the project folder
                     await Promise.all(Object.entries(virkshop.options.projectLinks).map(async ([whereInProject, whereInVirkshop])=>{
                         // TODO: make $VIRKSHOP_FOLDER and $PROJECT_FOLDER required at the front
@@ -441,6 +443,59 @@ export const createVirkshop = async (arg)=>{
                     await Promise.all(virkshop._internal.deadlines.beforeSetup)
 
                     // 
+                    // combine all the settings
+                    // 
+                    const settings = {}
+                    virkshop._internal.deadlines.beforeEnteringVirkshop.push(
+                        ((async ()=>{
+                            // mixin settings first (orderless)
+                            await Promise.all((await FileSystem.listPathsIn(virkshop.pathTo.mixins)).map(async (eachMixinPath)=>{
+                                const info = await FileSystem.info(`${eachMixinPath}/${virkshop.structure.specialFiles.settings}`)
+                                if (info.isFile) {
+                                    try {
+                                        const yamlString = await FileSystem.read(info.path)
+                                        const result = yaml.parse(yamlString)
+                                        merge(settings, result)
+                                    } catch (error) {
+                                        console.warn(`[${FileSystem.basename(eachMixinPath)}]: Tried to parse settings (${info.path}), but failed with the following error: ${error.msg}`)
+                                    }
+                                }
+                            }))
+
+                            // @virkshop overrides mixins
+                            try {
+                                const yamlString = await FileSystem.read(virkshop.pathTo.virkshopOptions)
+                                const result = yaml.parse(yamlString)
+                                merge(settings, result)
+                            } catch (error) {
+                                console.warn(`[@virkshop]: Tried to parse the settings (${virkshop.pathTo.virkshopOptions}), but failed with the following error: ${error.msg}`)
+                            }
+                            
+                            // master mixin overrides all
+                            const masterMixinSettingsPath = `${virkshop.pathTo.mixins}/${masterMixin}`
+                            const masterMixinSettingsInfo = await FileSystem.info(`${eachMixinPath}/${virkshop.structure.specialFiles.settings}`)
+                            if (masterMixinSettingsInfo.isFile) {
+                                try {
+                                    const yamlString = await FileSystem.read(masterMixinSettingsPath)
+                                    const result = yaml.parse(yamlString)
+                                    merge(settings, result)
+                                } catch (error) {
+                                    console.warn(`[${masterMixin}]: Tried to parse the settings (${masterMixinSettingsPath}), but failed with the following error: ${error.msg}`)
+                                }
+                            }
+                            
+                            // save output
+                            await FileSystem.write({
+                                path: `${virkshop.pathTo.mixture}/${virkshop.structure.specialFiles.settings}`,
+                                data: yaml.stringify(settings),
+                            })
+
+                            virkshop.settings = settings
+                        })())
+                    )
+
+                    
+                    // 
                     // start linking home together right after
                     // 
                     virkshop._internal.deadlines.beforeEnteringVirkshop.push(
@@ -516,7 +571,7 @@ export const createVirkshop = async (arg)=>{
                 },
                 // 
                 // 
-                // phase 2: "cooking" enters the virkshop, and runs zsh login scripts created by the mixins
+                // phase 2 "cooking": enters the virkshop, and runs zsh login scripts created by the mixins
                 // 
                 // 
                 async phase2(mixinPaths) {
@@ -1036,25 +1091,6 @@ export const shellApi = Object.defineProperties(
 // Helpers
 // 
 // 
-    function pathOfCaller() {
-        const err = new Error()
-        const filePaths = findAll(/^.+file:\/\/(\/[\w\W]*?):/gm, err.stack).map(each=>each[1])
-        
-        // if valid file
-        // TODO: make sure this works inside of anonymous functions (not sure if error stack handles that well)
-        const secondPath = filePaths[1]
-        if (secondPath) {
-            try {
-                if (Deno.statSync(secondPath).isFile) {
-                    return secondPath
-                }
-            } catch (error) {
-            }
-        }
-        // if in an interpreter
-        return Deno.cwd()
-    }
-
     function numberPrefixRenameList(filepaths) {
         let largestNumber = -Infinity
         const items = []
