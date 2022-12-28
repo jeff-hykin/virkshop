@@ -5,6 +5,7 @@
 - create branches like `pure` `standard`
 - remove relative paths to virkshop.js, use URL instead, maybe have a walk-up importer from URL and everything else local
 
+- DONE: create method for removing relative paths to virkshop.js
 - DONE: cli "virkshop/install [package name]"
 - DONE: add `!!deno`
 - DONE: create deno library for virkshop
