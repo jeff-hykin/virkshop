@@ -1,5 +1,5 @@
 #!/usr/bin/env -S deno run --allow-all
-import { FileSystem } from "https://deno.land/x/quickr@0.6.6/main/file_system.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.6.13/main/file_system.js"
 const { virkshop } = await FileSystem.walkUpImport("virkshop.js")
 
 // FIXME: the commented out code below needs converting to deno

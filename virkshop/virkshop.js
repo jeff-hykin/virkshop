@@ -1,6 +1,6 @@
-import { FileSystem } from "https://deno.land/x/quickr@0.6.6/main/file_system.js"
-import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.6.6/main/run.js"
-import { Console, clearStylesFrom, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, hidden, strikethrough, visible, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.6.6/main/console.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.6.13/main/file_system.js"
+import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.6.13/main/run.js"
+import { Console, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, strikethrough, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.6.13/main/console.js"
 import { indent, findAll } from "https://deno.land/x/good@0.7.8/string.js"
 import { intersection, subtract } from "https://deno.land/x/good@0.7.8/set.js"
 import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
@@ -472,8 +472,8 @@ export const createVirkshop = async (arg)=>{
                             }
                             
                             // master mixin overrides all
-                            const masterMixinSettingsPath = `${virkshop.pathTo.mixins}/${masterMixin}`
-                            const masterMixinSettingsInfo = await FileSystem.info(`${eachMixinPath}/${virkshop.structure.specialFiles.settings}`)
+                            const masterMixinSettingsPath = `${virkshop.pathTo.mixins}/${masterMixin}/${virkshop.structure.specialFiles.settings}`
+                            const masterMixinSettingsInfo = await FileSystem.info(masterMixinSettingsPath)
                             if (masterMixinSettingsInfo.isFile) {
                                 try {
                                     const yamlString = await FileSystem.read(masterMixinSettingsPath)
