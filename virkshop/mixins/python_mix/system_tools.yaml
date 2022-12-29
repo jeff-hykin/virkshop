@@ -1,0 +1,44 @@
+# 
+# Python
+# 
+- (environmentVariable):
+    var: PYTHONPATH
+    prepend: !!as_absolute_path "."
+    joinUsing: ":"
+
+- (environmentVariable):
+    var: PYTHONPATH
+    prepend: !!as_absolute_path "./main"
+    joinUsing: ":"
+
+- (package):
+    asBuildInput: true
+    load: [ "python38",]
+
+- (package):
+    asBuildInput: true
+    load: [ "python38Packages", "setuptools",]
+
+- (package):
+    asBuildInput: true
+    load: [ "python38Packages", "pip",]
+
+- (package):
+    asBuildInput: true
+    load: [ "python38Packages", "virtualenv",]
+
+- (package):
+    asBuildInput: true
+    load: [ "python38Packages", "wheel",]
+
+- (package):
+    asBuildInput: true
+    load: [ "cmake",]
+
+- (package):
+    asBuildInput: true
+    load: [ "pkg-config",]
+
+- (package):
+    asBuildInput: true
+    load: [ "libffi",]

@@ -187,7 +187,9 @@
     onlyIf: !!computed isMac
 
 # 
-# both often need
+# 
+# common dependencies
+# 
 # 
 - (package):
     asBuildInput: true
@@ -196,12 +198,6 @@
 - (package):
     asBuildInput: true
     load: [ "libkrb5",]
-
-# 
-# 
-# common dependencies
-# 
-# 
 
 - (package):
     asBuildInput: true
@@ -282,7 +278,6 @@
 # Basic Commandline tools
 #
 #
-
 - (package):
     asBuildInput: true
     load: [ "man",]
@@ -487,11 +482,18 @@
     load: [ "nix",]
 
 # 
-# python
-# 
-# 
 # Python
 # 
+- (environmentVariable):
+    var: PYTHONPATH
+    prepend: !!as_absolute_path "."
+    joinUsing: ":"
+
+- (environmentVariable):
+    var: PYTHONPATH
+    prepend: !!as_absolute_path "./main"
+    joinUsing: ":"
+
 - (package):
     asBuildInput: true
     load: [ "python38",]

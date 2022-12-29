@@ -3,6 +3,18 @@
 - try getting super_map to work with virkshop
 - create branches like `pure` `standard`
 
+- reconsider what can be modular and what cant
+    - consider making system_tools be @project/system_tools, and concating all the files
+        => kind of a problem with variable namespacing
+        consider the user experiance with the worst namespacing problem
+    - consider making the mix command more advanced. "mix" could be when:
+        - mixins copy their default settings into @project
+        - add things to system_tools
+        - mixins initialize git ignores
+        - mixins initialize hooks
+        - HOWEVER this removes the "delete the folder and its uninstalled" feature
+            - but this^ cant really work for gitignores (except maybe through: https://stackoverflow.com/questions/7005142/can-i-include-other-gitignore-file-in-a-gitignore-file-like-include-in-c-li)
+- add !load_yaml_file or !insert
 - DONE: remove relative paths to virkshop.js, use URL instead, maybe have a walk-up importer from URL and everything else local
 - DONE: create method for removing relative paths to virkshop.js
 - DONE: cli "virkshop/install [package name]"
@@ -25,6 +37,7 @@
 - DONE: get home folder linking working
 
 # beta
+- allow specifing binary names from particular packages
 - Documentation
     - Basics
         - When is virkshop NOT a good idea?
@@ -32,6 +45,8 @@
         - How do I make my own virkshop?
         - How can I customize a virkshop?
             1. Adding a command
+                - always edit the `mixins/`
+                - always debug the `mixture/`
             2. Adding a system tool
             3. Adding an env var
             4. 
@@ -39,7 +54,6 @@
     - Advanced
         - How to add a custom nix expression
         - Making your own mixin
-- allow specifing binary names from particular packages
 - add back TLDR cache linking
 - make linking nix cache controllable through options.json
 - virkshop update (wrapper around git mixin)
