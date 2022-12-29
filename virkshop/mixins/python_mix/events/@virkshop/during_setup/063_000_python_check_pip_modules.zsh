@@ -38,7 +38,7 @@ then
         # 
         # create check file
         # 
-        __temp_var__location_of_hash="$PROJECT_FOLDER/settings/.cache/.$__temp_var__hash_check_name.cleanable.hash"
+        __temp_var__location_of_hash="$TMPDIR/short_term/.$__temp_var__hash_check_name.cleanable.hash"
         if ! [ -f "$__temp_var__location_of_hash" ]; then
             # make sure the folder exists
             mkdir -p "$(dirname "$__temp_var__location_of_hash")"
@@ -78,7 +78,7 @@ then
     __temp_var__file_to_watch="$PROJECT_FOLDER/requirements.txt"
     __temp_var__hash_check_name="pip_modules"
     failed_check_command () {
-        # what to do when node modules haven't been installed yet
+        # what to do when packages haven't been installed yet
         python -m pip --disable-pip-version-check install -r "$__temp_var__file_to_watch"
         # if successful
         if [ $? -eq 0 ] 
@@ -99,7 +99,7 @@ then
         # 
         # create check file
         # 
-        __temp_var__location_of_hash="$PROJECT_FOLDER/settings/.cache/.$__temp_var__hash_check_name.cleanable.hash"
+        __temp_var__location_of_hash="$TMPDIR/short_term/.$__temp_var__hash_check_name.cleanable.hash"
         if ! [ -f "$__temp_var__location_of_hash" ]; then
             # make sure the folder exists
             mkdir -p "$(dirname "$__temp_var__location_of_hash")"

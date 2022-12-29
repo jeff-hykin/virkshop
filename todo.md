@@ -26,8 +26,21 @@
 - DONE: get home folder linking working
 
 # beta
+- Documentation
+    - Basics
+        - When is virkshop NOT a good idea?
+        - How do I use someone's virkshop?
+        - How do I make my own virkshop?
+        - How can I customize a virkshop?
+            1. Adding a command
+            2. Adding a system tool
+            3. Adding an env var
+            4. 
+            5. Adding a mixin
+    - Advanced
+        - How to add a custom nix expression
+        - Making your own mixin
 - allow specifing binary names from particular packages
-- maybe have a mixture.yaml for things like the gitignore settings
 - add back TLDR cache linking
 - make linking nix cache controllable through options.json
 - virkshop update (wrapper around git mixin)

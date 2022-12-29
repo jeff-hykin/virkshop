@@ -668,7 +668,7 @@ export const createVirkshop = async (arg)=>{
                         })()),
 
                         // 
-                        // since phase2 created the mixture, connect parts of the mixture to the outside folder system
+                        // since phase1 created the mixture, connect parts of the mixture to the outside folder system
                         // 
                         ((async ()=>{
                             mixinPaths = mixinPaths || await FileSystem.listPathsIn(virkshop.pathTo.mixins)
@@ -874,7 +874,59 @@ export const createVirkshop = async (arg)=>{
                         )
                     }
                 }
-            }
+            },
+            // 
+            // TODO: createCachedCheck
+            // 
+            // const thisMixinPath
+            // const hash
+            // const Console
+            // const FileSystem
+            // let checksCache = null
+            // function createCachedCheck({nameOfCheck, inputString, callback}) {
+            //     // get cache if hasn't already been read
+            //     if (!checksCache) {
+            //         const checksPath = `${Console.env.TMPDIR}/short_term/@virkshop/checks.cleanable.json`
+            //         try {
+            //             checksCache = JSON.parse(await FileSystem.read(checksPath))
+            //             // needs to be a pure object
+            //             if ((checksCache instanceof Array) || !(checksCache instanceof Object)) {
+            //                 throw Error(``)
+            //             }
+            //         } catch (error) {
+            //             checksCache = {}
+            //             // purge corrupt files
+            //             await FileSystem.write({
+            //                 path: checksPath,
+            //                 data: "{}",
+            //             })
+            //         }
+            //     }
+            //     const address = `${thisMixinPath}/${nameOfCheck}`
+            // 
+            //     const shortPath = await FileSystem.makeRelativePath({
+            //         from: virkshop.pathTo.mixins,
+            //         to: thisMixinPath,
+            //     })
+            // 
+            //     const oldHash = checksCache[address]
+            //     const newHash = hash(inputString)
+            //     console.log(`[mixins/${shortPath}] Checking ${nameOfCheck}`)
+            //     if (oldHash == newHash) {
+            //         console.log(`[mixins/${shortPath}] Found cache for ${nameOfCheck}, skipping`)
+            //     } else {
+            //         try {
+            //             await callback
+            //             checksCache[address] = newHash
+            //             await FileSystem.write({
+            //                 data: JSON.stringify(checksCache),
+            //                 path: checksPath,
+            //             })
+            //         } catch (error) {
+            //             console.warn(`[mixins/${shortPath}] Operation Failed ${nameOfCheck}, skipping`)
+            //         }
+            //     }
+            // }
         },
         {
             folder:      { get() { return virkshop.pathTo.virkshop } }, // alias
