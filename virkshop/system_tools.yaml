@@ -525,3 +525,11 @@
 - (package):
     asBuildInput: true
     load: [ "libffi",]
+
+
+# 
+# Node.js and Npm
+# 
+- (package):
+    asBuildInput: true
+    load: [ "nodejs",]

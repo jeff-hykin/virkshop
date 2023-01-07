@@ -1,0 +1,1 @@
+../../../../python_mix/events/@virkshop/during_setup/053_000_python_setup_venv copy.zsh

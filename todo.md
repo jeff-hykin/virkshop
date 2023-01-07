@@ -3,6 +3,7 @@
 - try getting super_map to work with virkshop
 - create branches like `pure` `standard`
 
+- scan and clear out dead links
 - reconsider what can be modular and what cant
     - consider making system_tools be @project/system_tools, and concating all the files
         => kind of a problem with variable namespacing

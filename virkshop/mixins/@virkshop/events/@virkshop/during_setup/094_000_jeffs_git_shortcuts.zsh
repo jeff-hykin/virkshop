@@ -1,0 +1,1 @@
+../../../../@project/events/@virkshop/during_setup/094_000_jeffs_git_shortcuts.zsh

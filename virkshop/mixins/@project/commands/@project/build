@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+cd main; npx quasar build -m electron "$@"
