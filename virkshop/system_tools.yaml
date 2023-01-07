@@ -533,3 +533,36 @@
 - (package):
     asBuildInput: true
     load: [ "nodejs",]
+
+# 
+# Android studio
+# 
+- (package):
+    asBuildInput: true
+    load: !!nix |
+        # adapted from: https://github.com/tadfisher/android-nixpkgs/tree/ba9f9902efbdcb11b914e323a707cfb04b07f7ce
+        let
+            # android-nixpkgs = (defaultWarehouse.callPackage 
+            #     (builtins.import 
+            #         (builtins.fetchTarball
+            #             ({url="https://github.com/tadfisher/android-nixpkgs/archive/ba9f9902efbdcb11b914e323a707cfb04b07f7ce.tar.gz";})
+            #         )
+            #         ({})
+            #     )
+            #     # Default; can also choose "beta", "preview", or "canary".
+            #     { channel = "stable"; }
+            # );
+            android-nixpkgs = defaultWarehouse.callPackage (import (builtins.fetchGit {
+                url = "https://github.com/tadfisher/android-nixpkgs.git";
+            })) {
+                # Default; can also choose "beta", "preview", or "canary".
+                channel = "stable";
+            };
+        in
+            android-nixpkgs.sdk (sdkPkgs: with sdkPkgs; [
+                cmdline-tools-latest
+                build-tools-32-0-0
+                platform-tools
+                platforms-android-31
+                emulator
+            ])
