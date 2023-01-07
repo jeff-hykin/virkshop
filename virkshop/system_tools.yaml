@@ -535,8 +535,19 @@
     load: [ "nodejs",]
 
 # 
+# Java (for android/gradle)
+# 
+- (package):
+    asBuildInput: true
+    load: [ "jdk11",]
+
+# 
 # Android studio
 # 
+- (package):
+    asBuildInput: true
+    load: [ "gradle",]
+
 - (package):
     asBuildInput: true
     load: !!nix |
@@ -561,8 +572,12 @@
         in
             android-nixpkgs.sdk (sdkPkgs: with sdkPkgs; [
                 cmdline-tools-latest
-                build-tools-32-0-0
+                # build-tools-32-0-0
+                build-tools-30-0-3
                 platform-tools
-                platforms-android-31
+                # platforms-android-31
+                platforms-android-30
                 emulator
             ])
+    # avdmanager create avd --force --name Pixel6 --abi google_apis/x86_64 --package 'system-images;android-30;google_apis;x86_64' --device "Pixel 6"
+    

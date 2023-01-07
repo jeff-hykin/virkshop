@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/jeff-hykin/virkshop#readme",
   "dependencies": {
-    "@quasar/cli": "^1.4.0"
+    "@quasar/cli": "^1.4.0",
+    "cordova": "^11.0.0"
   }
 }
