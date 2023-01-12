@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-
-# FIXME: use deno here because of recursion and symlinks

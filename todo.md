@@ -1,39 +1,49 @@
 # pre-alpha:
-- try getting super_map to work with virkshop
-- create branches like `pure` `standard`
+- add support for
+    - `@append .zshrc`
+    - `@prepend .zshrc`
+    - `@overwrite .zshrc`
+    - `@make .zshrc`
+    - `@copy_real .zshrc`
+    - `@link_real .zshrc`
 
-- reconsider what can be modular and what cant
-    - the system is becoming too complicated for regular people to quickly understand
-        1. Maybe get rid of the Mixins idea, just have one mixture and make `virkshop mixin` be a custom program
-            - this would also solve the lots-of-commits problem
-            - but would make updating/upgrading a mixin nearly impossible
-        2. Have home utilize a few things
-            - `@append .zshrc`
-            - `@prepend .zshrc`
-            - `@overwrite .zshrc`
-            - `@make .zshrc`
-            - `@copy_real .zshrc`
-            - `@link_real .zshrc`
-    - consider making system_tools be @project/system_tools, and concating all the files
-        => kind of a problem with variable namespacing
-        consider the user experiance with the worst namespacing problem
-        Right now there are three ideas:
-        - a globally editable file, such as .gitignore
-        - a source, such as a python command, that gets included in an auto-generated file/folder
-        - a mixin event that sets up a mixture
-    - maybe make the behavior of the system.yaml more generic
-        - have a pattern like @append.000_000.gitignore to combine it into another git ignore
-        - have an @overwite.gitignore
-        - what about creating a .git/
-    - how to handle interal dependencies, like expecting a .git
-    - consider making the mix command more advanced. "mix" could be when:
-        - mixins copy their default settings into @project
-        - add things to system_tools
-        - mixins initialize git ignores
-        - mixins initialize hooks
-        - HOWEVER this removes the "delete the folder and its uninstalled" feature
-            - but this^ cant really work for gitignores (except maybe through: https://stackoverflow.com/questions/7005142/can-i-include-other-gitignore-file-in-a-gitignore-file-like-include-in-c-li)
-- add !load_yaml_file or !insert
+- consider worst-case confusing scenarios, or conflicts caused by gitignore fighting with `commands/` or `home/`
+- create CLI option for 
+    - saving ENV vars (permanently)
+    - adding to path (permanently)
+
+- add `virkshop mixin` with support for an `@upon_mixing` event
+    - create a `skeleton` branch, no injections, git, node, or python
+    - create a `git` mixin
+        - ensures a git instance is initialized
+        - @copy_real .gitconfig
+        - adds gitignore with standard ignores (OS ignores and .ignore/.private)
+        - git hook events
+        - @link_real ssh
+        - ask about setting up a 50mb/100mb commit warning
+        - subrepo command
+        - eventually add a folder-sync option (list all folders, use `git check-ignore`)
+    - create a `standard` branch
+        - add `clean` and `purge` commands
+        - inject basics like `sudo`
+        - all the basic CLI helpers (`btm`, `tldr`, etc)
+        - @link_real ssh
+    - create a `python`
+        - pip command
+        - autoinit venv
+        - adds to gitignore
+        - adds clean and purge hooks
+        - install modules (requirements.txt, pypoetry.toml, maybe also run any `setup.py`)
+        - hash check for if python-venv version changed (and purge/reinstall upon python version change)
+        - git hooks that check if dependencies change upon pull/checkout
+        - eventually make venv and interactive upon_mixing question
+    - create a `nodejs`
+        - adds to gitignore
+        - adds npm-init
+        - adds startup module install check
+        - hash check for if node/npm version changed (and purge/reinstall upon node/npm version change)
+
+- DONE: try getting super_map to work with virkshop
 - DONE: remove relative paths to virkshop.js, use URL instead, maybe have a walk-up importer from URL and everything else local
 - DONE: create method for removing relative paths to virkshop.js
 - DONE: cli "virkshop/install [package name]"
@@ -57,6 +67,7 @@
 
 # beta
 - allow specifing binary names from particular packages
+- create an ENV-diff command for "it works on my machine" scenarios
 - Documentation
     - Basics
         - When is virkshop NOT a good idea?
@@ -87,6 +98,7 @@
 - handle env vars from computed values
 
 # delta
+- use WASM git inside of deno
 - tutorializer
 - nix-based if statements
 - generic nix variables
