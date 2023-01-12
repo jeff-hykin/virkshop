@@ -1,8 +1,6 @@
 virkshop:
     projectLinks:
-        "$PROJECT_FOLDER/commands":      "$VIRKSHOP_FOLDER/@project/commands"
-        "$PROJECT_FOLDER/documentation": "$VIRKSHOP_FOLDER/mixture/documentation"
-        "$PROJECT_FOLDER/events":        "$VIRKSHOP_FOLDER/mixture/events"
-        "$PROJECT_FOLDER/settings":      "$VIRKSHOP_FOLDER/mixture/settings"
+        "$PROJECT_FOLDER/commands":      "$VIRKSHOP_FOLDER/commands"
+        "$PROJECT_FOLDER/events":        "$VIRKSHOP_FOLDER/events"
     
     debuggingLevel: 1

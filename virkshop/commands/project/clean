@@ -1,0 +1,6 @@
+#!/usr/bin/env -S deno run --allow-all
+import { FileSystem } from "https://deno.land/x/quickr@0.6.13/main/file_system.js"
+// import { Console } from "https://deno.land/x/quickr@0.6.13/main/console.js"
+const { virkshop } = await FileSystem.walkUpImport("virkshop/@core/virkshop.js")
+
+await virkshop.trigger(`project/clean`) // run all the files inside virkshop/events/project/clean

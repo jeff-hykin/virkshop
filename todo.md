@@ -1,12 +1,31 @@
-
 # pre-alpha:
 - try getting super_map to work with virkshop
 - create branches like `pure` `standard`
 
 - reconsider what can be modular and what cant
+    - the system is becoming too complicated for regular people to quickly understand
+        1. Maybe get rid of the Mixins idea, just have one mixture and make `virkshop mixin` be a custom program
+            - this would also solve the lots-of-commits problem
+            - but would make updating/upgrading a mixin nearly impossible
+        2. Have home utilize a few things
+            - `@append .zshrc`
+            - `@prepend .zshrc`
+            - `@overwrite .zshrc`
+            - `@make .zshrc`
+            - `@copy_real .zshrc`
+            - `@link_real .zshrc`
     - consider making system_tools be @project/system_tools, and concating all the files
         => kind of a problem with variable namespacing
         consider the user experiance with the worst namespacing problem
+        Right now there are three ideas:
+        - a globally editable file, such as .gitignore
+        - a source, such as a python command, that gets included in an auto-generated file/folder
+        - a mixin event that sets up a mixture
+    - maybe make the behavior of the system.yaml more generic
+        - have a pattern like @append.000_000.gitignore to combine it into another git ignore
+        - have an @overwite.gitignore
+        - what about creating a .git/
+    - how to handle interal dependencies, like expecting a .git
     - consider making the mix command more advanced. "mix" could be when:
         - mixins copy their default settings into @project
         - add things to system_tools
