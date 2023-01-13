@@ -236,7 +236,7 @@ export const createVirkshop = async (arg)=>{
                 // 
                 // 
                 async phase1() {
-                    debuggingLevel && console.log("[Phase1: Pre-system-tools Work]")
+                    debuggingLevel && console.log("[Phase1: Starting before-system-tools work]")
 
                     // 
                     // make all the numbers correct
@@ -587,7 +587,7 @@ export const createVirkshop = async (arg)=>{
                     
                     var duration = (new Date()).getTime() - startTime; var startTime = (new Date()).getTime()
                     debuggingLevel && console.log(`    [${duration}ms on beforeEnteringVirkshop]`)
-                    debuggingLevel && console.log(`[Phase2: Using-system-tools Work] note: this step can take a while`)
+                    debuggingLevel && console.log(`[Phase2: Starting the with-system-tools work] note: this step can take a while`)
                     
                     // 
                     // run nix-shell
