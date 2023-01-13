@@ -1,12 +1,5 @@
 # pre-alpha:
-- add support for
-    - `@append .zshrc`
-    - `@prepend .zshrc`
-    - `@overwrite .zshrc`
-    - `@make .zshrc`
-    - `@copy_real .zshrc`
-    - `@link_real .zshrc`
-
+- clean up master branch
 - consider worst-case confusing scenarios, or conflicts caused by gitignore fighting with `commands/` or `home/`
 - create CLI option for 
     - saving ENV vars (permanently)
@@ -42,6 +35,14 @@
         - adds npm-init
         - adds startup module install check
         - hash check for if node/npm version changed (and purge/reinstall upon node/npm version change)
+
+- DONE: add support for
+    - `@append .zshrc`
+    - `@prepend .zshrc`
+    - `@overwrite .zshrc`
+    - `@make .zshrc`
+    - `@copy_real .zshrc`
+    - `@link_real .zshrc`
 
 - DONE: try getting super_map to work with virkshop
 - DONE: remove relative paths to virkshop.js, use URL instead, maybe have a walk-up importer from URL and everything else local

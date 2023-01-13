@@ -85,6 +85,7 @@ export const createVirkshop = async (arg)=>{
                     commands:         { get() { return `${virkshop.pathTo.virkshop}/commands` }},
                     settings:         { get() { return `${virkshop.pathTo.virkshop}/settings` }},
                     temporary:        { get() { return `${virkshop.pathTo.virkshop}/temporary.ignore` }},
+                    homeMixin:        { get() { return `${virkshop.pathTo.virkshop}/home` }},
                     fakeHome:         { get() { return `${virkshop.pathTo.temporary}/long_term/home` }},
                     virkshopOptions:  { get() { return `${virkshop.pathTo.virkshop}/settings.yaml` }},
                     systemTools:      { get() { return `${virkshop.pathTo.virkshop}/system_tools.yaml` }},
@@ -236,7 +237,7 @@ export const createVirkshop = async (arg)=>{
                 // 
                 // 
                 async phase1() {
-                    debuggingLevel && console.log("[Phase1: Mixins Setup]")
+                    debuggingLevel && console.log("[Phase1: Pre-system-tools Work]")
 
                     // 
                     // make all the numbers correct
@@ -286,13 +287,13 @@ export const createVirkshop = async (arg)=>{
                                 }
                             }
                             const duration = (new Date()).getTime() - startTime
-                            debuggingLevel && console.log(`     [${duration}ms: ${eventName}]`)
+                            debuggingLevel && console.log(`    [${duration}ms: ${eventName}]`)
                         }
                     )
                     virkshop._internal.deadlines.beforeSetup.push(selfSetupPromise)
 
                     // 
-                    // kick-off work for phase2 so that it runs ASAP
+                    // kick-off work for steps below so that it runs ASAP
                     // 
                     virkshop._internal.deadlines.beforeShellScripts.push(selfSetupPromise.then(async ()=>{
                         // read the the before_login files as soon as possible
@@ -326,30 +327,11 @@ export const createVirkshop = async (arg)=>{
                     await Promise.all(virkshop._internal.deadlines.beforeSetup)
 
                     // 
-                    // start linking home together right after
-                    // 
-                        // FIXME: handle all of the following:
-                            // - `@append .zshrc`
-                            // - `@prepend .zshrc`
-                            // - `@overwrite .zshrc`
-                            // - `@make .zshrc`
-                            // - `@copy_real .zshrc`
-                            // - `@link_real .zshrc`
-                },
-                // 
-                // 
-                // phase 2 "cooking": enters the virkshop, and runs zsh login scripts
-                // 
-                // 
-                async phase2() {
-                    // 
                     // the three operations below can be done in any order, which is why they're in this Promise.all
                     // 
-                    debuggingLevel && console.log("[Phase2: Nix+Zsh Setup]")
                     var startTime = (new Date()).getTime()
                     var defaultWarehouse
                     await Promise.all([
-
                         // 
                         // parse the systemTools file
                         // 
@@ -370,72 +352,223 @@ export const createVirkshop = async (arg)=>{
                         })()),
                         
                         // 
-                        // create the zshrc file
+                        // create the new home folder
                         // 
                         ((async ()=>{
-                            let shellProfileString = shellApi.shellProfileString
+                            
+                            const fileConnectionOperations = {
+                                ignore: async ({homePathTarget, item})=>{},
+                                append: async ({homePathTarget, item})=>{
+                                    if (item.isFolder) {
+                                        console.warn(`    [warning]: ${item} is a folder (cannot @append it)`)
+                                    } else {
+                                        // Should use a proper locking append operation, but currently (Jan 2023) FileSystem.append is not actually appending
+                                        await FileSystem.write({
+                                            path: homePathTarget,
+                                            data: `${await FileSystem.read(homePathTarget) || ""}\n${await FileSystem.read(item.path)}`,
+                                        })
+                                    }
+                                },
+                                prepend: async ({homePathTarget, item})=>{
+                                    if (item.isFolder) {
+                                        console.warn(`    [warning]: ${item} is a folder (cannot @append it)`)
+                                    } else {
+                                        await FileSystem.write({
+                                            path: homePathTarget,
+                                            data: `${await FileSystem.read(item.path)}\n${(await FileSystem.read(homePathTarget)||"")}`,
+                                        })
+                                    }
+                                },
+                                overwrite: async ({homePathTarget, item})=>{
+                                    if (item.isFolder) {
+                                        await FileSystem.relativeLink({
+                                            existingItem: item,
+                                            newItem: homePathTarget,
+                                            force: true,
+                                            overwrite:true
+                                        })
+                                    } else {
+                                        await FileSystem.write({
+                                            path: homePathTarget,
+                                            data: await FileSystem.read(item.path),
+                                        })
+                                    }
+                                },
+                                make: async ({homePathTarget, item})=>{
+                                    if (item.isFolder) {
+                                        await FileSystem.ensureIsFolder(homePathTarget)
+                                    } else {
+                                        // make executable
+                                        await FileSystem.addPermissions({ path: item.path, permissions: { owner: {canExecute: true} }})
+                                        // run the executable, and use the output as a file
+                                        await FileSystem.write({
+                                            path: homePathTarget,
+                                            data: await run`${item.path} ${Stdout(returnAsString)}`,
+                                        })
+                                    }
+                                },
+                                copy_real: async ({homePathTarget, item})=>{
+                                    const targetItem = await FileSystem.info(homePathTarget)
+                                    // only copy once
+                                    if (!targetItem.exists) {
+                                        const relativeHomePath = FileSystem.makeRelativePath({ from: virkshop.pathTo.fakeHome, to: homePathTarget })
+                                        const realHomePath = `${virkshop.pathTo.realHome}/${relativeHomePath}`
+                                        const realHomeItem = await FileSystem.info(realHomePath)
+                                        if (!realHomeItem.exists) {
+                                            if (item.isFolder) {
+                                                await FileSystem.ensureIsFolder(realHomeItem.path)
+                                            } else {
+                                                await FileSystem.ensureIsFile(realHomeItem.path)
+                                            }
+                                        }
+                                        
+                                        await FileSystem.copy({
+                                            from: realHomePath,
+                                            to: homePathTarget,
+                                        })
+                                    }
+                                },
+                                link_real: async ({homePathTarget, item})=>{
+                                    const targetItem = await FileSystem.info(homePathTarget)
+                                    // only link once
+                                    if (!targetItem.isSymlink) {
+                                        const relativeHomePath = FileSystem.makeRelativePath({ from: virkshop.pathTo.fakeHome, to: homePathTarget })
+                                        const realHomePath = `${virkshop.pathTo.realHome}/${relativeHomePath}`
+                                        const realHomeItem = await FileSystem.info(realHomePath)
+                                        if (!realHomeItem.exists) {
+                                            if (item.isFolder) {
+                                                await FileSystem.ensureIsFolder(realHomeItem.path)
+                                            } else {
+                                                await FileSystem.ensureIsFile(realHomeItem.path)
+                                            }
+                                        }
+                                        
+                                        await FileSystem.absoluteLink({
+                                            existingItem: realHomePath,
+                                            newItem: homePathTarget,
+                                        })
+                                    }
+                                },
+                            }
+                            const operationSchedule = Object.fromEntries(Object.keys(fileConnectionOperations).map(each=>[each, []]))
+                            const possibleNames = Object.keys(fileConnectionOperations).map(each=>`@${each}`)
+                            await Promise.all(
+                                (await FileSystem.listItemsIn(virkshop.pathTo.homeMixin, { recursively: true})).map(async (eachItem)=>{
+                                    const theBasename = FileSystem.basename(eachItem.path)
+                                    const relativePath = FileSystem.makeRelativePath({ from: virkshop.pathTo.homeMixin, to: eachItem.path, })
+                                    const homePathTarget = `${virkshop.pathTo.fakeHome}/${FileSystem.parentPath(relativePath)}/${theBasename.replace(/^@[^ ]+ /, "")}`
+                                    
+                                    // if it doesnt start with a command, then we have a problem
+                                    if (!possibleNames.some(each=>theBasename.startsWith(`${each} `))) {
+                                        if (!eachItem.isFolder) {
+                                            console.warn(`    [warning]: ${eachItem.path} should start with one of: ${possibleNames.join(",")} followed by a space`)
+                                        } else {
+                                            let isEmpty = true
+                                            for await (const each of FileSystem.iteratePathsIn(eachItem)) {
+                                                isEmpty = false
+                                                break
+                                            }
+                                            if (isEmpty) {
+                                                console.warn(`    [warning]: ${eachItem.path} should either contain something that starts with one of:`)
+                                                console.warn(`               ${possibleNames.join(",")}`)
+                                                console.warn(`               or the item itself should start with one of those`)
+                                                console.warn(`    [continuing despite warning]`)
+                                            }
+                                            // if not empty, then do nothing because we will end up checking the children on another iteration
+                                        }
+                                    } else {
+                                        const operation = theBasename.match(/^@([^ ]+) /)[1]
+                                        operationSchedule[operation].push({
+                                            operation,
+                                            homePathTarget,
+                                            item: eachItem,
+                                        })
+                                    }
+                                })
+                            )
+                            
+                            // clear out the things that must be recreated
+                            await Promise.all([
+                                ...operationSchedule.append.map(({ homePathTarget })=>FileSystem.remove(homePathTarget)),
+                                ...operationSchedule.prepend.map(({ homePathTarget })=>FileSystem.remove(homePathTarget)),
+                            ])
                             
                             // 
-                            // add project commands
+                            //  create the shell file
                             // 
-                            shellProfileString += `
-                                #
-                                # inject project's virkshop commands
-                                #
-                                export PATH='${shellApi.escapeShellArgument(virkshop.pathTo.commands)}:'"$PATH"
-                            `.replace(/\n */g,"\n")
+                                let shellProfileString = shellApi.shellProfileString
+                                
+                                // 
+                                // add project commands
+                                // 
+                                shellProfileString += `
+                                    #
+                                    # inject project's virkshop commands
+                                    #
+                                    export PATH='${shellApi.escapeShellArgument(virkshop.pathTo.commands)}:'"$PATH"
+                                `.replace(/\n */g,"\n")
 
-                            // 
-                            // add during_setup scripts
-                            // 
-                            await Promise.all(virkshop._internal.deadlines.beforeShellScripts)
-                            virkshop._internal.sortPrioitiesByPath(virkshop._internal.shellSetupPriorities , ([eachSource, ...otherData])=>eachSource)
-                            for (const [eachSource, eachContent] of virkshop._internal.shellSetupPriorities) {
-                                // TODO: add a debugging echo here if debuggingLevel
-                                shellProfileString += `\n#\n# ${eachSource}\n#\n${eachContent}\n`
-                            }
-                            
-                            // 
-                            // add project commands again
-                            // 
-                            shellProfileString += `
-                                #
-                                # inject project's virkshop commands
-                                #
-                                ${shellApi.generatePrependToPathString(virkshop.pathTo.commands)}
-                            `.replace(/\n */g,"\n")
-                            // 
-                            // make folders work as recursive commands
-                            // 
-                            for (const eachFolderPath of await FileSystem.listFolderPathsIn(virkshop.pathTo.commands)) {
-                                shellProfileString += shellApi.createHierarchicalCommandFor(eachFolderPath)
-                            }
-                            
-                            const autogeneratedPath = `${virkshop.pathTo.fakeHome}/${shellApi.autogeneratedProfile}`
-                            await FileSystem.info(shellApi.profilePath).then(async (itemInfo)=>{
-                                if (!itemInfo.exists) {
+                                // 
+                                // add @setup_after_system_tools scripts
+                                // 
+                                await Promise.all(virkshop._internal.deadlines.beforeShellScripts)
+                                virkshop._internal.sortPrioitiesByPath(virkshop._internal.shellSetupPriorities , ([eachSource, ...otherData])=>eachSource)
+                                for (const [eachSource, eachContent] of virkshop._internal.shellSetupPriorities) {
+                                    if (debuggingLevel) {
+                                        shellProfileString += `\necho '${shellApi.escapeShellArgument(`    [loading: ${FileSystem.basename(eachSource)}]`)}'`
+                                    }
+                                    shellProfileString += `\n#\n# ${eachSource}\n#\n${eachContent}\n`
+                                }
+                                
+                                // 
+                                // add project commands again
+                                // 
+                                shellProfileString += `
+                                    #
+                                    # inject project's virkshop commands
+                                    #
+                                    ${shellApi.generatePrependToPathString(virkshop.pathTo.commands)}
+                                `.replace(/\n */g,"\n")
+                                // 
+                                // make folders work as recursive commands
+                                // 
+                                for (const eachFolderPath of await FileSystem.listFolderPathsIn(virkshop.pathTo.commands)) {
+                                    shellProfileString += shellApi.createHierarchicalCommandFor(eachFolderPath)
+                                }
+                                
+                                const autogeneratedPath = `${virkshop.pathTo.fakeHome}/${shellApi.autogeneratedProfile}`
+                                await FileSystem.info(shellApi.profilePath).then(async (itemInfo)=>{
                                     await FileSystem.write({
                                         path: shellApi.profilePath,
                                         data: `
                                             . './${shellApi.escapeShellArgument(shellApi.autogeneratedProfile)}'
                                         `.replace(/\n                                            /g, "\n"),
                                     })
-                                }
-                            })
+                                })
 
-                            shellProfileString += virkshop._internal.finalShellCode
+                                shellProfileString += virkshop._internal.finalShellCode
+                                
+                                // write the new shell profile
+                                await FileSystem.write({
+                                    path: autogeneratedPath,
+                                    data: shellProfileString,
+                                    force: true,
+                                    overwrite: true,
+                                })
                             
-                            // write the new shell profile
-                            await FileSystem.write({
-                                path: autogeneratedPath,
-                                data: shellProfileString,
-                                force: true,
-                                overwrite: true,
-                            })
+                            // 
+                            // finally run/check every operation, by operation group
+                            // 
+                            for (const [operation, scheduledCalls] of Object.entries(operationSchedule)) {
+                                await Promise.all(scheduledCalls.map(
+                                    argument=>fileConnectionOperations[operation](argument)
+                                ))
+                            }
+
                         })()),
                     ])
                     var duration = (new Date()).getTime() - startTime; var startTime = (new Date()).getTime()
-                    debuggingLevel && console.log(`     [${duration}ms creating shell profile and shell.nix]`)
+                    debuggingLevel && console.log(`    [${duration}ms creating shell profile and shell.nix]`)
                     
                     // 
                     // finish dynamic setup
@@ -454,8 +587,8 @@ export const createVirkshop = async (arg)=>{
                     await Promise.all(permissionPromises)
                     
                     var duration = (new Date()).getTime() - startTime; var startTime = (new Date()).getTime()
-                    debuggingLevel && console.log(`     [${duration}ms on beforeEnteringVirkshop]`)
-                    console.log(`     [starting nix-shell (note: this step can take a while)]`)
+                    debuggingLevel && console.log(`    [${duration}ms on beforeEnteringVirkshop]`)
+                    console.log(`[Phase2: Using-system-tools Work] note: this step can take a while`)
                     
                     // 
                     // run nix-shell
@@ -504,7 +637,6 @@ export const createVirkshop = async (arg)=>{
             async enter() {
                 await virkshop._stages.phase0() // phase 0: creates/discovers basic virkshop structure (establish linked files/folders, clean broken links)
                 await virkshop._stages.phase1() // phase 1: runs setup_before_system_tools
-                await virkshop._stages.phase2() // phase 2: enters the virkshop, and runs zsh scripts
             },
             async trigger(eventPath) {
                 const alreadExecuted = new Set()
@@ -669,7 +801,7 @@ export const shellApi = Object.defineProperties(
             
             if [ -n "$VIRKSHOP_DEBUG" ]
             then
-                deno eval 'console.log(\`     [\${(new Date()).getTime()-Deno.env.get("_shell_start_time")}ms nix-shell]\`)'
+                deno eval 'console.log(\`    [\${(new Date()).getTime()-Deno.env.get("_shell_start_time")}ms nix-shell]\`)'
             fi
             unset _shell_start_time
 

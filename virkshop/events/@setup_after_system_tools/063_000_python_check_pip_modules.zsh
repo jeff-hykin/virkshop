@@ -9,7 +9,7 @@ fi
 if [ -f "$PROJECT_FOLDER/pyproject.toml" ] && [ -n "$(command -v "poetry")" ]
 then
     # main inputs
-    __temp_var__command_name="python_mix/check_pip_modules"
+    __temp_var__command_name="check_pip_modules"
     __temp_var__file_to_watch="$PROJECT_FOLDER/pyproject.toml"
     __temp_var__hash_check_name="pip_poetry_modules"
     failed_check_command () {
@@ -22,18 +22,17 @@ then
         # if successful
         if [ $? -eq 0 ] 
         then
-            echo "[$__temp_var__command_name] Check finished (dependencies installed)"
+            echo "        [$__temp_var__command_name] Check finished (dependencies installed)"
             return 0
         # if failed
         else
-            echo "[$__temp_var__command_name] Check failed: issues with install"
+            echo "        [$__temp_var__command_name] Check failed: issues with install"
             return 1
         fi
     }
 
     # ensure that the source file and hash file exist
-    echo 
-    echo "[$__temp_var__command_name] Checking"
+    echo "        [$__temp_var__command_name] Checking"
     if [ -f "$__temp_var__file_to_watch" ]; then
         # 
         # create check file
@@ -54,14 +53,14 @@ then
         if [ "$__temp_var__old_hash" != "$__temp_var__new_hash" ]; then
             failed_check_command && echo "$__temp_var__new_hash" > "$__temp_var__location_of_hash"
         else
-            echo "[$__temp_var__command_name] Check Passed => assuming packages are installed"
+            echo "        [$__temp_var__command_name] Check Passed => assuming packages are installed"
         fi
         
         unset __temp_var__location_of_hash
         unset __temp_var__old_hash
         unset __temp_var__new_hash
     else
-        echo "[$__temp_var__command_name] Check Passed (but only because no dependency file was found)"
+        echo "        [$__temp_var__command_name] Check Passed (but only because no dependency file was found)"
     fi
     unset __temp_var__command_name
     unset __temp_var__file_to_watch
@@ -83,18 +82,17 @@ then
         # if successful
         if [ $? -eq 0 ] 
         then
-            echo "[$__temp_var__command_name] Check finished (dependencies installed)"
+            echo "        [$__temp_var__command_name] Check finished (dependencies installed)"
             return 0
         # if failed
         else
-            echo "[$__temp_var__command_name] Check failed: issues with install"
+            echo "        [$__temp_var__command_name] Check failed: issues with install"
             return 1
         fi
     }
 
     # ensure that the source file and hash file exist
-    echo 
-    echo "[$__temp_var__command_name] Checking"
+    echo "        [$__temp_var__command_name] Checking"
     if [ -f "$__temp_var__file_to_watch" ]; then
         # 
         # create check file
@@ -115,14 +113,14 @@ then
         if [ "$__temp_var__old_hash" != "$__temp_var__new_hash" ]; then
             failed_check_command && echo "$__temp_var__new_hash" > "$__temp_var__location_of_hash"
         else
-            echo "[$__temp_var__command_name] Check Passed => assuming packages are installed"
+            echo "        [$__temp_var__command_name] Check Passed => assuming packages are installed"
         fi
         
         unset __temp_var__location_of_hash
         unset __temp_var__old_hash
         unset __temp_var__new_hash
     else
-        echo "[$__temp_var__command_name] Check Passed (but only because no dependency file was found)"
+        echo "        [$__temp_var__command_name] Check Passed (but only because no dependency file was found)"
     fi
     unset __temp_var__command_name
     unset __temp_var__file_to_watch
