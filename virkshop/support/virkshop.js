@@ -301,12 +301,12 @@ export const createVirkshop = async (arg)=>{
                         const files = await FileSystem.listFilePathsIn(parentFolderString)
                         await Promise.all(files.map(async eachPath=>{
                             if (eachPath.match(/\.deno\.js$/)) {
-                                // puts things inside of virkshop._internal.deadlines
-                                await virkshop.importDeadlinesFrom({
-                                    path: eachPath,
-                                    source: eachPath.slice(parentFolderString.length),
-                                    eventName,
-                                })
+                                virkshop._internal.shellSetupPriorities.push(
+                                    [
+                                        eachPath.slice(parentFolderString.length),
+                                        `deno run -q -A '${shellApi.escapeShellArgument(eachPath)}'`,
+                                    ]
+                                )
                             } else if (eachPath.match(/\.zsh$/)) {
                                 virkshop._internal.shellSetupPriorities.push(
                                     [
