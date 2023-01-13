@@ -567,7 +567,7 @@ export const createVirkshop = async (arg)=>{
                         })()),
                     ])
                     var duration = (new Date()).getTime() - startTime; var startTime = (new Date()).getTime()
-                    debuggingLevel && console.log(`    [${duration}ms creating shell profile and shell.nix]`)
+                    debuggingLevel && console.log(`    [${duration}ms creating shell profile and shell.nix from system_tools.yaml]`)
                     
                     // 
                     // finish dynamic setup
@@ -586,7 +586,7 @@ export const createVirkshop = async (arg)=>{
                     await Promise.all(permissionPromises)
                     
                     var duration = (new Date()).getTime() - startTime; var startTime = (new Date()).getTime()
-                    debuggingLevel && console.log(`    [${duration}ms on beforeEnteringVirkshop]`)
+                    debuggingLevel && console.log(`    [${duration}ms waiting on beforeEnteringVirkshop]`)
                     debuggingLevel && console.log(`[Phase2: Starting the with-system-tools work] note: this step can take a while`)
                     
                     // 

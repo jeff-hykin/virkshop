@@ -6,76 +6,82 @@
 - (defaultWarehouse):
     saveAs: "defaultWarehouse"
     createWarehouseFrom:
-        tarFileUrl: &defaultWarehouseAnchor "https://github.com/NixOS/nixpkgs/archive/ce6aa13369b667ac2542593170993504932eb836.tar.gz"
+        tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/ce6aa13369b667ac2542593170993504932eb836.tar.gz"
     arguments:
-        config: &defaultWarehouseConfig
+        config:
             allowUnfree: true
             cudaSupport: true
-            permittedInsecurePackages: [ "openssl-1.0.2u" ]
+            # permittedInsecurePackages: [ "openssl-1.0.2u" ]
 
-- (warehouse):
-    saveAs: "warehouseWithTorch_1_8_1"
-    createWarehouseFrom: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/141439f6f11537ee349a58aaf97a5a5fc072365c.tar.gz" }
-    arguments:
-        config: {}
+# Examples of extra warehouses:
+
+# - (warehouse):
+#     saveAs: "warehouseWithTorch_1_8_1"
+#     createWarehouseFrom: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/141439f6f11537ee349a58aaf97a5a5fc072365c.tar.gz" }
+#     arguments:
+#         config: {}
     
-- (warehouse):
-    saveAs: "warehouseWithNcclCudaToolkit_11_2"
-    createWarehouseFrom: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/2cdd608fab0af07647da29634627a42852a8c97f.tar.gz" }
-    arguments:
-        config: {}
+# - (warehouse):
+#     saveAs: "warehouseWithNcclCudaToolkit_11_2"
+#     createWarehouseFrom: { tarFileUrl: "https://github.com/NixOS/nixpkgs/archive/2cdd608fab0af07647da29634627a42852a8c97f.tar.gz" }
+#     arguments:
+#         config: {}
         
-- (warehouse):
-    saveAs: "warehouseForNetworking"
-    createWarehouseFrom: { nixCommitHash: "c00039f697caa02208a01e7712bfe11c484cceca" }
-    arguments:
-        config: {}
+# - (warehouse):
+#     saveAs: "warehouseForNetworking"
+#     createWarehouseFrom: { nixCommitHash: "c00039f697caa02208a01e7712bfe11c484cceca" }
+#     arguments:
+#         config: {}
 
 
 # 
 # 
-# compute values
+# compute values (which are then used for hardware-specific packages)
 # 
 #
 
-# # example1: using command line 
+# # example1.1: using command line, the stdout of the command is parsed as a JSON value before being put into a variable
 # - (compute):
 #     runCommand: [ "python", "-c", "from sys import platform;import json;print(json.dumps(platform == 'darwin'))" ]
 #     withPackages: [ "python" ]
 #     fromWarehouse: !!warehouse defaultWarehouse
 #     saveAs: isMac
 
-# example1: using javascript (deno)
-- (compute): # approach is about 1000ms faster than the cli-approach above because the deno runtime is already instantiated (the deno runtime is parsing this file)
-    value: !!deno Deno.build.os == 'darwin'
-    saveAs: isMac
+# # example2: same outcome as example1, but using javascript (deno)
+# #           this approach is about 1000ms faster than the cli-approach above because 
+# #           the deno runtime is already instantiated (the deno runtime is parsing this file)
+# - (compute): 
+#     value: !!deno " Deno.build.os == 'darwin' "
+#     saveAs: isMac
 
-# isLinux
-- (compute):
-    value: !!deno Deno.build.os == 'linux'
-    saveAs: isLinux
+# # example3: create an isLinux variable
+# - (compute):
+#     saveAs: isLinux
+#     value: !!deno |
+#         Deno.build.os == 'linux'
 
-# available/magic tags:
-    # !!deno
-    # !!as_absolute_path
-    # !!nix
-    # !!computed
-    # !!package
-    # !!warehouse
+# available tags:
+    # !!warehouse               # marks a string as a name of a warehouse (ex: from: !!warehouse "defaultWarehose" )
+    # !!computed                # marks a string as a name of a computed value (ex: onlyIf: !!computed "isMac" )
+    # !!package                 # marks a string as a name of a package value (ex: from: !!package "pythonPackages" )
+    # !!deno                    # a string that will be evaluated in a deno runtime and replaced with the output
+    # !!as_absolute_path        # useful for PATH, PYTHONPATH, and the like: converts a path (relative to this file) into a string that is an absolute-path
+    # !!nix                     # system_tools.yaml is converted to a shell.nix file, this tag indicates that a string to be transfered directly/literally to that file
 
 # 
 # 
 # env vars
 # 
 # 
-- (environmentVariable):
-    var: HOWDY
-    overwriteAs: "Howdy"
 
-- (environmentVariable):
-    var: PATH
-    prepend: !!as_absolute_path "./mixture/commands"
-    joinUsing: ":"
+# - (environmentVariable):
+#     var: HOWDY
+#     overwriteAs: "Howdy"
+
+# - (environmentVariable):
+#     var: PATH
+#     prepend: !!as_absolute_path "./mixture/commands"
+#     joinUsing: ":"
 
 # 
 # 
@@ -85,389 +91,6 @@
 # 
 # 
 
-# 
-# Linux
-# 
-- (package):
-    asBuildInput: true
-    load: [ "pkgconfig",]
-    asNativeBuildInput: true
-    onlyIf: !!computed isLinux
-
-- (package):
-    asBuildInput: true
-    load: [ "libconfig",]
-    asNativeBuildInput: true
-    onlyIf: !!computed isLinux
-
-- (package):
-    asBuildInput: true
-    load: [ "cmake",]
-    asNativeBuildInput: true
-    onlyIf: !!computed isLinux
-
-- (package):
-    asBuildInput: true
-    load: [ "stdenv", "cc",]
-    onlyIf: !!computed isLinux
-
-# 
-# Mac
-# 
-- (package):
-    asBuildInput: true
-    load: [ "xcbuild",]
-    asNativeBuildInput: true
-    onlyIf: !!computed isMac
-
-- (package):
-    asBuildInput: true
-    load: [ "xcodebuild",]
-    asNativeBuildInput: true
-    onlyIf: !!computed isMac
-
-- (package):
-    asBuildInput: true
-    load: [ "darwin", "libobjc", ]
-    asNativeBuildInput: true
-    onlyIf: !!computed isMac
-
-- (package):
-    asBuildInput: true
-    load: [ "darwin", "apple_sdk", "frameworks", "CoreServices" ]
-    asNativeBuildInput: true
-    onlyIf: !!computed isMac
-
-- (package):
-    asBuildInput: true
-    load: [ "darwin", "apple_sdk", "frameworks", "CoreFoundation" ]
-    asNativeBuildInput: true
-    onlyIf: !!computed isMac
-
-- (package):
-    asBuildInput: true
-    load: [ "darwin", "apple_sdk", "frameworks", "Foundation" ]
-    asNativeBuildInput: true
-    onlyIf: !!computed isMac
-
-- (package):
-    asBuildInput: true
-    load: [ "darwin", "apple_sdk", "frameworks", "AVKit" ]
-    asNativeBuildInput: true
-    onlyIf: !!computed isMac
-
-- (package):
-    asBuildInput: true
-    load: [ "darwin", "apple_sdk", "frameworks", "AVFoundation" ]
-    asNativeBuildInput: true
-    onlyIf: !!computed isMac
-
-- (package):
-    asBuildInput: true
-    load: [ "darwin", "apple_sdk", "frameworks", "AppKit" ]
-    asNativeBuildInput: true
-    onlyIf: !!computed isMac
-
-- (package):
-    asBuildInput: true
-    load: [ "darwin", "apple_sdk", "frameworks", "WebKit" ]
-    asNativeBuildInput: true
-    onlyIf: !!computed isMac
-
-- (package):
-    asBuildInput: true
-    load: [ "darwin", "apple_sdk", "frameworks", "Accounts" ]
-    asNativeBuildInput: true
-    onlyIf: !!computed isMac
-
-- (package):
-    asBuildInput: true
-    load: [ "darwin", "apple_sdk", "frameworks", "Security" ]
-    asNativeBuildInput: true
-    onlyIf: !!computed isMac
-
-# 
-# 
-# common dependencies
-# 
-# 
-- (package):
-    asBuildInput: true
-    load: [ "gcc",]
-
-- (package):
-    asBuildInput: true
-    load: [ "libkrb5",]
-
-- (package):
-    asBuildInput: true
-    load: [ "ncurses5",]
-
-- (package):
-    asBuildInput: true
-    load: [ "openssh",]
-
-# 
-# 
-# fancy command line tools
-# 
-# 
-- (package):
-    asBuildInput: true
-    load: [ "fd",]
-
-- (package):
-    asBuildInput: true
-    load: [ "sd",]
-
-- (package):
-    asBuildInput: true
-    load: [ "dua",]
-
-- (package):
-    asBuildInput: true
-    load: [ "tealdeer",]
-
-- (package):
-    asBuildInput: true
-    load: [ "bottom",]
-
-- (package):
-    asBuildInput: true
-    load: [ "exa",]
-
-- (package):
-    asBuildInput: true
-    load: [ "zsh",]
-    saveAs: zsh
-
-- (package):
-    asBuildInput: true
-    load: [ "zsh-syntax-highlighting",]
-    saveAs: zshSyntaxHighlighting
-
-- (package):
-    asBuildInput: true
-    load: [ "oh-my-zsh",]
-    saveAs: ohMyZsh
-
-- (package):
-    asBuildInput: true
-    load: [ "zsh-autosuggestions",]
-    saveAs: zshAutosuggestions
-
-- (package):
-    asBuildInput: true
-    load: [ "spaceship-prompt",]
-    saveAs: spaceshipPrompt
-
-- (package):
-    asBuildInput: true
-    load: [ "nnn",]
-
-- (package):
-    asBuildInput: true
-    load: [ "jq",]
-
-- (package):
-    asBuildInput: true
-    load: [ "git-subrepo",]
-
-#
-#
-# Basic Commandline tools
-#
-#
-- (package):
-    asBuildInput: true
-    load: [ "man",]
-
-- (package):
-    asBuildInput: true
-    load: [ "coreutils",]
-
-- (package):
-    asBuildInput: true
-    load: [ "ripgrep",]
-
-- (package):
-    asBuildInput: true
-    load: [ "which",]
-
-- (package):
-    asBuildInput: true
-    load: [ "git",]
-
-- (package):
-    asBuildInput: true
-    load: [ "colorls",]
-
-- (package):
-    asBuildInput: true
-    load: [ "tree",]
-
-- (package):
-    asBuildInput: true
-    load: [ "less",]
-
-- (package):
-    asBuildInput: true
-    load: [ "nano",]
-
-- (package):
-    asBuildInput: true
-    load: [ "unzip",]
-
-- (package):
-    asBuildInput: true
-    load: [ "zip",]
-
-- (package):
-    asBuildInput: true
-    load: [ "findutils",]
-
-- (package):
-    asBuildInput: true
-    load: [ "wget",]
-
-- (package):
-    asBuildInput: true
-    load: [ "curl",]
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "arp",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "ifconfig",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "netstat",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "ping",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "route",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "col",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "column",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "fdisk",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "fsck",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "getconf",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "getent",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "getopt",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "hexdump",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "hostname",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "killall",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "locale",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "more",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "mount",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "ps",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "quota",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "script",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "sysctl",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "top",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "umount",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "whereis",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "write",]
-    from: !!warehouse warehouseForNetworking
-
-- (package):
-    asBuildInput: true
-    load: [ "unixtools", "xxd",]
-    from: !!warehouse warehouseForNetworking
 
 # 
 # core
@@ -475,53 +98,254 @@
 - (package):
     asBuildInput: true
     load: [ "deno",]
-    from: "ce6aa13369b667ac2542593170993504932eb836"
+    from: "ce6aa13369b667ac2542593170993504932eb836" # a commit-hash of https://github.com/NixOS/nixpkgs, e.g. https://github.com/NixOS/nixpkgs/archive/ce6aa13369b667ac2542593170993504932eb836.tar.gz
 
 - (package):
     asBuildInput: true
     load: [ "nix",]
 
-# 
-# Python
-# 
-- (environmentVariable):
-    var: PYTHONPATH
-    prepend: !!as_absolute_path "."
-    joinUsing: ":"
-
-- (environmentVariable):
-    var: PYTHONPATH
-    prepend: !!as_absolute_path "./main"
-    joinUsing: ":"
-
 - (package):
     asBuildInput: true
-    load: [ "python38",]
+    load: [ "zsh",]
+    
+# # 
+# # example of including a linux-specific system package
+# # 
 
-- (package):
-    asBuildInput: true
-    load: [ "python38Packages", "setuptools",]
+# - (package):
+#     asBuildInput: true
+#     load: [ "pkgconfig",]
+#     asNativeBuildInput: true
+#     onlyIf: !!computed isLinux
 
-- (package):
-    asBuildInput: true
-    load: [ "python38Packages", "pip",]
+# - (package):
+#     asBuildInput: true
+#     load: [ "cmake",]
+#     asNativeBuildInput: true
+#     onlyIf: !!computed isLinux
 
-- (package):
-    asBuildInput: true
-    load: [ "python38Packages", "virtualenv",]
+# # 
+# # example of including a mac-specific system package
+# # 
 
-- (package):
-    asBuildInput: true
-    load: [ "python38Packages", "wheel",]
+# - (package):
+#     asBuildInput: true
+#     load: [ "xcbuild",]
+#     asNativeBuildInput: true
+#     onlyIf: !!computed isMac
 
-- (package):
-    asBuildInput: true
-    load: [ "cmake",]
+# - (package):
+#     asBuildInput: true
+#     load: [ "xcodebuild",]
+#     asNativeBuildInput: true
+#     onlyIf: !!computed isMac
 
-- (package):
-    asBuildInput: true
-    load: [ "pkg-config",]
+# - (package):
+#     asBuildInput: true
+#     load: [ "darwin", "libobjc", ]
+#     asNativeBuildInput: true
+#     onlyIf: !!computed isMac
 
-- (package):
-    asBuildInput: true
-    load: [ "libffi",]
+# - (package):
+#     asBuildInput: true
+#     load: [ "darwin", "apple_sdk", "frameworks", "CoreServices" ]
+#     asNativeBuildInput: true
+#     onlyIf: !!computed isMac
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "darwin", "apple_sdk", "frameworks", "CoreFoundation" ]
+#     asNativeBuildInput: true
+#     onlyIf: !!computed isMac
+
+
+#
+#
+# Some very basic commands you may want to comment in
+#
+#
+
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "which",]
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "curl",]
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "less",]
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "man",]
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "coreutils",]
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "findutils",]
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "wget",]
+    
+# - (package):
+#     asBuildInput: true
+#     load: [ "nano",]
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "zip",]
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unzip",]
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "git",]
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "colorls",]
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "ping",]
+#     from: !!warehouse warehouseForNetworking
+
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "ifconfig",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "netstat",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "arp",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "route",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "col",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "column",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "fdisk",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "fsck",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "getconf",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "getent",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "getopt",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "hexdump",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "hostname",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "killall",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "locale",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "more",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "mount",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "ps",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "quota",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "script",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "sysctl",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "top",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "umount",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "whereis",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "write",]
+#     from: !!warehouse warehouseForNetworking
+
+# - (package):
+#     asBuildInput: true
+#     load: [ "unixtools", "xxd",]
+#     from: !!warehouse warehouseForNetworking

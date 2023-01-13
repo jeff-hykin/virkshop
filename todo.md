@@ -1,12 +1,14 @@
 # pre-alpha:
 - clean up master branch
-- DONE: rename `@core` without the @
 - consider worst-case confusing scenarios, or conflicts caused by gitignore fighting with `commands/` or `home/`
 - create CLI option for 
     - saving ENV vars (permanently)
     - adding to path (permanently)
 
-- DONE: add `virkshop/mixin` with support for an `@upon_mixing` event
+- add support for custom nix-channels somehow, maybe using `!!nix` inside of custom warehouses, maybe using !!computed
+    - update documentation inside of system_tools.yaml
+- add onlyIf: !!nix support
+
 - create a `skeleton` branch, no injections, git, node, or python
 - create a `git` mixin
     - ensures a git instance is initialized
@@ -37,6 +39,8 @@
     - adds startup module install check
     - hash check for if node/npm version changed (and purge/reinstall upon node/npm version change)
 
+- DONE: rename `@core` without the @
+- DONE: add `virkshop/mixin` with support for an `@upon_mixing` event
 - DONE: add support for
     - `@append .zshrc`
     - `@prepend .zshrc`
