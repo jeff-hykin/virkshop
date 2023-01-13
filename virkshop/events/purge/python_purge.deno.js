@@ -1,6 +1,6 @@
 #!/usr/bin/env -S deno run --allow-all
 import { FileSystem } from "https://deno.land/x/quickr@0.6.13/main/file_system.js"
-const { virkshop } = await FileSystem.walkUpImport("virkshop/@core/virkshop")
+const { virkshop } = await FileSystem.walkUpImport("virkshop/support/virkshop")
 
 // FIXME: the commented out code below needs converting to deno
 // if [ -d "$FORNIX_FOLDER" ]
