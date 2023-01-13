@@ -77,7 +77,24 @@ import { parse } from "https://deno.land/std@0.171.0/flags/mod.ts"
     // search + install steps
     // 
     console.log(`... searching ${from||"defaultWarehouse"}, getting a response from nix can take a minute ...`)
-    const resultString =  await run('nix-env', '-qa', packageName, "--json", "-f", warehouseTarFileUrl, Stdout(returnAsString))
+    const currentPlatform = await run(
+        "nix",
+        "eval",
+        "--extra-experimental-features", "nix-command",
+        "--impure",
+        "--raw",
+        "--expr",
+        `
+            (builtins.import 
+                (builtins.fetchTarball
+                    ({url=${nix.escapeJsValue(warehouseTarFileUrl)};})
+                )
+                ({})
+            ).stdenv.system
+        `,
+        Stdout(returnAsString)
+    )
+    const resultString =  await run('nix-env', '-qa', packageName, "--json", "--system-filter", currentPlatform, "-f", warehouseTarFileUrl, Stdout(returnAsString))
     if (resultString) {
         const results = JSON.parse(resultString)
         const packageAttributeNames = Object.entries(results).map(([key, value])=>key.replace(/^nixpkgs\.(.+)/,"$1"))
