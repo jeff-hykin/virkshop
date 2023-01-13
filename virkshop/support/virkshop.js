@@ -211,7 +211,7 @@ export const createVirkshop = async (arg)=>{
                     // TODO: purge broken system links more
                     
                     // link virkshop folders up-and-out into the project folder
-                    await Promise.all(Object.entries(virkshop.options.projectLinks).map(async ([whereInProject, whereInVirkshop])=>{
+                    await Promise.all(Object.entries(virkshop.options.projectLinks||[]).map(async ([whereInProject, whereInVirkshop])=>{
                         // TODO: make $VIRKSHOP_FOLDER and $PROJECT_FOLDER required at the front
                         whereInProject = whereInProject.replace(/^\$PROJECT_FOLDER\//, "./")
                         whereInVirkshop = whereInVirkshop.replace(/^\$VIRKSHOP_FOLDER\//, "./")
@@ -587,7 +587,7 @@ export const createVirkshop = async (arg)=>{
                     
                     var duration = (new Date()).getTime() - startTime; var startTime = (new Date()).getTime()
                     debuggingLevel && console.log(`    [${duration}ms on beforeEnteringVirkshop]`)
-                    console.log(`[Phase2: Using-system-tools Work] note: this step can take a while`)
+                    debuggingLevel && console.log(`[Phase2: Using-system-tools Work] note: this step can take a while`)
                     
                     // 
                     // run nix-shell
@@ -798,8 +798,7 @@ export const shellApi = Object.defineProperties(
             DISABLE_AUTO_UPDATE="true"
             DISABLE_UPDATE_PROMPT="true"
             
-            if [ -n "$VIRKSHOP_DEBUG" ]
-            then
+            if ! [ "$VIRKSHOP_DEBUG" = "0" ]; then
                 deno eval 'console.log(\`    [\${(new Date()).getTime()-Deno.env.get("_shell_start_time")}ms nix-shell]\`)'
             fi
             unset _shell_start_time
