@@ -1,5 +1,6 @@
 # pre-alpha:
 - clean up master branch
+- rename `@core` without the @
 - consider worst-case confusing scenarios, or conflicts caused by gitignore fighting with `commands/` or `home/`
 - create CLI option for 
     - saving ENV vars (permanently)
