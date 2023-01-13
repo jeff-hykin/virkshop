@@ -12,6 +12,7 @@ import * as Path from "https://deno.land/std@0.128.0/path/mod.ts"
 import { zip } from "https://deno.land/x/good@0.7.7/array.js"
 import { virkshop, parsePackageTools } from "./support/virkshop.js"
 import { nix } from "./support/nix_tools.js"
+import { parse } from "https://deno.land/std@0.171.0/flags/mod.ts"
 
 // 
 // start some async ops
@@ -75,8 +76,8 @@ import { nix } from "./support/nix_tools.js"
     // 
     // search + install steps
     // 
-    console.log("... searching defaultWarehouse, waiting on response from nix ...")
-    const resultString =  await run('nix-env', '-qa', packageName, "--json", "-f", currentSystemTools.defaultWarehouse.createWarehouseFrom.tarFileUrl, Stdout(returnAsString))
+    console.log(`... searching ${from||"defaultWarehouse"}, getting a response from nix can take a minute ...`)
+    const resultString =  await run('nix-env', '-qa', packageName, "--json", "-f", warehouseTarFileUrl, Stdout(returnAsString))
     if (resultString) {
         const results = JSON.parse(resultString)
         const packageAttributeNames = Object.entries(results).map(([key, value])=>key.replace(/^nixpkgs\.(.+)/,"$1"))
@@ -101,9 +102,11 @@ import { nix } from "./support/nix_tools.js"
             })
             console.log(`Package successfully added to ${relativePathToSystemTools}`)
         } else {
-            console.log("Here are some similar names, re-run with one of them")
-            for (const [ attribute, commonName, version ] of zip(packageAttributeNames, packageCommonNames, packageVersions)) {
-                console.log(`    ${attribute} (commonName:${commonName}, version:${version})`)
+            console.log(`Here are some similar names, re-run with one of them (e.g. virkshop/install ${packageAttributeNames[0]})`)
+            const namePadding    = Math.max(...packageAttributeNames.map(each=>each.length))
+            const versionPadding = Math.max(...packageVersions.map(each=>`${each}`.length))
+            for (const [ attribute, commonlyCalled, version ] of zip(packageAttributeNames, packageCommonNames, packageVersions)) {
+                console.log(`    ${attribute.padEnd(namePadding)} (version:${version.padEnd(versionPadding)}, commonlyCalled:${commonlyCalled})`)
             }
         }
         Deno.exit(0)
