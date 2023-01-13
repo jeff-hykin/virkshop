@@ -1,6 +1,6 @@
 #!/usr/bin/env -S deno run --allow-all
-import { FileSystem } from "https://deno.land/x/quickr@0.6.13/main/file_system.js"
-import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.6.13/main/run.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.6.14/main/file_system.js"
+import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.6.14/main/run.js"
 const { virkshop } = await FileSystem.walkUpImport("virkshop/support/virkshop")
 
 // cd to the main folder

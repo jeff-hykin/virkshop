@@ -6,36 +6,36 @@
     - saving ENV vars (permanently)
     - adding to path (permanently)
 
-- add `virkshop mixin` with support for an `@upon_mixing` event
-    - create a `skeleton` branch, no injections, git, node, or python
-    - create a `git` mixin
-        - ensures a git instance is initialized
-        - @copy_real .gitconfig
-        - adds gitignore with standard ignores (OS ignores and .ignore/.private)
-        - git hook events
-        - @link_real ssh
-        - ask about setting up a 50mb/100mb commit warning
-        - subrepo command
-        - eventually add a folder-sync option (list all folders, use `git check-ignore`)
-    - create a `standard` branch
-        - add `clean` and `purge` commands
-        - inject basics like `sudo`
-        - all the basic CLI helpers (`btm`, `tldr`, etc)
-        - @link_real ssh
-    - create a `python`
-        - pip command
-        - autoinit venv
-        - adds to gitignore
-        - adds clean and purge hooks
-        - install modules (requirements.txt, pypoetry.toml, maybe also run any `setup.py`)
-        - hash check for if python-venv version changed (and purge/reinstall upon python version change)
-        - git hooks that check if dependencies change upon pull/checkout
-        - eventually make venv and interactive upon_mixing question
-    - create a `nodejs`
-        - adds to gitignore
-        - adds npm-init
-        - adds startup module install check
-        - hash check for if node/npm version changed (and purge/reinstall upon node/npm version change)
+- DONE: add `virkshop/mixin` with support for an `@upon_mixing` event
+- create a `skeleton` branch, no injections, git, node, or python
+- create a `git` mixin
+    - ensures a git instance is initialized
+    - @copy_real .gitconfig
+    - adds gitignore with standard ignores (OS ignores and .ignore/.private)
+    - git hook events
+    - @link_real ssh
+    - ask about setting up a 50mb/100mb commit warning
+    - subrepo command
+    - eventually add a folder-sync option (list all folders, use `git check-ignore`)
+- create a `standard` branch
+    - add `clean` and `purge` commands
+    - inject basics like `sudo`
+    - all the basic CLI helpers (`btm`, `tldr`, etc)
+    - @link_real ssh
+- create a `python`
+    - pip command
+    - autoinit venv
+    - adds to gitignore
+    - adds clean and purge hooks
+    - install modules (requirements.txt, pypoetry.toml, maybe also run any `setup.py`)
+    - hash check for if python-venv version changed (and purge/reinstall upon python version change)
+    - git hooks that check if dependencies change upon pull/checkout
+    - eventually make venv and interactive upon_mixing question
+- create a `nodejs`
+    - adds to gitignore
+    - adds npm-init
+    - adds startup module install check
+    - hash check for if node/npm version changed (and purge/reinstall upon node/npm version change)
 
 - DONE: add support for
     - `@append .zshrc`
@@ -68,6 +68,9 @@
 - DONE: get home folder linking working
 
 # beta
+- todo: clean up `virkshop/mixin` so that it doesn't depend on a command line git (maybe also try avoiding the use of allow-unrelated-histories)
+    - maybe make it use the same @append system for all its files/folders, and then avoid git entirely
+    - maybe look into git merging, but treating all the mixin stuff as ealier-commits (compared to on-this-repo commits)
 - allow specifing binary names from particular packages
 - create an ENV-diff command for "it works on my machine" scenarios
 - Documentation

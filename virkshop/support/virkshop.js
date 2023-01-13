@@ -1,6 +1,6 @@
-import { FileSystem } from "https://deno.land/x/quickr@0.6.13/main/file_system.js"
-import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.6.13/main/run.js"
-import { Console, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, strikethrough, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.6.13/main/console.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.6.14/main/file_system.js"
+import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.6.14/main/run.js"
+import { Console, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, strikethrough, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.6.14/main/console.js"
 import { indent, findAll } from "https://deno.land/x/good@0.7.8/string.js"
 import { intersection, subtract } from "https://deno.land/x/good@0.7.8/set.js"
 import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
@@ -18,8 +18,7 @@ import { nix } from "./nix_tools.js"
 // 
 // 
 let debuggingLevel = false
-const virkshopIdentifierPath = `@core/virkshop.js` // The only thing that can basically never change
-const masterMixin = "@project"
+const virkshopIdentifierPath = `support/virkshop.js` // The only thing that can basically never change
 export const createVirkshop = async (arg)=>{
     var { virkshopPath, projectPath } = {...arg}
     virkshopPath = virkshopPath || Console.env.VIRKSHOP_FOLDER         // env var is used when already inside of the virkshop
@@ -62,9 +61,9 @@ export const createVirkshop = async (arg)=>{
                 } else if (virkshopPaths.length >= 2) {
                     // TODO: although I want to give a warning here, if I did then there would be no way to get rid of it
                     // (beacuse the default virkshop object is always created first, and would throw an error before they get a chance to create their own)
-                    return Error(`\n\n(This is the virkshop library speaking)\nI'm unable to load using the default methods because it seems there is more than one virkshop folder in the project.\nTo specify which one to use do\n    import { createVirkshop } from "..."\n    createVirkshop({ virkshopPath: "WHICH_FOLDER_HERE", projectPath: "" })\nAnd then specify which of the ones you want to use inside ${callerPath}\n`)
+                    return Error(`\n\n(This is the virkshop library speaking)\nI'm unable to load using the default methods because it seems there is more than one virkshop folder in the project.\nTo specify which one to use do\n    import { createVirkshop } from "..."\n    createVirkshop({ virkshopPath: "WHICH_FOLDER_HERE", projectPath: "" })\nAnd then specify which of the ones you want to use inside ${FileSystem.pathOfCaller()}\n`)
                 } else if (virkshopPaths.length == 0) {
-                    return Error(`\n\n(This is the virkshop library speaking)\nI'm unable to load using the default methods because I couldn't find any virkshop folders in the project.\nTo specify which one to use do\n    import { createVirkshop } from "..."\n    createVirkshop({ virkshopPath: "WHICH_FOLDER_HERE", projectPath: "" })\nAnd then specify which of the ones you want to use inside ${callerPath}\n`)
+                    return Error(`\n\n(This is the virkshop library speaking)\nI'm unable to load using the default methods because I couldn't find any virkshop folders in the project.\nTo specify which one to use do\n    import { createVirkshop } from "..."\n    createVirkshop({ virkshopPath: "WHICH_FOLDER_HERE", projectPath: "" })\nAnd then specify which of the ones you want to use inside ${FileSystem.pathOfCaller()}\n`)
                 }
             }
         }
@@ -282,7 +281,7 @@ export const createVirkshop = async (arg)=>{
                                             await run`${eachItem.path}`
                                         }
                                     } catch (error) {
-                                        console.log(`\n\nWARNING: error while executing ${eventName}, ${error.stack}`,)
+                                        console.warn(`\n\nWARNING: error while executing ${eventName}, ${error.stack}`,)
                                     }
                                 }
                             }
@@ -752,7 +751,7 @@ export const createVirkshop = async (arg)=>{
                     try {
                         yamlString = Deno.readTextFileSync(virkshop.pathTo.virkshopOptions)
                     } catch (error) {
-                        console.log(`Couldn't find the ${FileSystem.basename(virkshop.pathTo.virkshopOptions)} file, so one will be created`)
+                        debuggingLevel && console.log(`Couldn't find the ${FileSystem.basename(virkshop.pathTo.virkshopOptions)} file, so one will be created`)
                         // TODO: update this string before final release
                         yamlString = `
                             virkshop:
