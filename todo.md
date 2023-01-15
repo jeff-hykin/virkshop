@@ -26,12 +26,13 @@
     - inject basics like `sudo`, `which`, etc
 - create a `standard` branch
     - add `clean` and `purge` commands
+    - inject common things like [ "darwin", "apple_sdk", "frameworks", "CoreServices" ]
     - add fancy ZSH stuff
+    - gitignore everything
 - create a `jeffs-basics` branch
     - all the rust CLI helpers (`btm`, `tldr`, etc)
     - jeffs git tools
     - `git-subrepo`
-    - gitignore everything
 - create a `mixins/python/standard`
     - pip command
     - python poetry if pypoetry.toml exists
