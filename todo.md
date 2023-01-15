@@ -11,22 +11,30 @@
 - add onlyIf: !!nix support
 
 - DONE: create a `skeleton` branch, no injections, git, node, or python
-- DONE: create a `git` mixin
+- DONE: create a `mixins/git/standard` mixin
     - DONE: ensures a git instance is initialized
     - DONE: @copy_real .gitconfig
     - DONE: @link_real ssh
     - DONE: adds gitignore with standard ignores (OS ignores and .ignore/.private)
     - DONE: subrepo command
     - DONE: git hook events
+    - remove git subrepo
     - eventually ask about setting up a 50mb/100mb commit warning
     - eventually add a folder-sync option (list all folders, use `git check-ignore`)
+- rename `skeleton` to `bare-minimum`
+- create a `minimal` branch
+    - inject basics like `sudo`, `which`, etc
 - create a `standard` branch
     - add `clean` and `purge` commands
-    - inject basics like `sudo`
-    - all the basic CLI helpers (`btm`, `tldr`, etc)
-    - @link_real ssh
-- create a `python`
+    - add fancy ZSH stuff
+- create a `jeffs-basics` branch
+    - all the rust CLI helpers (`btm`, `tldr`, etc)
+    - jeffs git tools
+    - `git-subrepo`
+    - gitignore everything
+- create a `mixins/python/standard`
     - pip command
+    - python poetry if pypoetry.toml exists
     - autoinit venv
     - adds to gitignore
     - adds clean and purge hooks
@@ -34,7 +42,7 @@
     - hash check for if python-venv version changed (and purge/reinstall upon python version change)
     - git hooks that check if dependencies change upon pull/checkout
     - eventually make venv and interactive upon_mixing question
-- create a `nodejs`
+- create a `mixins/nodejs/standard`
     - adds to gitignore
     - adds npm-init
     - adds startup module install check
