@@ -91,6 +91,7 @@ export const createVirkshop = async (arg)=>{
                     _tempNixShellFile:{ get() { return `${virkshop.pathTo.fakeHome}/shell.nix` }},
                 }
             ),
+            coreWarehouse: "https://github.com/NixOS/nixpkgs/archive/ce6aa13369b667ac2542593170993504932eb836.tar.gz",
             _internal: {
                 homeMappingPriorities: [],
                 shellSetupPriorities: [],
@@ -774,6 +775,10 @@ export const createVirkshop = async (arg)=>{
             },
         },
     )
+    
+    // ensure these are set for any @setup_before_system_tools imports
+    Console.env.VIRKSHOP_FOLDER = virkshop.pathTo.virkshop
+    Console.env.PROJECT_FOLDER  = virkshop.pathTo.project
     
     debuggingLevel = virkshop.options.debuggingLevel
     return virkshop
@@ -1532,7 +1537,7 @@ export const fornixToNix = async function({string, path}) {
                 let
                     frozenStd = (builtins.import 
                         (builtins.fetchTarball
-                            ({url="https://github.com/NixOS/nixpkgs/archive/ce6aa13369b667ac2542593170993504932eb836.tar.gz";})
+                            ({url=${nix.escapeJsValue(virkshop.coreWarehouse)};})
                         )
                         ({})
                     );

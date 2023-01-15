@@ -5,11 +5,12 @@
     - saving ENV vars (permanently)
     - adding to path (permanently)
 
+- fix shellApi.escape
 - add support for custom nix-channels somehow, maybe using `!!nix` inside of custom warehouses, maybe using !!computed
     - update documentation inside of system_tools.yaml
 - add onlyIf: !!nix support
 
-- create a `skeleton` branch, no injections, git, node, or python
+- DONE: create a `skeleton` branch, no injections, git, node, or python
 - create a `git` mixin
     - ensures a git instance is initialized
     - @copy_real .gitconfig

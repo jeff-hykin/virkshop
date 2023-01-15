@@ -212,6 +212,10 @@
 
 # - (package):
 #     asBuildInput: true
+#     load: [ "git-subrepo",]
+
+# - (package):
+#     asBuildInput: true
 #     load: [ "colorls",]
 
 # - (package):
