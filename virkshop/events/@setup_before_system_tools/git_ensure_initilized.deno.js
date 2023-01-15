@@ -51,9 +51,9 @@ export const deadlines = {
 
             function createShellHookStringFor(hookName) {
                 return `${start}
-                    deno run -q -A '${virkshop.shellApi.escapeShellArgument(`
+                    deno eval -q '${virkshop.shellApi.escapeShellArgument(`
                         import { Console } from "https://deno.land/x/quickr@0.6.14/main/console.js"
-                        const { virkshop } = await import(\`\${Console.env.VIRKSHOP_FOLDER||"virkshop"}/support/virkshop.js\`)
+                        const { virkshop } = await import(\`\${Console.env.VIRKSHOP_FOLDER||"./virkshop"}/support/virkshop.js\`)
                         await virkshop.trigger("git/${hookName}")
                     `)}'
                 ${end}`.replace(/\n                /g,"\n")
@@ -86,6 +86,9 @@ export const deadlines = {
                         data: replacementText,
                     })
                 }
+                
+                // make sure its executable
+                FileSystem.addPermissions({path, permissions: { owner: {canExecute: true} }})
 
                 checkedHooks.add(hookName)
             }
