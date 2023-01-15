@@ -92,6 +92,9 @@ export const createVirkshop = async (arg)=>{
                 }
             ),
             coreWarehouse: "https://github.com/NixOS/nixpkgs/archive/ce6aa13369b667ac2542593170993504932eb836.tar.gz",
+            get shellApi() {
+                return shellApi
+            },
             _internal: {
                 homeMappingPriorities: [],
                 shellSetupPriorities: [],
@@ -282,7 +285,7 @@ export const createVirkshop = async (arg)=>{
                                             await run`${eachItem.path}`
                                         }
                                     } catch (error) {
-                                        console.warn(`\n\nWARNING: error while executing ${eventName}, ${error.stack}`,)
+                                        console.warn(`\n\nWARNING: error while executing ${eachItem.path}, ${error.stack}`,)
                                     }
                                 }
                             }
@@ -831,6 +834,9 @@ export const shellApi = Object.defineProperties(
                 fi
             }
         `,
+        lineComment(string) {
+            return `# ${string}`
+        },
         escapeShellArgument(string) { // TODO: make this include outside wrapping quotes
             return string.replace(/'/g, `'"'"'`)
         },
