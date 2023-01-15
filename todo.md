@@ -14,11 +14,11 @@
 - create a `git` mixin
     - ensures a git instance is initialized
     - @copy_real .gitconfig
-    - adds gitignore with standard ignores (OS ignores and .ignore/.private)
-    - git hook events
     - @link_real ssh
-    - ask about setting up a 50mb/100mb commit warning
+    - adds gitignore with standard ignores (OS ignores and .ignore/.private)
     - subrepo command
+    - git hook events
+    - eventually ask about setting up a 50mb/100mb commit warning
     - eventually add a folder-sync option (list all folders, use `git check-ignore`)
 - create a `standard` branch
     - add `clean` and `purge` commands

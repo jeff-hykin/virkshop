@@ -206,13 +206,13 @@
 #     asBuildInput: true
 #     load: [ "unzip",]
 
-# - (package):
-#     asBuildInput: true
-#     load: [ "git",]
+- (package):
+    asBuildInput: true
+    load: [ "git",]
 
-# - (package):
-#     asBuildInput: true
-#     load: [ "git-subrepo",]
+- (package):
+    asBuildInput: true
+    load: [ "git-subrepo",]
 
 # - (package):
 #     asBuildInput: true
