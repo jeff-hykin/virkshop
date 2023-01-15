@@ -11,13 +11,13 @@
 - add onlyIf: !!nix support
 
 - DONE: create a `skeleton` branch, no injections, git, node, or python
-- create a `git` mixin
-    - ensures a git instance is initialized
-    - @copy_real .gitconfig
-    - @link_real ssh
-    - adds gitignore with standard ignores (OS ignores and .ignore/.private)
-    - subrepo command
-    - git hook events
+- DONE: create a `git` mixin
+    - DONE: ensures a git instance is initialized
+    - DONE: @copy_real .gitconfig
+    - DONE: @link_real ssh
+    - DONE: adds gitignore with standard ignores (OS ignores and .ignore/.private)
+    - DONE: subrepo command
+    - DONE: git hook events
     - eventually ask about setting up a 50mb/100mb commit warning
     - eventually add a folder-sync option (list all folders, use `git check-ignore`)
 - create a `standard` branch
