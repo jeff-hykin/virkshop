@@ -1,7 +1,10 @@
 # pre-alpha:
-- check if injections work, add standard injections
+- document:
+    - injections
+    - getting path
+- add standard injections
+- create extras branch for jeffs_git_shortcuts and the like
 - add warning if package doesn't have asBuildInput: true or asNativeBuildInput: true
-- clean up master branch
 - consider worst-case confusing scenarios, or conflicts caused by gitignore fighting with `commands/` or `home/`
 - create CLI option for 
     - saving ENV vars (permanently)
@@ -10,6 +13,7 @@
 - fix shellApi.escape
 - add support for custom nix-channels somehow, maybe using `!!nix` inside of custom warehouses, maybe using !!computed
     - update documentation inside of system_tools.yaml
+    - test this using nixGL channel
 - add onlyIf: !!nix support
 
 - DONE: create a `skeleton` branch, no injections, git, node, or python
