@@ -30,6 +30,8 @@
 - rename `skeleton` to `bare-minimum`
 - create a `minimal` branch
     - inject basics like `sudo`, `which`, etc
+- fix/update the `mixins/git` branch
+    - fix the hooks (they cause problems when not in an env)
 - create a `standard` branch
     - add `clean` and `purge` commands
     - inject common things like [ "darwin", "apple_sdk", "frameworks", "CoreServices" ]
