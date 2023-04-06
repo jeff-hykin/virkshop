@@ -1,4 +1,5 @@
 # pre-alpha:
+- add warning if package doesn't have asBuildInput: true or asNativeBuildInput: true
 - clean up master branch
 - consider worst-case confusing scenarios, or conflicts caused by gitignore fighting with `commands/` or `home/`
 - create CLI option for 

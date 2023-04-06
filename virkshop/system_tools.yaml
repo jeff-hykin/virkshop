@@ -96,18 +96,23 @@
 # Python
 # 
 - (package):
+    asBuildInput: true
     load: [ "python38",]
 
 - (package):
+    asBuildInput: true
     load: [ "python38Packages", "setuptools",]
 
 - (package):
+    asBuildInput: true
     load: [ "python38Packages", "pip",]
 
 - (package):
+    asBuildInput: true
     load: [ "python38Packages", "virtualenv",]
 
 - (package):
+    asBuildInput: true
     load: [ "python38Packages", "wheel",]
 
 # 

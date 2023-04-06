@@ -1,13 +1,13 @@
 # TMPDIR fixes a pip issue
 export TMPDIR="$VIRKSHOP_FOLDER/temporary.ignore"
 mkdir -p "$TMPDIR"
-export VIRTUAL_ENV="$VIRKSHOP_FOLDER/../.venv"
+export VIRTUAL_ENV="$PROJECT_FOLDER/.venv"
 export PATH="$HOME/.local/bin:$PATH"
 if ! [ -d "$VIRTUAL_ENV" ]
 then
     echo "creating virtual env for python"
     # TODO: run the cleanup
-    . "$VIRKSHOP_FOLDER/settings/extensions/python/during_clean.sh"
+    # . "$VIRKSHOP_FOLDER/settings/extensions/python/during_clean.sh"
     python -m venv "$VIRTUAL_ENV" && echo "virtual env created"
 fi
 
