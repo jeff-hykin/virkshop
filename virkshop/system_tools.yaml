@@ -107,6 +107,7 @@
 - (package):
     asBuildInput: true
     load: [ "zsh",]
+    saveAs: zsh
     
 # 
 # example of including a linux-specific system package
@@ -222,7 +223,6 @@
     asBuildInput: true
     load: [ "unixtools", "ping",]
     from: !!warehouse warehouseForNetworking
-
 
 - (package):
     asBuildInput: true
@@ -353,3 +353,61 @@
     asBuildInput: true
     load: [ "unixtools", "xxd",]
     from: !!warehouse warehouseForNetworking
+
+
+# 
+# 
+# fancy command line tools
+# 
+# 
+- (package):
+    asBuildInput: true
+    load: [ "fd",]
+
+- (package):
+    asBuildInput: true
+    load: [ "sd",]
+
+- (package):
+    asBuildInput: true
+    load: [ "dua",]
+
+- (package):
+    asBuildInput: true
+    load: [ "tealdeer",]
+
+- (package):
+    asBuildInput: true
+    load: [ "bottom",]
+
+- (package):
+    asBuildInput: true
+    load: [ "exa",]
+
+- (package):
+    asBuildInput: true
+    load: [ "zsh-syntax-highlighting",]
+    saveAs: zsh-syntax-highlighting
+
+- (package):
+    asBuildInput: true
+    load: [ "oh-my-zsh",]
+    saveAs: oh-my-zsh
+
+- (package):
+    asBuildInput: true
+    load: [ "zsh-autosuggestions",]
+    saveAs: zsh-autosuggestions
+
+- (package):
+    asBuildInput: true
+    load: [ "spaceship-prompt",]
+    saveAs: spaceship-prompt
+
+- (package):
+    asBuildInput: true
+    load: [ "nnn",]
+
+- (package):
+    asBuildInput: true
+    load: [ "jq",]
