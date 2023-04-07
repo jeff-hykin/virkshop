@@ -4,12 +4,11 @@
         - saving ENV vars (permanently)
         - adding to path (permanently)
     - maybe add warning if package doesn't have asBuildInput: true or asNativeBuildInput: true
-- `2_minimal`
-    - injections: `sudo`, `logger`, `diskutil`, `osascript`
 - `mixins/git`
     - fix the hooks (check if inside env)
     - eventually ask about setting up a 50mb/100mb commit warning
     - eventually add a folder-sync option (list all folders, use `git check-ignore`)
+- `2_minimal`
 - `3_standard`
     - injections:  `vim`, `vi`, `emacs`, `nvim`, `code`
     - link keychain
