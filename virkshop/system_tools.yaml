@@ -222,10 +222,6 @@
 
 - (package):
     asBuildInput: true
-    load: [ "colorls",]
-
-- (package):
-    asBuildInput: true
     load: [ "unixtools", "ping",]
     from: !!warehouse warehouseForNetworking
 
@@ -367,26 +363,6 @@
 # 
 - (package):
     asBuildInput: true
-    load: [ "fd",]
-
-- (package):
-    asBuildInput: true
-    load: [ "sd",]
-
-- (package):
-    asBuildInput: true
-    load: [ "dua",]
-
-- (package):
-    asBuildInput: true
-    load: [ "tealdeer",]
-
-- (package):
-    asBuildInput: true
-    load: [ "bottom",]
-
-- (package):
-    asBuildInput: true
     load: [ "exa",]
 
 - (package):
@@ -408,11 +384,3 @@
     asBuildInput: true
     load: [ "spaceship-prompt",]
     saveAs: spaceship-prompt
-
-- (package):
-    asBuildInput: true
-    load: [ "nnn",]
-
-- (package):
-    asBuildInput: true
-    load: [ "jq",]
