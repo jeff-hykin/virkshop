@@ -181,7 +181,6 @@ export const createVirkshop = async (arg)=>{
                                         })
                                         await FileSystem.addPermissions({path: pathThatIsHopefullyGitIgnored, permissions: { owner: {canExecute: true} }})
                                     } else {
-                                        await FileSystem.remove(commandPath)
                                         await FileSystem.remove(pathThatIsHopefullyGitIgnored)
                                     }
                                 })
@@ -333,7 +332,7 @@ export const createVirkshop = async (arg)=>{
                     await Promise.all(virkshop._internal.deadlines.beforeSetup)
 
                     // 
-                    // the three operations below can be done in any order, which is why they're in this Promise.all
+                    // the two operations below can be done in any order, which is why they're in this Promise.all
                     // 
                     var startTime = (new Date()).getTime()
                     var defaultWarehouse
@@ -577,7 +576,7 @@ export const createVirkshop = async (arg)=>{
                     for await (const eachCommand of FileSystem.recursivelyIterateItemsIn(virkshop.pathTo.commands)) {
                         if (eachCommand.isFile) {
                             permissionPromises.push(
-                                await FileSystem.addPermissions({path: eachCommand.path, permissions: { owner: {canExecute: true} }})
+                                FileSystem.addPermissions({path: eachCommand.path, permissions: { owner: {canExecute: true} }}).catch()
                             )
                         }
                     }
