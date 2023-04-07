@@ -1,6 +1,6 @@
 # pre-alpha:
 - document:
-    - injections
+    - injections: `diskutil`, and others
     - getting path
 - add standard injections
 - create extras branch for jeffs_git_shortcuts and the like
