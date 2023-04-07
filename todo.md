@@ -3,20 +3,24 @@
     - create CLI option for 
         - saving ENV vars (permanently)
         - adding to path (permanently)
-    - maybe add warning if package doesn't have asBuildInput: true or asNativeBuildInput: true
+    - DONE: virkshop.injectUsersCommand(name)
+    - LATER: add warning if injected command overwrites non-symlink file (indicating the user had a custom command there)
 - `mixins/git`
-    - fix the hooks (check if inside env)
-    - eventually ask about setting up a 50mb/100mb commit warning
-    - eventually add a folder-sync option (list all folders, use `git check-ignore`)
+    - DONE: fix the hooks (check if inside env)
 - `2_minimal`
+    - add cachix support: settings input for a cachix name, use ENV var for pushing
 - `3_standard`
-    - injections:  `vim`, `vi`, `emacs`, `nvim`, `code`
+    - DONE: injections:  `vim`, `vi`, `emacs`, `nvim`, `code`
     - link keychain
     - add `clean` and `purge` commands
+    - LATER: eventually ask about setting up a 50mb/100mb commit warning
+    - LATER: eventually add a folder-sync option (list all folders, use `git check-ignore`)
 - `4_extras`
     - all the rust CLI helpers (`btm`, `tldr`, etc)
-- `mixins/python/standard`
+    - DONE: jeff git shortcuts
+- `mixins/python/minimal`
     - pip command
+- `mixins/python/standard`
     - python poetry if pypoetry.toml exists
     - autoinit venv
     - adds to gitignore
