@@ -3,11 +3,10 @@
     - create CLI option for 
         - saving ENV vars (permanently)
         - adding to path (permanently)
-    - maybe add warning if package doesn't have asBuildInput: true or asNativeBuildInput: true
 - `mixins/git`
-    - fix the hooks (check if inside env)
-    - eventually ask about setting up a 50mb/100mb commit warning
-    - eventually add a folder-sync option (list all folders, use `git check-ignore`)
+    - DONE: fix the hooks (check if inside env)
+    - LATER: eventually ask about setting up a 50mb/100mb commit warning
+    - LATER: eventually add a folder-sync option (list all folders, use `git check-ignore`)
 - `2_minimal`
 - `3_standard`
     - injections:  `vim`, `vi`, `emacs`, `nvim`, `code`
