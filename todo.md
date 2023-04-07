@@ -1,5 +1,6 @@
 # pre-alpha:
 - `1_bare_minimum`
+    - rename to be "setup_with_system_tools"
     - create CLI option for 
         - saving ENV vars (permanently)
         - adding to path (permanently)
@@ -10,6 +11,7 @@
 - `2_minimal`
     - add cachix support: settings input for a cachix name, use ENV var for pushing
 - `3_standard`
+    - add `trigger` command
     - remove colorls
     - LATER: eventually ask about setting up a 50mb/100mb commit warning
     - LATER: eventually add a folder-sync option (list all folders, use `git check-ignore`)
@@ -18,7 +20,7 @@
     - DONE: link keychain
     - DONE: link deno cache
 - `4_extras`
-    - all the rust CLI helpers (`btm`, `tldr`, etc)
+    - DONE: all the rust CLI helpers (`btm`, `tldr`, etc)
     - DONE: jeff git shortcuts
 - `mixins/python/minimal`
     - pip command
