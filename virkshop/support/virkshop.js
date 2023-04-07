@@ -1160,7 +1160,7 @@ export const shellApi = Object.defineProperties(
                 } else {
                     return FileSystem.normalize(
                         FileSystem.makeAbsolutePath(
-                            FileSystem.makeRelativePath({from: folderOfYamlFile, to: relativePathString })
+                            `${folderOfYamlFile}/${relativePathString}`
                         )
                     )
                 }
