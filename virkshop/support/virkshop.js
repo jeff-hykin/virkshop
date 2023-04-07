@@ -822,6 +822,8 @@ export const shellApi = Object.defineProperties(
                     if [ "$sub_command" = "package" ]
                     then
                         deno eval 'console.log(JSON.parse(Deno.env.get("VIRKSHOP_NIX_SHELL_DATA")).packagePaths[Deno.args[0]])' "$@"
+                    else
+                        echo "error: expected: virkshop_tools nix_path_for package ARG, but got virkshop_tools nix_path_for $sub_command" 
                     fi
                 elif [ "$sub_command" = "nix_lib_path_for" ]
                 then
@@ -830,6 +832,8 @@ export const shellApi = Object.defineProperties(
                     if [ "$sub_command" = "package" ]
                     then
                         deno eval 'console.log(JSON.parse(Deno.env.get("VIRKSHOP_NIX_SHELL_DATA")).libraryPaths[Deno.args[0]])' "$@"
+                    else
+                        echo "error: expected: virkshop_tools nix_lib_path_for package ARG, but got virkshop_tools nix_lib_path_for $sub_command" 
                     fi
                 fi
             }
@@ -1156,7 +1160,7 @@ export const shellApi = Object.defineProperties(
                 } else {
                     return FileSystem.normalize(
                         FileSystem.makeAbsolutePath(
-                            FileSystem.makeRelativePath({from: folderOfYamlFile, to: relativePathString })
+                            `${folderOfYamlFile}/${relativePathString}`
                         )
                     )
                 }
@@ -1360,14 +1364,14 @@ export const systemToolsToNix = async function({string, path}) {
                 // means it was a constant, or preprocessed via a !!deno tag
                 resultAsValue = values.value
             } else {
-                const packages = values.withPackages || []
+                const withPackages = values.withPackages || []
                 const whichWarehouse = values.fromWarehouse || defaultWarehouse
                 const tarFileUrl = warehouses[whichWarehouse.name].tarFileUrl // TODO: there's a lot of things that could screw up here, add checks/warnings for them
                 const escapedArguments = 'NO_COLOR=true '+values.runCommand.map(each=>`'${shellApi.escapeShellArgument(each)}'`).join(" ")
-                const fullCommand = ["nix-shell", "--pure", "--packages", ...packages, "-I", "nixpkgs="+tarFileUrl, "--run",  escapedArguments,]
+                const fullCommand = ["nix-shell", "--pure", "--packages", ...withPackages, "-I", "nixpkgs="+tarFileUrl, "--run",  escapedArguments,]
                 
                 const commandForDebugging = fullCommand.join(" ")
-                if (! packages) {
+                if (! withPackages) {
                     throw Error(`For\n- (compute):\n    saveAs: ${varName}\n    withPackages: []\nThe withPackages being empty is a problem. Try at least try: withPackages: ["bash"]`)
                 }
                 
