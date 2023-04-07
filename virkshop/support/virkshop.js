@@ -19,6 +19,7 @@ import { nix } from "./nix_tools.js"
 // 
 let debuggingLevel = false
 const virkshopIdentifierPath = `support/virkshop.js` // The only thing that can basically never change
+const originalPathVar = Console.env.PATH
 export const createVirkshop = async (arg)=>{
     var { virkshopPath, projectPath } = {...arg}
     virkshopPath = virkshopPath || Console.env.VIRKSHOP_FOLDER         // env var is used when already inside of the virkshop
@@ -175,9 +176,10 @@ export const createVirkshop = async (arg)=>{
                                     if (absolutePathToCommand) {
                                         await FileSystem.write({
                                             path: pathThatIsHopefullyGitIgnored,
-                                            data: `#!/usr/bin/env bash\n# NOTE: this command was auto-generated and is just a wrapper around the user's ${commandName.replace(/\n/,"")}\nHOME=${shellApi.escapeShellArgument(virkshop.pathTo.realHome)} PATH=${shellApi.escapeShellArgument(Console.env.PATH)} ${absolutePathToCommand} "$@"`.replace(/\n/g, ""),
+                                            data: `#!/usr/bin/env sh\n# NOTE: this command was auto-generated and is just a wrapper around the user's ${commandName.replace(/\n/,"")}\n`+`HOME=${shellApi.escapeShellArgument(virkshop.pathTo.realHome)} PATH=${shellApi.escapeShellArgument(originalPathVar)} ${absolutePathToCommand} "$@"`.replace(/\n/g, ""),
                                             overwrite: true,
                                         })
+                                        await FileSystem.addPermissions({path: pathThatIsHopefullyGitIgnored, permissions: { owner: {canExecute: true} }})
                                     } else {
                                         await FileSystem.remove(commandPath)
                                         await FileSystem.remove(pathThatIsHopefullyGitIgnored)
