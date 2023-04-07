@@ -51,11 +51,13 @@ export const deadlines = {
 
             function createShellHookStringFor(hookName) {
                 return `${start}
-                    deno eval -q '${virkshop.shellApi.escapeShellArgument(`
-                        import { Console } from "https://deno.land/x/quickr@0.6.20/main/console.js"
-                        const { virkshop } = await import(\`\${Console.env.VIRKSHOP_FOLDER||"./virkshop"}/support/virkshop.js\`)
-                        await virkshop.trigger("git/${hookName}")
-                    `)}'
+                    if [ -n "$VIRKSHOP_FOLDER" ]; then
+                        deno eval -q ${virkshop.shellApi.escapeShellArgument(`
+                            import { Console } from "https://deno.land/x/quickr@0.6.20/main/console.js"
+                            const { virkshop } = await import(\`\${Console.env.VIRKSHOP_FOLDER||"./virkshop"}/support/virkshop.js\`)
+                            await virkshop.trigger("git/${hookName}")
+                        `)}
+                    fi
                 ${end}`.replace(/\n                /g,"\n")
             }
 
