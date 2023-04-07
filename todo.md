@@ -1,6 +1,5 @@
 # pre-alpha:
 - `1_bare_minimum`
-    - add support for injections
     - create CLI option for 
         - saving ENV vars (permanently)
         - adding to path (permanently)

@@ -82,6 +82,7 @@ export const createVirkshop = async (arg)=>{
                 {
                     events:           { get() { return `${virkshop.pathTo.virkshop}/events` }},
                     commands:         { get() { return `${virkshop.pathTo.virkshop}/commands` }},
+                    injections:       { get() { return `${virkshop.pathTo.temporary}/long_term/injections` }}, 
                     settings:         { get() { return `${virkshop.pathTo.virkshop}/settings` }},
                     temporary:        { get() { return `${virkshop.pathTo.virkshop}/temporary.ignore` }},
                     homeMixin:        { get() { return `${virkshop.pathTo.virkshop}/home` }},
@@ -151,7 +152,7 @@ export const createVirkshop = async (arg)=>{
                         },
                         injectUsersCommand(commandName) {
                             virkshop._internal.deadlines.beforeEnteringVirkshop.push(((async ()=>{
-                                const pathThatIsHopefullyGitIgnored = `${virkshop.pathTo.temporary}/long_term/injections/${this.eventName}/${commandName}`
+                                const pathThatIsHopefullyGitIgnored = `${virkshop.pathTo.injections}/${commandName}`
                                 const commandPath = `${virkshop.pathTo.commands}/${commandName}`
                                 
                                 await FileSystem.ensureIsFile(pathThatIsHopefullyGitIgnored)
@@ -174,7 +175,7 @@ export const createVirkshop = async (arg)=>{
                                     if (absolutePathToCommand) {
                                         await FileSystem.write({
                                             path: pathThatIsHopefullyGitIgnored,
-                                            data: `#!/usr/bin/env bash\n`+`HOME=${shellApi.escapeShellArgument(virkshop.pathTo.realHome)} PATH=${shellApi.escapeShellArgument(Console.env.PATH)} ${absolutePathToCommand} "$@"`.replace(/\n/g, ""),
+                                            data: `#!/usr/bin/env bash\n# NOTE: this command was auto-generated and is just a wrapper around the user's ${commandName.replace(/\n/,"")}\nHOME=${shellApi.escapeShellArgument(virkshop.pathTo.realHome)} PATH=${shellApi.escapeShellArgument(Console.env.PATH)} ${absolutePathToCommand} "$@"`.replace(/\n/g, ""),
                                             overwrite: true,
                                         })
                                     } else {
@@ -502,16 +503,6 @@ export const createVirkshop = async (arg)=>{
                                 let shellProfileString = shellApi.shellProfileString
                                 
                                 // 
-                                // add project commands
-                                // 
-                                shellProfileString += `
-                                    #
-                                    # inject project's virkshop commands
-                                    #
-                                    export PATH=${shellApi.escapeShellArgument(virkshop.pathTo.commands)}":$PATH"
-                                `.replace(/\n */g,"\n")
-
-                                // 
                                 // add @setup_after_system_tools scripts
                                 // 
                                 await Promise.all(virkshop._internal.deadlines.beforeShellScripts)
@@ -524,7 +515,7 @@ export const createVirkshop = async (arg)=>{
                                 }
                                 
                                 // 
-                                // add project commands again
+                                // add project commands
                                 // 
                                 shellProfileString += `
                                     #
@@ -532,6 +523,7 @@ export const createVirkshop = async (arg)=>{
                                     #
                                     ${shellApi.generatePrependToPathString(virkshop.pathTo.commands)}
                                 `.replace(/\n */g,"\n")
+                                
                                 // 
                                 // make folders work as recursive commands
                                 // 
@@ -577,8 +569,8 @@ export const createVirkshop = async (arg)=>{
                     // finish dynamic setup
                     // 
                     await Promise.all(virkshop._internal.deadlines.beforeEnteringVirkshop)
-                    // make all commands executable
                     
+                    // make all commands executable
                     const permissionPromises = []
                     for await (const eachCommand of FileSystem.recursivelyIterateItemsIn(virkshop.pathTo.commands)) {
                         if (eachCommand.isFile) {
@@ -845,7 +837,10 @@ export const shellApi = Object.defineProperties(
             return "'"+string.replace(/'/g, `'"'"'`)+"'"
         },
         generatePrependToPathString(newPath) {
-            return `export PATH='${this.escapeShellArgument(newPath)}:'"$PATH"`
+            return `export PATH=${this.escapeShellArgument(newPath)}":$PATH"`
+        },
+        generateAppendToPathString(newPath) {
+            return `export PATH="$PATH:"${this.escapeShellArgument(newPath)}`
         },
         createHierarchicalCommandFor(folderPath) {
             const name = this.escapeShellArgument(FileSystem.basename(folderPath))
@@ -854,12 +849,12 @@ export const shellApi = Object.defineProperties(
                 # 
                 # command for ${name} folder
                 # 
-                    '${name}' () {
+                    ${name} () {
                         # enable globbing
                         setopt extended_glob &>/dev/null
                         shopt -s globstar &>/dev/null
                         shopt -s dotglob &>/dev/null
-                        local search_path='${this.escapeShellArgument(folderPath)}'
+                        local search_path=${this.escapeShellArgument(folderPath)}
                         local argument_combination="$search_path/$1"
                         while [[ -n "$@" ]]
                         do
@@ -903,8 +898,8 @@ export const shellApi = Object.defineProperties(
                         ls -1FL --group-directories-first --color "$search_path" | sed 's/^/    /' | sed -E 's/(\\*|@)$/ /' 1>&2
                         return 1 # error, no command
                     }
-                    '__autocomplete_for__${name}' () {
-                        local commands_path='${this.escapeShellArgument(FileSystem.parentPath(folderPath))}'
+                    '__autocomplete_for__'${name} () {
+                        local commands_path=${this.escapeShellArgument(FileSystem.parentPath(folderPath))}
                         # TODO: make this space friendly
                         # TODO: make this do partial-word complete 
                         function join_by { local d=\${1-} f=\${2-}; if shift 2; then printf %s "$f" "\${@/#/$d}"; fi; }
@@ -923,22 +918,22 @@ export const shellApi = Object.defineProperties(
                         fi
                         # echo "$(dirname "$commands_path/$item_path")"
                     }
-                    compdef '__autocomplete_for__${name}' '${name}'
+                    compdef '__autocomplete_for__'${name} ${name}
             `.replace(/\n                /g, "\n")
         },
         modifyEnvVar({ name, overwriteAs, prepend, append, joinUsing="", }) {
             name = name.trim()
             if (overwriteAs) {
-                return `\nexport ${name}='${this.escapeShellArgument(overwriteAs)}'\n`
+                return `\nexport ${name}=${this.escapeShellArgument(overwriteAs)}\n`
             }
             
             let output = ""
             if (prepend) {
                 output += `
                     if [ -z "$${name}" ]; then
-                        export ${name}='${this.escapeShellArgument(prepend)}'
+                        export ${name}=${this.escapeShellArgument(prepend)}
                     else
-                        export ${name}='${this.escapeShellArgument(prepend)}${this.escapeShellArgument(joinUsing)}'"$${name}"
+                        export ${name}=${this.escapeShellArgument(prepend)}${this.escapeShellArgument(joinUsing)}"$${name}"
                     fi
                 `.replace(/\n                    /,"\n")
             }
@@ -946,9 +941,9 @@ export const shellApi = Object.defineProperties(
             if (append) {
                 output += `
                     if [ -z "$${name}" ]; then
-                        export ${name}='${this.escapeShellArgument(append)}'
+                        export ${name}=${this.escapeShellArgument(append)}
                     else
-                        export ${name}="$${name}"'${this.escapeShellArgument(joinUsing)}${this.escapeShellArgument(append)}'
+                        export ${name}="$${name}"${this.escapeShellArgument(joinUsing)}${this.escapeShellArgument(append)}
                     fi
                 `.replace(/\n                    /,"\n")
             }
