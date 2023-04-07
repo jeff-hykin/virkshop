@@ -363,6 +363,26 @@
 # 
 - (package):
     asBuildInput: true
+    load: [ "fd",]
+
+- (package):
+    asBuildInput: true
+    load: [ "sd",]
+
+- (package):
+    asBuildInput: true
+    load: [ "dua",]
+
+- (package):
+    asBuildInput: true
+    load: [ "tealdeer",]
+
+- (package):
+    asBuildInput: true
+    load: [ "bottom",]
+
+- (package):
+    asBuildInput: true
     load: [ "exa",]
 
 - (package):
