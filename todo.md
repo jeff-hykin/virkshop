@@ -1,19 +1,40 @@
 # pre-alpha:
-- document:
+- `1_bare_minimum`
+    - create CLI option for 
+        - saving ENV vars (permanently)
+        - adding to path (permanently)
+    - maybe add warning if package doesn't have asBuildInput: true or asNativeBuildInput: true
+- `2_minimal`
     - injections: `diskutil`, and others
-    - getting path
-- add standard injections
-- create extras branch for jeffs_git_shortcuts and the like
-- add warning if package doesn't have asBuildInput: true or asNativeBuildInput: true
-- consider worst-case confusing scenarios, or conflicts caused by gitignore fighting with `commands/` or `home/`
-- create CLI option for 
-    - saving ENV vars (permanently)
-    - adding to path (permanently)
+- `mixins/git`
+    - fix the hooks (check if inside env)
+    - eventually ask about setting up a 50mb/100mb commit warning
+    - eventually add a folder-sync option (list all folders, use `git check-ignore`)
+- `3_standard`
+    - add `clean` and `purge` commands
+- `4_extras`
+    - all the rust CLI helpers (`btm`, `tldr`, etc)
+- `mixins/python/standard`
+    - pip command
+    - python poetry if pypoetry.toml exists
+    - autoinit venv
+    - adds to gitignore
+    - adds clean and purge hooks
+    - install modules (requirements.txt, pypoetry.toml, maybe also run any `setup.py`)
+    - hash check for if python-venv version changed (and purge/reinstall upon python version change)
+    - git hooks that check if dependencies change upon pull/checkout
+    - eventually make venv and interactive upon_mixing question
+- `mixins/nodejs/standard`
+    - adds to gitignore
+    - adds npm-init
+    - adds startup module install check
+    - hash check for if node/npm version changed (and purge/reinstall upon node/npm version change)
 
-- fix shellApi.escape
-- add support for custom nix-channels somehow, maybe using `!!nix` inside of custom warehouses, maybe using !!computed
-    - update documentation inside of system_tools.yaml
-    - test this using nixGL channel
+- documentation:
+    - how to convert a nix-channel thing (nixGL) into system_tools.yaml
+    - getting path of nixpkgs
+- consider worst-case confusing scenarios, or conflicts caused by gitignore fighting with `commands/` or `home/`
+
 - add onlyIf: !!nix support
 
 - DONE: create a `skeleton` branch, no injections, git, node, or python
@@ -27,35 +48,6 @@
     - remove git subrepo
     - eventually ask about setting up a 50mb/100mb commit warning
     - eventually add a folder-sync option (list all folders, use `git check-ignore`)
-- rename `skeleton` to `bare-minimum`
-- create a `minimal` branch
-    - inject basics like `sudo`, `which`, etc
-- fix/update the `mixins/git` branch
-    - fix the hooks (they cause problems when not in an env)
-- create a `standard` branch
-    - add `clean` and `purge` commands
-    - inject common things like [ "darwin", "apple_sdk", "frameworks", "CoreServices" ]
-    - add fancy ZSH stuff
-    - gitignore everything
-- create a `jeffs-basics` branch
-    - all the rust CLI helpers (`btm`, `tldr`, etc)
-    - jeffs git tools
-    - `git-subrepo`
-- create a `mixins/python/standard`
-    - pip command
-    - python poetry if pypoetry.toml exists
-    - autoinit venv
-    - adds to gitignore
-    - adds clean and purge hooks
-    - install modules (requirements.txt, pypoetry.toml, maybe also run any `setup.py`)
-    - hash check for if python-venv version changed (and purge/reinstall upon python version change)
-    - git hooks that check if dependencies change upon pull/checkout
-    - eventually make venv and interactive upon_mixing question
-- create a `mixins/nodejs/standard`
-    - adds to gitignore
-    - adds npm-init
-    - adds startup module install check
-    - hash check for if node/npm version changed (and purge/reinstall upon node/npm version change)
 
 - DONE: rename `@core` without the @
 - DONE: add `virkshop/mixin` with support for an `@upon_mixing` event
@@ -102,8 +94,6 @@
         - How do I make my own virkshop?
         - How can I customize a virkshop?
             1. Adding a command
-                - always edit the `mixins/`
-                - always debug the `mixture/`
             2. Adding a system tool
             3. Adding an env var
             4. 

@@ -5,3 +5,5 @@ virkshop:
         # "$PROJECT_FOLDER/events":        "$VIRKSHOP_FOLDER/events"
     
     debuggingLevel: 1
+    injectExternalCommands:
+        - sudo
