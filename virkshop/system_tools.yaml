@@ -108,9 +108,9 @@
     asBuildInput: true
     load: [ "zsh",]
     
-# # 
-# # example of including a linux-specific system package
-# # 
+# 
+# example of including a linux-specific system package
+# 
 
 # - (package):
 #     asBuildInput: true
@@ -124,9 +124,9 @@
 #     asNativeBuildInput: true
 #     onlyIf: !!computed isLinux
 
-# # 
-# # example of including a mac-specific system package
-# # 
+# 
+# example of including a mac-specific system package
+# 
 
 # - (package):
 #     asBuildInput: true
@@ -212,7 +212,7 @@
 
 # - (package):
 #     asBuildInput: true
-#     load: [ "git-subrepo",]
+#     load: [ "openssh",]
 
 # - (package):
 #     asBuildInput: true
