@@ -80,11 +80,6 @@
 
 - (environmentVariable):
     var: PATH
-    prepend: !!as_absolute_path "./commands"
-    joinUsing: ":"
-
-- (environmentVariable):
-    var: PATH
     append: !!as_absolute_path "./temporary.ignore/long_term/injections"
     joinUsing: ":"
 
