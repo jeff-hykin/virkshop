@@ -3,7 +3,7 @@
     - create CLI option for 
         - saving ENV vars (permanently)
         - adding to path (permanently)
-    - injections that don't exist are going to cause churn (constant back and fourth commits)
+    - DONE: injections that don't exist are going to cause churn (constant back and fourth commits)
     - LATER: add warning if injected command overwrites non-symlink file (indicating the user had a custom command there)
 - `mixins/git`
     - DONE: fix the hooks (check if inside env)
