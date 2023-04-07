@@ -1,7 +1,6 @@
 # pre-alpha:
 - `1_bare_minimum`
     - add support for injections
-    - fix shellApi.escape
     - create CLI option for 
         - saving ENV vars (permanently)
         - adding to path (permanently)
