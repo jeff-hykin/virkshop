@@ -1,4 +1,4 @@
-// NOTE: startup will generally finish faster if code is put inside of @setup_before_system_tools (compared to @setup_after_system_tools)
+// NOTE: startup will generally finish faster if code is put inside of @setup_without_system_tools (compared to @setup_with_system_tools)
 
 export const deadlines = {
     // deadlines are in chronological order (top is the shortest/soonest)
