@@ -1,10 +1,10 @@
 # pre-alpha:
 - `1_bare_minimum`
-    - rename to be "setup_with_system_tools"
     - create CLI option for 
         - saving ENV vars (permanently)
         - adding to path (permanently)
     - DONE: virkshop.injectUsersCommand(name)
+    - LATER: clean up the virkshop command for getting paths and such (make it a deno command, give it a --help, etc)
     - LATER: add warning if injected command overwrites non-symlink file (indicating the user had a custom command there)
 - `mixins/git`
     - DONE: fix the hooks (check if inside env)
