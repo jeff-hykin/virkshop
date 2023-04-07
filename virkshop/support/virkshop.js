@@ -577,7 +577,7 @@ export const createVirkshop = async (arg)=>{
                     for await (const eachCommand of FileSystem.recursivelyIterateItemsIn(virkshop.pathTo.commands)) {
                         if (eachCommand.isFile) {
                             permissionPromises.push(
-                                await FileSystem.addPermissions({path: eachCommand.path, permissions: { owner: {canExecute: true} }})
+                                FileSystem.addPermissions({path: eachCommand.path, permissions: { owner: {canExecute: true} }}).catch()
                             )
                         }
                     }
