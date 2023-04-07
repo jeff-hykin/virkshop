@@ -3,13 +3,14 @@
     - create CLI option for 
         - saving ENV vars (permanently)
         - adding to path (permanently)
+    - LATER: add warning if injected command overwrites non-symlink file (indicating the user had a custom command there)
 - `mixins/git`
     - DONE: fix the hooks (check if inside env)
     - LATER: eventually ask about setting up a 50mb/100mb commit warning
     - LATER: eventually add a folder-sync option (list all folders, use `git check-ignore`)
 - `2_minimal`
 - `3_standard`
-    - injections:  `vim`, `vi`, `emacs`, `nvim`, `code`
+    - DONE: injections:  `vim`, `vi`, `emacs`, `nvim`, `code`
     - link keychain
     - add `clean` and `purge` commands
 - `4_extras`
