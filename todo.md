@@ -12,7 +12,6 @@
     - add cachix support: settings input for a cachix name, use ENV var for pushing
 - `3_standard`
     - add `trigger` command
-    - remove colorls
     - LATER: eventually ask about setting up a 50mb/100mb commit warning
     - LATER: eventually add a folder-sync option (list all folders, use `git check-ignore`)
     - DONE: add `clean` and `purge` commands
