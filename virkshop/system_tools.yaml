@@ -212,7 +212,7 @@
 
 - (package):
     asBuildInput: true
-    load: [ "git-subrepo",]
+    load: [ "openssh",]
 
 - (package):
     asBuildInput: true
