@@ -1,6 +1,6 @@
-import { FileSystem } from "https://deno.land/x/quickr@0.6.14/main/file_system.js"
-import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.6.14/main/run.js"
-import { Console, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, strikethrough, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.6.14/main/console.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.6.20/main/file_system.js"
+import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.6.20/main/run.js"
+import { Console, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, strikethrough, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.6.20/main/console.js"
 import { indent, findAll } from "https://deno.land/x/good@0.7.8/string.js"
 import { intersection, subtract } from "https://deno.land/x/good@0.7.8/set.js"
 import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
@@ -19,6 +19,7 @@ import { nix } from "./nix_tools.js"
 // 
 let debuggingLevel = false
 const virkshopIdentifierPath = `support/virkshop.js` // The only thing that can basically never change
+const originalPathVar = Console.env.PATH
 export const createVirkshop = async (arg)=>{
     var { virkshopPath, projectPath } = {...arg}
     virkshopPath = virkshopPath || Console.env.VIRKSHOP_FOLDER         // env var is used when already inside of the virkshop
@@ -82,6 +83,7 @@ export const createVirkshop = async (arg)=>{
                 {
                     events:           { get() { return `${virkshop.pathTo.virkshop}/events` }},
                     commands:         { get() { return `${virkshop.pathTo.virkshop}/commands` }},
+                    injections:       { get() { return `${virkshop.pathTo.temporary}/long_term/injections` }}, 
                     settings:         { get() { return `${virkshop.pathTo.virkshop}/settings` }},
                     temporary:        { get() { return `${virkshop.pathTo.virkshop}/temporary.ignore` }},
                     homeMixin:        { get() { return `${virkshop.pathTo.virkshop}/home` }},
@@ -147,11 +149,11 @@ export const createVirkshop = async (arg)=>{
                                 `.replace(/\n                                /g,"\n"))
                             }
                             
-                            virkshop._internal.shellSetupPriorities.push([ this.source, `${name}='${shellApi.escapeShellArgument(value)}'` ])
+                            virkshop._internal.shellSetupPriorities.push([ this.source, `${name}=${shellApi.escapeShellArgument(value)}` ])
                         },
                         injectUsersCommand(commandName) {
                             virkshop._internal.deadlines.beforeEnteringVirkshop.push(((async ()=>{
-                                const pathThatIsHopefullyGitIgnored = `${virkshop.pathTo.temporary}/long_term/injections/${this.eventName}/${commandName}`
+                                const pathThatIsHopefullyGitIgnored = `${virkshop.pathTo.injections}/${commandName}`
                                 const commandPath = `${virkshop.pathTo.commands}/${commandName}`
                                 
                                 await FileSystem.ensureIsFile(pathThatIsHopefullyGitIgnored)
@@ -174,9 +176,10 @@ export const createVirkshop = async (arg)=>{
                                     if (absolutePathToCommand) {
                                         await FileSystem.write({
                                             path: pathThatIsHopefullyGitIgnored,
-                                            data: `#!/usr/bin/env bash\n`+`HOME='${shellApi.escapeShellArgument(virkshop.pathTo.realHome)}' PATH='${shellApi.escapeShellArgument(Console.env.PATH)}' ${absolutePathToCommand} "$@"`.replace(/\n/g, ""),
+                                            data: `#!/usr/bin/env sh\n# NOTE: this command was auto-generated and is just a wrapper around the user's ${commandName.replace(/\n/,"")}\n`+`HOME=${shellApi.escapeShellArgument(virkshop.pathTo.realHome)} PATH=${shellApi.escapeShellArgument(originalPathVar)} ${absolutePathToCommand} "$@"`.replace(/\n/g, ""),
                                             overwrite: true,
                                         })
+                                        await FileSystem.addPermissions({path: pathThatIsHopefullyGitIgnored, permissions: { owner: {canExecute: true} }})
                                     } else {
                                         await FileSystem.remove(commandPath)
                                         await FileSystem.remove(pathThatIsHopefullyGitIgnored)
@@ -308,7 +311,7 @@ export const createVirkshop = async (arg)=>{
                                 virkshop._internal.shellSetupPriorities.push(
                                     [
                                         eachPath.slice(parentFolderString.length),
-                                        `deno run -q -A '${shellApi.escapeShellArgument(eachPath)}'`,
+                                        `deno run -q -A ${shellApi.escapeShellArgument(eachPath)}`,
                                     ]
                                 )
                             } else if (eachPath.match(/\.zsh$/)) {
@@ -344,7 +347,7 @@ export const createVirkshop = async (arg)=>{
                             
                             const yamlString = await FileSystem.read(virkshop.pathTo.systemTools)
                             // TODO: get a hash of this and see if nix-shell should even be regenerated or not (as an optimization)
-                            const result = await fornixToNix({string: yamlString, path: virkshop.pathTo.systemTools})
+                            const result = await systemToolsToNix({string: yamlString, path: virkshop.pathTo.systemTools})
                             defaultWarehouse = result.defaultWarehouse
                             // TODO: add error for no default warehouse
                             await FileSystem.write({
@@ -502,29 +505,19 @@ export const createVirkshop = async (arg)=>{
                                 let shellProfileString = shellApi.shellProfileString
                                 
                                 // 
-                                // add project commands
-                                // 
-                                shellProfileString += `
-                                    #
-                                    # inject project's virkshop commands
-                                    #
-                                    export PATH='${shellApi.escapeShellArgument(virkshop.pathTo.commands)}:'"$PATH"
-                                `.replace(/\n */g,"\n")
-
-                                // 
                                 // add @setup_after_system_tools scripts
                                 // 
                                 await Promise.all(virkshop._internal.deadlines.beforeShellScripts)
                                 virkshop._internal.sortPrioitiesByPath(virkshop._internal.shellSetupPriorities , ([eachSource, ...otherData])=>eachSource)
                                 for (const [eachSource, eachContent] of virkshop._internal.shellSetupPriorities) {
                                     if (debuggingLevel) {
-                                        shellProfileString += `\necho '${shellApi.escapeShellArgument(`    [loading: ${FileSystem.basename(eachSource)}]`)}'`
+                                        shellProfileString += `\necho ${shellApi.escapeShellArgument(`    [loading: ${FileSystem.basename(eachSource)}]`)}`
                                     }
                                     shellProfileString += `\n#\n# ${eachSource}\n#\n${eachContent}\n`
                                 }
                                 
                                 // 
-                                // add project commands again
+                                // add project commands
                                 // 
                                 shellProfileString += `
                                     #
@@ -532,6 +525,7 @@ export const createVirkshop = async (arg)=>{
                                     #
                                     ${shellApi.generatePrependToPathString(virkshop.pathTo.commands)}
                                 `.replace(/\n */g,"\n")
+                                
                                 // 
                                 // make folders work as recursive commands
                                 // 
@@ -544,7 +538,7 @@ export const createVirkshop = async (arg)=>{
                                     await FileSystem.write({
                                         path: shellApi.profilePath,
                                         data: `
-                                            . './${shellApi.escapeShellArgument(shellApi.autogeneratedProfile)}'
+                                            . ./${shellApi.escapeShellArgument(shellApi.autogeneratedProfile)}
                                         `.replace(/\n                                            /g, "\n"),
                                     })
                                 })
@@ -577,8 +571,8 @@ export const createVirkshop = async (arg)=>{
                     // finish dynamic setup
                     // 
                     await Promise.all(virkshop._internal.deadlines.beforeEnteringVirkshop)
-                    // make all commands executable
                     
+                    // make all commands executable
                     const permissionPromises = []
                     for await (const eachCommand of FileSystem.recursivelyIterateItemsIn(virkshop.pathTo.commands)) {
                         if (eachCommand.isFile) {
@@ -822,6 +816,8 @@ export const shellApi = Object.defineProperties(
                     if [ "$sub_command" = "package" ]
                     then
                         deno eval 'console.log(JSON.parse(Deno.env.get("VIRKSHOP_NIX_SHELL_DATA")).packagePaths[Deno.args[0]])' "$@"
+                    else
+                        echo "error: expected: virkshop_tools nix_path_for package ARG, but got virkshop_tools nix_path_for $sub_command" 
                     fi
                 elif [ "$sub_command" = "nix_lib_path_for" ]
                 then
@@ -830,6 +826,8 @@ export const shellApi = Object.defineProperties(
                     if [ "$sub_command" = "package" ]
                     then
                         deno eval 'console.log(JSON.parse(Deno.env.get("VIRKSHOP_NIX_SHELL_DATA")).libraryPaths[Deno.args[0]])' "$@"
+                    else
+                        echo "error: expected: virkshop_tools nix_lib_path_for package ARG, but got virkshop_tools nix_lib_path_for $sub_command" 
                     fi
                 fi
             }
@@ -838,10 +836,13 @@ export const shellApi = Object.defineProperties(
             return `# ${string}`
         },
         escapeShellArgument(string) { // TODO: make this include outside wrapping quotes
-            return string.replace(/'/g, `'"'"'`)
+            return "'"+string.replace(/'/g, `'"'"'`)+"'"
         },
         generatePrependToPathString(newPath) {
-            return `export PATH='${this.escapeShellArgument(newPath)}:'"$PATH"`
+            return `export PATH=${this.escapeShellArgument(newPath)}":$PATH"`
+        },
+        generateAppendToPathString(newPath) {
+            return `export PATH="$PATH:"${this.escapeShellArgument(newPath)}`
         },
         createHierarchicalCommandFor(folderPath) {
             const name = this.escapeShellArgument(FileSystem.basename(folderPath))
@@ -850,12 +851,12 @@ export const shellApi = Object.defineProperties(
                 # 
                 # command for ${name} folder
                 # 
-                    '${name}' () {
+                    ${name} () {
                         # enable globbing
                         setopt extended_glob &>/dev/null
                         shopt -s globstar &>/dev/null
                         shopt -s dotglob &>/dev/null
-                        local search_path='${this.escapeShellArgument(folderPath)}'
+                        local search_path=${this.escapeShellArgument(folderPath)}
                         local argument_combination="$search_path/$1"
                         while [[ -n "$@" ]]
                         do
@@ -899,8 +900,8 @@ export const shellApi = Object.defineProperties(
                         ls -1FL --group-directories-first --color "$search_path" | sed 's/^/    /' | sed -E 's/(\\*|@)$/ /' 1>&2
                         return 1 # error, no command
                     }
-                    '__autocomplete_for__${name}' () {
-                        local commands_path='${this.escapeShellArgument(FileSystem.parentPath(folderPath))}'
+                    '__autocomplete_for__'${name} () {
+                        local commands_path=${this.escapeShellArgument(FileSystem.parentPath(folderPath))}
                         # TODO: make this space friendly
                         # TODO: make this do partial-word complete 
                         function join_by { local d=\${1-} f=\${2-}; if shift 2; then printf %s "$f" "\${@/#/$d}"; fi; }
@@ -919,22 +920,22 @@ export const shellApi = Object.defineProperties(
                         fi
                         # echo "$(dirname "$commands_path/$item_path")"
                     }
-                    compdef '__autocomplete_for__${name}' '${name}'
+                    compdef '__autocomplete_for__'${name} ${name}
             `.replace(/\n                /g, "\n")
         },
         modifyEnvVar({ name, overwriteAs, prepend, append, joinUsing="", }) {
             name = name.trim()
             if (overwriteAs) {
-                return `\nexport ${name}='${this.escapeShellArgument(overwriteAs)}'\n`
+                return `\nexport ${name}=${this.escapeShellArgument(overwriteAs)}\n`
             }
             
             let output = ""
             if (prepend) {
                 output += `
                     if [ -z "$${name}" ]; then
-                        export ${name}='${this.escapeShellArgument(prepend)}'
+                        export ${name}=${this.escapeShellArgument(prepend)}
                     else
-                        export ${name}='${this.escapeShellArgument(prepend)}${this.escapeShellArgument(joinUsing)}'"$${name}"
+                        export ${name}=${this.escapeShellArgument(prepend)}${this.escapeShellArgument(joinUsing)}"$${name}"
                     fi
                 `.replace(/\n                    /,"\n")
             }
@@ -942,9 +943,9 @@ export const shellApi = Object.defineProperties(
             if (append) {
                 output += `
                     if [ -z "$${name}" ]; then
-                        export ${name}='${this.escapeShellArgument(append)}'
+                        export ${name}=${this.escapeShellArgument(append)}
                     else
-                        export ${name}="$${name}"'${this.escapeShellArgument(joinUsing)}${this.escapeShellArgument(append)}'
+                        export ${name}="$${name}"${this.escapeShellArgument(joinUsing)}${this.escapeShellArgument(append)}
                     fi
                 `.replace(/\n                    /,"\n")
             }
@@ -1156,7 +1157,7 @@ export const shellApi = Object.defineProperties(
                 } else {
                     return FileSystem.normalize(
                         FileSystem.makeAbsolutePath(
-                            FileSystem.makeRelativePath({from: folderOfYamlFile, to: relativePathString })
+                            `${folderOfYamlFile}/${relativePathString}`
                         )
                     )
                 }
@@ -1253,9 +1254,9 @@ export const parsePackageTools = async (pathToPackageTools)=>{
 }
 
 // 
-// fornixToNix
+// systemToolsToNix
 // 
-export const fornixToNix = async function({string, path}) {
+export const systemToolsToNix = async function({string, path}) {
     // TODO: add error for trying to assign to a keyword (like "builtins", "rec", "let", etc)
     const start = (new Date()).getTime()
     const dataStructure = await readExtendedYaml({path, string})
@@ -1360,14 +1361,14 @@ export const fornixToNix = async function({string, path}) {
                 // means it was a constant, or preprocessed via a !!deno tag
                 resultAsValue = values.value
             } else {
-                const packages = values.withPackages || []
+                const withPackages = values.withPackages || []
                 const whichWarehouse = values.fromWarehouse || defaultWarehouse
                 const tarFileUrl = warehouses[whichWarehouse.name].tarFileUrl // TODO: there's a lot of things that could screw up here, add checks/warnings for them
-                const escapedArguments = 'NO_COLOR=true '+values.runCommand.map(each=>`'${shellApi.escapeShellArgument(each)}'`).join(" ")
-                const fullCommand = ["nix-shell", "--pure", "--packages", ...packages, "-I", "nixpkgs="+tarFileUrl, "--run",  escapedArguments,]
+                const escapedArguments = 'NO_COLOR=true '+values.runCommand.map(each=>`${shellApi.escapeShellArgument(each)}`).join(" ")
+                const fullCommand = ["nix-shell", "--pure", "--packages", ...withPackages, "-I", "nixpkgs="+tarFileUrl, "--run",  escapedArguments,]
                 
                 const commandForDebugging = fullCommand.join(" ")
-                if (! packages) {
+                if (! withPackages) {
                     throw Error(`For\n- (compute):\n    saveAs: ${varName}\n    withPackages: []\nThe withPackages being empty is a problem. Try at least try: withPackages: ["bash"]`)
                 }
                 
