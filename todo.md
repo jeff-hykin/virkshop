@@ -1,32 +1,24 @@
 # pre-alpha:
-- clean up master branch
-- consider worst-case confusing scenarios, or conflicts caused by gitignore fighting with `commands/` or `home/`
-- create CLI option for 
-    - saving ENV vars (permanently)
-    - adding to path (permanently)
-
-- fix shellApi.escape
-- add support for custom nix-channels somehow, maybe using `!!nix` inside of custom warehouses, maybe using !!computed
-    - update documentation inside of system_tools.yaml
-- add onlyIf: !!nix support
-
-- DONE: create a `skeleton` branch, no injections, git, node, or python
-- create a `git` mixin
-    - ensures a git instance is initialized
-    - @copy_real .gitconfig
-    - adds gitignore with standard ignores (OS ignores and .ignore/.private)
-    - git hook events
-    - @link_real ssh
-    - ask about setting up a 50mb/100mb commit warning
-    - subrepo command
+- `1_bare_minimum`
+    - add support for injections
+    - fix shellApi.escape
+    - create CLI option for 
+        - saving ENV vars (permanently)
+        - adding to path (permanently)
+    - maybe add warning if package doesn't have asBuildInput: true or asNativeBuildInput: true
+- `2_minimal`
+    - injections: `diskutil`, and others
+- `mixins/git`
+    - fix the hooks (check if inside env)
+    - eventually ask about setting up a 50mb/100mb commit warning
     - eventually add a folder-sync option (list all folders, use `git check-ignore`)
-- create a `standard` branch
+- `3_standard`
     - add `clean` and `purge` commands
-    - inject basics like `sudo`
-    - all the basic CLI helpers (`btm`, `tldr`, etc)
-    - @link_real ssh
-- create a `python`
+- `4_extras`
+    - all the rust CLI helpers (`btm`, `tldr`, etc)
+- `mixins/python/standard`
     - pip command
+    - python poetry if pypoetry.toml exists
     - autoinit venv
     - adds to gitignore
     - adds clean and purge hooks
@@ -34,11 +26,30 @@
     - hash check for if python-venv version changed (and purge/reinstall upon python version change)
     - git hooks that check if dependencies change upon pull/checkout
     - eventually make venv and interactive upon_mixing question
-- create a `nodejs`
+- `mixins/nodejs/standard`
     - adds to gitignore
     - adds npm-init
     - adds startup module install check
     - hash check for if node/npm version changed (and purge/reinstall upon node/npm version change)
+
+- documentation:
+    - how to convert a nix-channel thing (nixGL) into system_tools.yaml
+    - getting path of nixpkgs
+- consider worst-case confusing scenarios, or conflicts caused by gitignore fighting with `commands/` or `home/`
+
+- add onlyIf: !!nix support
+
+- DONE: create a `skeleton` branch, no injections, git, node, or python
+- DONE: create a `mixins/git/standard` mixin
+    - DONE: ensures a git instance is initialized
+    - DONE: @copy_real .gitconfig
+    - DONE: @link_real ssh
+    - DONE: adds gitignore with standard ignores (OS ignores and .ignore/.private)
+    - DONE: subrepo command
+    - DONE: git hook events
+    - remove git subrepo
+    - eventually ask about setting up a 50mb/100mb commit warning
+    - eventually add a folder-sync option (list all folders, use `git check-ignore`)
 
 - DONE: rename `@core` without the @
 - DONE: add `virkshop/mixin` with support for an `@upon_mixing` event
@@ -85,8 +96,6 @@
         - How do I make my own virkshop?
         - How can I customize a virkshop?
             1. Adding a command
-                - always edit the `mixins/`
-                - always debug the `mixture/`
             2. Adding a system tool
             3. Adding an env var
             4. 
