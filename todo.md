@@ -102,8 +102,6 @@
         - How do I make my own virkshop?
         - How can I customize a virkshop?
             1. Adding a command
-                - always edit the `mixins/`
-                - always debug the `mixture/`
             2. Adding a system tool
             3. Adding an env var
             4. 
