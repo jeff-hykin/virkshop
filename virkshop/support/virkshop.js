@@ -1,6 +1,6 @@
-import { FileSystem } from "https://deno.land/x/quickr@0.6.14/main/file_system.js"
-import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.6.14/main/run.js"
-import { Console, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, strikethrough, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.6.14/main/console.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.6.20/main/file_system.js"
+import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.6.20/main/run.js"
+import { Console, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, strikethrough, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.6.20/main/console.js"
 import { indent, findAll } from "https://deno.land/x/good@0.7.8/string.js"
 import { intersection, subtract } from "https://deno.land/x/good@0.7.8/set.js"
 import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
@@ -344,7 +344,7 @@ export const createVirkshop = async (arg)=>{
                             
                             const yamlString = await FileSystem.read(virkshop.pathTo.systemTools)
                             // TODO: get a hash of this and see if nix-shell should even be regenerated or not (as an optimization)
-                            const result = await fornixToNix({string: yamlString, path: virkshop.pathTo.systemTools})
+                            const result = await systemToolsToNix({string: yamlString, path: virkshop.pathTo.systemTools})
                             defaultWarehouse = result.defaultWarehouse
                             // TODO: add error for no default warehouse
                             await FileSystem.write({
@@ -1257,9 +1257,9 @@ export const parsePackageTools = async (pathToPackageTools)=>{
 }
 
 // 
-// fornixToNix
+// systemToolsToNix
 // 
-export const fornixToNix = async function({string, path}) {
+export const systemToolsToNix = async function({string, path}) {
     // TODO: add error for trying to assign to a keyword (like "builtins", "rec", "let", etc)
     const start = (new Date()).getTime()
     const dataStructure = await readExtendedYaml({path, string})
