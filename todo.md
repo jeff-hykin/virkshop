@@ -3,6 +3,8 @@
     - create CLI option for 
         - saving ENV vars (permanently)
         - adding to path (permanently)
+    - reconsider the !!warehouse in favor of something like !!var
+    - add example for is_raspbian or is_arm
     - DONE: virkshop.injectUsersCommand(name)
     - LATER: clean up the virkshop command for getting paths and such (make it a deno command, give it a --help, etc)
     - LATER: add warning if injected command overwrites non-symlink file (indicating the user had a custom command there)
