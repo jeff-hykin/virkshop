@@ -15,7 +15,7 @@
     
     
     # virkshop uses a fake-home so that nothing in your real home folder gets broken
-    # AND scripts inside of virkshop/events/@setup_before_system_tools might often create files in the fake home
+    # AND scripts inside of virkshop/events/@setup_without_system_tools might often create files in the fake home
     # SO you don't want to have an "@overwrite .zshrc" because its likely one of the scripts has put something into the zshrc already
     # thats why we use an "@append .zshrc" file
     # you can also simultaniously have a "@prepend .zshrc" file if you
