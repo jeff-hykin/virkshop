@@ -238,7 +238,7 @@ export const createVirkshop = async (arg)=>{
                 },
                 // 
                 // 
-                // phase 1: runs setup_before_system_tools and setup_after_system_tools
+                // phase 1: runs setup_without_system_tools and setup_with_system_tools
                 // 
                 // 
                 async phase1() {
@@ -256,9 +256,9 @@ export const createVirkshop = async (arg)=>{
                     await Promise.all(promises)
                     
                     // 
-                    // run setup_before_system_tools
+                    // run setup_without_system_tools
                     // 
-                    const eventName = "@setup_before_system_tools"
+                    const eventName = "@setup_without_system_tools"
                     const alreadExecuted = new Set()
                     const parentFolderString = `${virkshop.pathTo.events}/${eventName}`
                     const selfSetupPromise = FileSystem.recursivelyListItemsIn(parentFolderString).then(
@@ -302,7 +302,7 @@ export const createVirkshop = async (arg)=>{
                     // 
                     virkshop._internal.deadlines.beforeShellScripts.push(selfSetupPromise.then(async ()=>{
                         // read the the before_login files as soon as possible
-                        const eventName = `@setup_after_system_tools`
+                        const eventName = `@setup_with_system_tools`
                         const parentFolderString = `${virkshop.pathTo.events}/${eventName}`
                         const files = await FileSystem.listFilePathsIn(parentFolderString)
                         await Promise.all(files.map(async eachPath=>{
@@ -504,7 +504,7 @@ export const createVirkshop = async (arg)=>{
                                 let shellProfileString = shellApi.shellProfileString
                                 
                                 // 
-                                // add @setup_after_system_tools scripts
+                                // add @setup_with_system_tools scripts
                                 // 
                                 await Promise.all(virkshop._internal.deadlines.beforeShellScripts)
                                 virkshop._internal.sortPrioitiesByPath(virkshop._internal.shellSetupPriorities , ([eachSource, ...otherData])=>eachSource)
@@ -632,7 +632,7 @@ export const createVirkshop = async (arg)=>{
             },
             async enter() {
                 await virkshop._stages.phase0() // phase 0: creates/discovers basic virkshop structure (establish linked files/folders, clean broken links)
-                await virkshop._stages.phase1() // phase 1: runs setup_before_system_tools
+                await virkshop._stages.phase1() // phase 1: runs setup_without_system_tools
             },
             async trigger(eventPath) {
                 const alreadExecuted = new Set()
@@ -772,7 +772,7 @@ export const createVirkshop = async (arg)=>{
         },
     )
     
-    // ensure these are set for any @setup_before_system_tools imports
+    // ensure these are set for any @setup_without_system_tools imports
     Console.env.VIRKSHOP_FOLDER = virkshop.pathTo.virkshop
     Console.env.PROJECT_FOLDER  = virkshop.pathTo.project
     
