@@ -344,7 +344,7 @@ export const createVirkshop = async (arg)=>{
                             
                             const yamlString = await FileSystem.read(virkshop.pathTo.systemTools)
                             // TODO: get a hash of this and see if nix-shell should even be regenerated or not (as an optimization)
-                            const result = await fornixToNix({string: yamlString, path: virkshop.pathTo.systemTools})
+                            const result = await systemToolsToNix({string: yamlString, path: virkshop.pathTo.systemTools})
                             defaultWarehouse = result.defaultWarehouse
                             // TODO: add error for no default warehouse
                             await FileSystem.write({
@@ -1253,9 +1253,9 @@ export const parsePackageTools = async (pathToPackageTools)=>{
 }
 
 // 
-// fornixToNix
+// systemToolsToNix
 // 
-export const fornixToNix = async function({string, path}) {
+export const systemToolsToNix = async function({string, path}) {
     // TODO: add error for trying to assign to a keyword (like "builtins", "rec", "let", etc)
     const start = (new Date()).getTime()
     const dataStructure = await readExtendedYaml({path, string})
