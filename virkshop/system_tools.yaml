@@ -78,11 +78,6 @@
 #     var: HOWDY
 #     overwriteAs: "Howdy"
 
-- (environmentVariable):
-    var: PATH
-    append: !!as_absolute_path "./temporary.ignore/long_term/injections"
-    joinUsing: ":"
-
 - (environmentVariable): # impure, but often necessary/practical and minimal
     var: PATH
     append: "/usr/bin"
