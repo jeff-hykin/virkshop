@@ -1,20 +1,22 @@
 # pre-alpha:
 - `1_bare_minimum`
-    - rename to be "setup_with_system_tools"
+    - reconsider the !!warehouse in favor of something like !!var
+    - add example for is_raspbian or is_arm
     - create CLI option for 
         - saving ENV vars (permanently)
         - adding to path (permanently)
     - DONE: virkshop.injectUsersCommand(name)
+    - LATER: clean up the virkshop command for getting paths and such (make it a deno command, give it a --help, etc)
     - LATER: add warning if injected command overwrites non-symlink file (indicating the user had a custom command there)
 - `mixins/git`
     - DONE: fix the hooks (check if inside env)
 - `2_minimal`
     - add cachix support: settings input for a cachix name, use ENV var for pushing
 - `3_standard`
-    - add `trigger` command
     - LATER: eventually ask about setting up a 50mb/100mb commit warning
     - LATER: eventually add a folder-sync option (list all folders, use `git check-ignore`)
     - DONE: add `clean` and `purge` commands
+    - DONE: add `trigger` command
     - DONE: injections:  `vim`, `vi`, `emacs`, `nvim`, `code`
     - DONE: link keychain
     - DONE: link deno cache
