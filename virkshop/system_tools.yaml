@@ -357,45 +357,45 @@
 # 
 # 
 - (package):
-    asBuildInput: true
     load: [ "fd",]
+    asBuildInput: true
 
 - (package):
-    asBuildInput: true
     load: [ "sd",]
+    asBuildInput: true
 
 - (package):
-    asBuildInput: true
     load: [ "dua",]
+    asBuildInput: true
 
 - (package):
-    asBuildInput: true
     load: [ "tealdeer",]
+    asBuildInput: true
 
 - (package):
-    asBuildInput: true
     load: [ "bottom",]
+    asBuildInput: true
 
 - (package):
-    asBuildInput: true
     load: [ "exa",]
+    asBuildInput: true
 
 - (package):
-    asBuildInput: true
     load: [ "zsh-syntax-highlighting",]
+    asBuildInput: true
     saveVariableAs: zsh-syntax-highlighting
 
 - (package):
-    asBuildInput: true
     load: [ "oh-my-zsh",]
+    asBuildInput: true
     saveVariableAs: oh-my-zsh
 
 - (package):
-    asBuildInput: true
     load: [ "zsh-autosuggestions",]
+    asBuildInput: true
     saveVariableAs: zsh-autosuggestions
 
 - (package):
-    asBuildInput: true
     load: [ "spaceship-prompt",]
+    asBuildInput: true
     saveVariableAs: spaceship-prompt
