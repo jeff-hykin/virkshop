@@ -1064,10 +1064,10 @@ export const shellApi = Object.defineProperties(
             tagName: "nix",
         })
     // 
-    // !!warehouse support
+    // !!var support
     // 
-        const WarehouseVar = createCustomTag({
-            tagName: "warehouse",
+        const SystemToolVar = createCustomTag({
+            tagName: "var",
             yamlNodeIsValidACustomType(data) {
                 if (typeof data !== 'string') return false
                 if (data.length === 0) return false
@@ -1077,47 +1077,7 @@ export const shellApi = Object.defineProperties(
                 return !!data.match(validVariableNameRegex)
             },
             createJavasriptValueFromYamlString(data) {
-                const nixVar = new WarehouseVar()
-                nixVar.asString = data
-                nixVar.name = data.trim()
-                return nixVar
-            }
-        })
-    // 
-    // !!computed support
-    // 
-        const ComputedVar = createCustomTag({
-            tagName: "computed",
-            yamlNodeIsValidACustomType(data) {
-                if (typeof data !== 'string') return false
-                if (data.length === 0) return false
-                
-                data = data.trim()
-                // if its a variable name
-                return !!data.match(validVariableNameRegex)
-            },
-            createJavasriptValueFromYamlString(data) {
-                const nixVar = new ComputedVar()
-                nixVar.asString = data
-                nixVar.name = data.trim()
-                return nixVar
-            }
-        })
-    // 
-    // !!package support
-    // 
-        const PackageVar = createCustomTag({
-            tagName: "package",
-            yamlNodeIsValidACustomType(data) {
-                if (typeof data !== 'string') return false
-                if (data.length === 0) return false
-                
-                data = data.trim()
-                // if its a variable name
-                return !!data.match(validVariableNameRegex)
-            },
-            createJavasriptValueFromYamlString(data) {
-                const nixVar = new PackageVar()
+                const nixVar = new SystemToolVar()
                 nixVar.asString = data
                 nixVar.name = data.trim()
                 return nixVar
@@ -1173,7 +1133,7 @@ export const shellApi = Object.defineProperties(
         converter: (obj)=>obj.asString,
     })
     nix.addCustomJsConverter({
-        checker: (obj)=>obj instanceof WarehouseVar || obj instanceof ComputedVar || obj instanceof PackageVar,
+        checker: (obj)=>obj instanceof SystemToolVar,
         converter: (obj)=>obj.name,
     })
 
@@ -1230,10 +1190,10 @@ export const parsePackageTools = async (pathToPackageTools)=>{
     // in the future their may be some extra logic here
     const asString = await FileSystem.read(pathToPackageTools)
     const dataStructure = await readExtendedYaml({path: pathToPackageTools, string: asString})
-    const allSaveAsValues = dataStructure.map(each=>each[Object.keys(each)[0]].saveAs)
+    const allSaveAsValues = dataStructure.map(each=>each[Object.keys(each)[0]].saveVariableAs)
     const illegalNames = allSaveAsValues.filter(each=>`${each}`.startsWith("_-"))
     if (illegalNames.length > 0) {
-        throw Error(`Inside ${pathToPackageTools}, there are some illegal saveAs names (names that start with "_-")\nPlease rename these values:${illegalNames.map(each=>`\n    saveAs: ${each}`).join("")}`)
+        throw Error(`Inside ${pathToPackageTools}, there are some illegal saveVariableAs names (names that start with "_-")\nPlease rename these values:${illegalNames.map(each=>`\n    saveVariableAs: ${each}`).join("")}`)
     }
     dataStructure.asString = asString
     dataStructure.packages = dataStructure.map(each=>each["(package)"]).filter(each=>each instanceof Object)
@@ -1259,7 +1219,7 @@ export const systemToolsToNix = async function({string, path}) {
     // TODO: add error for trying to assign to a keyword (like "builtins", "rec", "let", etc)
     const start = (new Date()).getTime()
     const dataStructure = await readExtendedYaml({path, string})
-    const allSaveAsValues = dataStructure.map(each=>each[Object.keys(each)[0]].saveAs)
+    const allSaveAsValues = dataStructure.map(each=>each[Object.keys(each)[0]].saveVariableAs)
     const frequencyCountOfVarNames = allSaveAsValues.filter(each=>each).reduce((frequency, item)=>(frequency[item]?frequency[item]++:frequency[item]=1, frequency), {})
     const varNames = []
     let defaultWarehouse = null
@@ -1329,13 +1289,13 @@ export const systemToolsToNix = async function({string, path}) {
             //         allowUnfree: true
             //         cudaSupport: true
             //         permittedInsecurePackages: [ "openssl-1.0.2u" ]
-            // saveAs: "!!nix defaultWarehouse"
+            // saveVariableAs: "!!nix defaultWarehouse"
 
-            const varName = values.saveAs
+            const varName = values.saveVariableAs
             const nixCommitHash = values.createWarehouseFrom.nixCommitHash
             const tarFileUrl = values.createWarehouseFrom.tarFileUrl || `https://github.com/NixOS/nixpkgs/archive/${nixCommitHash}.tar.gz`
             const warehouseArguments = values.arguments || {}
-            warehouses[varName] = new WarehouseVar()
+            warehouses[varName] = new SystemToolVar()
             warehouses[varName].name = varName
             warehouses[varName].tarFileUrl = tarFileUrl
             warehouses[varName].arguments = warehouseArguments
@@ -1352,9 +1312,9 @@ export const systemToolsToNix = async function({string, path}) {
         } else if (kind == "(compute)") {
             // - (compute):
             //     runCommand: [ "nix-shell", "--pure", "--packages", "deno", "deno eval 'console.log(JSON.stringify(Deno.build.os==\'darwin\'))'", "-I", *defaultWarehouseAnchor ]
-            //     saveAs: isMac
+            //     saveVariableAs: isMac
             const values = eachEntry[kind]
-            const varName = values.saveAs
+            const varName = values.saveVariableAs
             let resultAsValue
             if (Object.keys(values).includes('value')) {
                 // means it was a constant, or preprocessed via a !!deno tag
@@ -1368,7 +1328,7 @@ export const systemToolsToNix = async function({string, path}) {
                 
                 const commandForDebugging = fullCommand.join(" ")
                 if (! withPackages) {
-                    throw Error(`For\n- (compute):\n    saveAs: ${varName}\n    withPackages: []\nThe withPackages being empty is a problem. Try at least try: withPackages: ["bash"]`)
+                    throw Error(`For\n- (compute):\n    saveVariableAs: ${varName}\n    withPackages: []\nThe withPackages being empty is a problem. Try at least try: withPackages: ["bash"]`)
                 }
                 
                 // TODO: make sure everything in the runCommand is a string
@@ -1392,7 +1352,7 @@ export const systemToolsToNix = async function({string, path}) {
         // 
         } else if (kind == "(environmentVariable)") {
             const values = eachEntry[kind]
-            virkshop._internal.finalShellCode += shellApi.modifyEnvVar({ ...values, name: values.var })
+            virkshop._internal.finalShellCode += shellApi.modifyEnvVar({ ...values, name: values.envVar })
         // 
         // (package)
         // 
@@ -1406,7 +1366,7 @@ export const systemToolsToNix = async function({string, path}) {
             // 
             // handle onlyIf
             // 
-            if (values.onlyIf instanceof ComputedVar) {
+            if (values.onlyIf instanceof SystemToolVar) {
                 // skip if value is false
                 if (!computed[values.onlyIf.name]) {
                     continue
@@ -1448,7 +1408,7 @@ export const systemToolsToNix = async function({string, path}) {
             let nixValue
             if (values.load instanceof NixValue) {
                 nixValue = `(${values.load.asString})`
-            } else if (source instanceof WarehouseVar || source instanceof ComputedVar || source instanceof PackageVar) {
+            } else if (source instanceof SystemToolVar) {
                 const loadAttribute = values.load.map(each=>nix.escapeJsValue(`${each}`)).join(".")
                 nixValue = `${source.name}.${loadAttribute}`
             // from a hash/url directly
@@ -1475,8 +1435,8 @@ export const systemToolsToNix = async function({string, path}) {
             // 
             // create name if needed
             // 
-            if (values.saveAs) {
-                const varName = values.saveAs
+            if (values.saveVariableAs) {
+                const varName = values.saveVariableAs
                 packages[varName] = values
                 saveNixVar(varName, nixValue)
             }
@@ -1486,7 +1446,7 @@ export const systemToolsToNix = async function({string, path}) {
         } else if (kind == "(nix)") {
             // from: !!warehouse pythonPackages
             // load: [ "pyopengl",]
-            // saveAs: varName
+            // saveVariableAs: varName
             const values = eachEntry[kind]
             
             // 
@@ -1495,7 +1455,7 @@ export const systemToolsToNix = async function({string, path}) {
             const source = values.from || defaultWarehouse
             const loadAttribute = values.load.map(each=>nix.escapeJsValue(`${each}`)).join(".")
             let nixValue
-            if (source instanceof WarehouseVar || source instanceof ComputedVar || source instanceof PackageVar) {
+            if (source instanceof SystemToolVar) {
                 nixValue = `${source.name}.${loadAttribute}`
             // from a hash/url directly
             } else {
@@ -1510,7 +1470,7 @@ export const systemToolsToNix = async function({string, path}) {
             // 
             // create name if needed
             // 
-            const varName = values.saveAs
+            const varName = values.saveVariableAs
             nixValues[varName] = values
             saveNixVar(varName, nixValue)
         }
