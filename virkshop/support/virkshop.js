@@ -1,6 +1,6 @@
-import { FileSystem } from "https://deno.land/x/quickr@0.6.20/main/file_system.js"
-import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.6.20/main/run.js"
-import { Console, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, strikethrough, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.6.20/main/console.js"
+import { FileSystem } from "https://deno.land/x/quickr@0.6.24/main/file_system.js"
+import { run, throwIfFails, zipInto, mergeInto, returnAsString, Timeout, Env, Cwd, Stdin, Stdout, Stderr, Out, Overwrite, AppendTo } from "https://deno.land/x/quickr@0.6.24/main/run.js"
+import { Console, black, white, red, green, blue, yellow, cyan, magenta, lightBlack, lightWhite, lightRed, lightGreen, lightBlue, lightYellow, lightMagenta, lightCyan, blackBackground, whiteBackground, redBackground, greenBackground, blueBackground, yellowBackground, magentaBackground, cyanBackground, lightBlackBackground, lightRedBackground, lightGreenBackground, lightYellowBackground, lightBlueBackground, lightMagentaBackground, lightCyanBackground, lightWhiteBackground, bold, reset, dim, italic, underline, inverse, strikethrough, gray, grey, lightGray, lightGrey, grayBackground, greyBackground, lightGrayBackground, lightGreyBackground, } from "https://deno.land/x/quickr@0.6.24/main/console.js"
 import { indent, findAll } from "https://deno.land/x/good@0.7.8/string.js"
 import { intersection, subtract } from "https://deno.land/x/good@0.7.8/set.js"
 import { move as moveAndRename } from "https://deno.land/std@0.133.0/fs/mod.ts"
@@ -1352,7 +1352,16 @@ export const systemToolsToNix = async function({string, path}) {
         // 
         } else if (kind == "(environmentVariable)") {
             const values = eachEntry[kind]
-            virkshop._internal.finalShellCode += shellApi.modifyEnvVar({ ...values, name: values.envVar })
+            if (values.onlyIf === false) {
+                continue
+            } else if (values.onlyIf instanceof SystemToolVar) {
+                // skip if value is false
+                if (!computed[values.onlyIf.name]) {
+                    continue
+                }
+            } else {
+                virkshop._internal.finalShellCode += shellApi.modifyEnvVar({ ...values, name: values.envVar })
+            }
         // 
         // (package)
         // 
@@ -1366,7 +1375,9 @@ export const systemToolsToNix = async function({string, path}) {
             // 
             // handle onlyIf
             // 
-            if (values.onlyIf instanceof SystemToolVar) {
+            if (values.onlyIf === false) {
+                continue
+            } else if (values.onlyIf instanceof SystemToolVar) {
                 // skip if value is false
                 if (!computed[values.onlyIf.name]) {
                     continue
