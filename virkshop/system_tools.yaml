@@ -79,7 +79,7 @@
 
 # - (environmentVariable):
 #     envVar: PATH
-#     prepend: !!as_absolute_path "./mixture/commands" # the "." is the folder of the system_tools.yaml file
+#     prepend: !!as_absolute_path "./home" # the "." is the folder containing the system_tools.yaml file
 #     joinUsing: ":"
 
 # 
