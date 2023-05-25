@@ -1,6 +1,0 @@
-
-
-- (environmentVariable):
-    envVar: hi
-    overwriteAs: !!as_absolute_path "../thing"
-        
