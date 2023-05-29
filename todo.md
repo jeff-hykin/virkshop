@@ -1,6 +1,6 @@
 # pre-alpha:
 - `1_bare_minimum`
-    - add example for is_raspbian or is_arm
+    - DONE: add example for is_raspbian or is_arm
     - DONE:  create CLI option for saving ENV vars (permanently)
     - DONE: reconsider the !!warehouse in favor of something like !!var, and use varName instead of saveAs
     - DONE: virkshop.injectUsersCommand(name)

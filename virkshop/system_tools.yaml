@@ -54,11 +54,29 @@
 #     value: !!deno " Deno.build.os == 'darwin' "
 #     saveVariableAs: isMac
 
-# # example3: create an isLinux variable
+# # example3: create an isArm64 variable
+#     runCommand: [ "zsh", "-c", "if [ $(arch) = 'arm64' ]; then echo 'true'; else echo 'false'; fi" ]
+#     withPackages: [ "python" ]
+#     fromWarehouse: !!var defaultWarehouse
+#     saveVariableAs: isArm64
+
+# # example4: create an isLinux variable
 # - (compute):
 #     saveVariableAs: isLinux
 #     value: !!deno |
 #         Deno.build.os == 'linux'
+
+# # example5: create an isUbuntu variable
+# - (compute):
+#     saveVariableAs: isUbuntu
+#     value: !!deno |
+#         await Deno.readTextFile("/etc/os-release").catch(_=>false).then(text=>!!text.match(/ubuntu/i))
+
+# # example6: create an isRaspbian variable
+# - (compute):
+#     saveVariableAs: isRaspbian
+#     value: !!deno |
+#         await Deno.readTextFile("/etc/os-release").catch(_=>false).then(text=>!!text.match(/raspbian/i))
 
 # available tags:
     # !!var               # marks that a string will be intepreted as a variable name, and the value of the variable will be used
