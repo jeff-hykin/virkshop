@@ -369,3 +369,47 @@
 #     load: [ "unixtools", "xxd",]
 #     from: !!var warehouseForNetworking
 #     asBuildInput: true
+
+# 
+# 
+# AssemblyScript
+# 
+# 
+- (package):
+    load: !!nix |
+        defaultWarehouse.stdenv.mkDerivation {
+            name = "assemblyscript";
+            packageName = "assemblyscript";
+            version = "0.27.5";
+            
+            gcc = defaultWarehouse.gcc;
+            coreutils = defaultWarehouse.coreutils;
+            src = builtins.fetchTarball ({
+                url="https://github.com/AssemblyScript/assemblyscript/archive/a0c27fadd027a32542420160deff04dc31e10f59.tar.gz";
+            });
+            
+            buildInputs = [
+                defaultWarehouse.nodejs
+                defaultWarehouse.nodePackages.npm
+            ];
+            
+            installPhase = ''
+                export HOME="$PWD/home"
+                mkdir -p "$out"
+                cp -r "$src" "$out/assemblyscript/"
+                cd "$out/assemblyscript/"
+                chmod -R +w .
+                npm install
+                npm run build
+                cd "$out"
+                npm init -y
+                npm install "$out/assemblyscript/"
+                
+                echo "there should be a package json here"
+                ln -s "$out/node_modules/.bin" "$out/bin"
+                
+                # ensure executability
+                chmod +x "$out/bin/"*
+            '';
+        }
+    asBuildInput: true
