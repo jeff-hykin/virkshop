@@ -376,6 +376,10 @@
 # 
 # 
 - (package):
+    load: [ "wabt" ]
+    asBuildInput: true
+
+- (package):
     load: !!nix |
         defaultWarehouse.stdenv.mkDerivation {
             name = "assemblyscript";
