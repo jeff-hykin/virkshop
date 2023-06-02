@@ -624,8 +624,11 @@ export const nix = {
             const nixPaths = (Console.env.NIX_PATH||"").split(":")
             const nixpkgsVariableSource = "nixpkgs=/nix/var/nix/profiles/per-user/root/channels/nixpkgs"
             const defaultVariableSource = `/nix/var/nix/profiles/per-user/root/channels`
-            nixPaths.includes(nixpkgsVariableSource) || nixPaths.push(nixpkgsVariableSource)
-            nixPaths.includes(defaultVariableSource) || nixPaths.push(defaultVariableSource)
+            const defaultVariableSourceInfo = await FileSystem.info(defaultVariableSource)
+            if (defaultVariableSourceInfo.exists) {
+                nixPaths.includes(nixpkgsVariableSource) || nixPaths.push(nixpkgsVariableSource)
+                nixPaths.includes(defaultVariableSource) || nixPaths.push(defaultVariableSource)
+            }
             Console.env.NIX_PATH = nixPaths.join(":").trim()
         // 
         // PATH
