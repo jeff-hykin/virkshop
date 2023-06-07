@@ -422,3 +422,10 @@
     load: [ "spaceship-prompt",]
     asBuildInput: true
     saveVariableAs: spaceship-prompt
+
+# 
+# extras
+# 
+- (package):
+    load: [ "git-subrepo",]
+    asBuildInput: true
