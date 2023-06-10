@@ -4,7 +4,7 @@
 # 
 # 
 
-# explaination:
+# explanation:
     # for file and folder names names inside of virkshop/home you can use these followed by a space to do some magic
     #     @append
     #     @prepend
