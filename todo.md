@@ -1,5 +1,13 @@
 # pre-alpha:
 - `1_bare_minimum`
+    - change how the pathing is done in settings `!path/relative_to_project ./commands: !path/relative_to_virkshop` instead of `$VIRKSHOP_FOLDER/commands"`
+    - improve the shellApi
+        - make a distinct set of shellStatements
+        - add a "hasCommand" statement
+    - plugin system
+        - support events (at minimum)
+        - restrict names
+        - support commands
     - DONE: add example for is_raspbian or is_arm
     - DONE:  create CLI option for saving ENV vars (permanently)
     - DONE: reconsider the !!warehouse in favor of something like !!var, and use varName instead of saveAs
@@ -21,6 +29,7 @@
 - `4_extras`
     - DONE: all the rust CLI helpers (`btm`, `tldr`, etc)
     - DONE: jeff git shortcuts
+    - 
 - `mixins/python/minimal`
     - pip command
 - `mixins/python/standard`
