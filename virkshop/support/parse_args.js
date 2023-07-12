@@ -39,51 +39,51 @@ function hasKey(obj, keys) {
     return hasOwn(o, key)
 }
 
+/** Take a set of command line arguments, optionally with a set of options, and
+ * return an object representing the flags found in the passed arguments.
+ *
+ * By default, any arguments starting with `-` or `--` are considered boolean
+ * flags. If the argument name is followed by an equal sign (`=`) it is
+ * considered a key-value pair. Any arguments which could not be parsed are
+ * available in the `_` property of the returned object.
+ *
+ * By default, the flags module tries to determine the type of all arguments
+ * automatically and the return type of the `parse` method will have an index
+ * signature with `any` as value (`{ [x: string]: any }`).
+ *
+ * If the `string`, `boolean` or `collect` option is set, the return value of
+ * the `parse` method will be fully typed and the index signature of the return
+ * type will change to `{ [x: string]: unknown }`.
+ *
+ * Any arguments after `'--'` will not be parsed and will end up in `parsedArgs._`.
+ *
+ * Numeric-looking arguments will be returned as numbers unless `options.string`
+ * or `options.boolean` is set for that argument name.
+ *
+ * @example
+ * ```ts
+ * import { Args } from "../support/parse_args.js"
+ * const parsedArgs = new Args({argList: Deno.args})
+ * ```
+ *
+ * @example
+ * ```ts
+ * import { Args } from "../support/parse_args.js"
+ * const parsedArgs = Args({argList:["--foo", "--bar=baz", "./quux.txt"]})
+ * // parsedArgs: { foo: true, bar: "baz", _: ["./quux.txt"] }
+ * ```
+ */
 export class Args {
-    /** Take a set of command line arguments, optionally with a set of options, and
-     * return an object representing the flags found in the passed arguments.
-     *
-     * By default, any arguments starting with `-` or `--` are considered boolean
-     * flags. If the argument name is followed by an equal sign (`=`) it is
-     * considered a key-value pair. Any arguments which could not be parsed are
-     * available in the `_` property of the returned object.
-     *
-     * By default, the flags module tries to determine the type of all arguments
-     * automatically and the return type of the `parse` method will have an index
-     * signature with `any` as value (`{ [x: string]: any }`).
-     *
-     * If the `string`, `boolean` or `collect` option is set, the return value of
-     * the `parse` method will be fully typed and the index signature of the return
-     * type will change to `{ [x: string]: unknown }`.
-     *
-     * Any arguments after `'--'` will not be parsed and will end up in `parsedArgs._`.
-     *
-     * Numeric-looking arguments will be returned as numbers unless `options.string`
-     * or `options.boolean` is set for that argument name.
-     *
-     * @example
-     * ```ts
-     * import { parse } from "https://deno.land/std@$STD_VERSION/flags/mod.ts"
-     * const parsedArgs = parse(Deno.args)
-     * ```
-     *
-     * @example
-     * ```ts
-     * import { parse } from "https://deno.land/std@$STD_VERSION/flags/mod.ts"
-     * const parsedArgs = parse(["--foo", "--bar=baz", "./quux.txt"])
-     * // parsedArgs: { foo: true, bar: "baz", _: ["./quux.txt"] }
-     * ```
-     */
     constructor({
-            argList,
-            alias = {},
-            boolean = false,
-            stopEarly = false,
-            string = [],
-            collect = [],
-            negatable = [],
-            unknown = (i) => i,
-            ...otherArgs
+        argList,
+        alias = {},
+        boolean = false,
+        stopEarly = false,
+        string = [],
+        collect = [],
+        negatable = [],
+        unknown = (i) => i,
+        ...otherArgs
     }) {
         this.argList = argList
 
@@ -251,7 +251,7 @@ export class Args {
 
         let notFlags = []
         let args = argList
-
+        
         // all args after "--" are not parsed
         if (args.includes("--")) {
             notFlags = args.slice(args.indexOf("--") + 1)
