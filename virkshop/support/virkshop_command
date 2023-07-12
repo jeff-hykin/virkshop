@@ -1,0 +1,29 @@
+import { Args } from "./parse_args.js"
+
+const { namedArgs } = new Args({argList: Deno.args})
+
+const helpString = `
+
+    Examples:
+        @virkshop --nixPathFor zsh-autosuggestions
+        @virkshop --nixLibPathFor zsh-autosuggestions
+
+`.replace(/\n    /g, "\n")
+
+if (namedArgs.help) {
+    console.log(helpString)
+} else if (namedArgs.nixPathFor) {
+    const envData = JSON.parse(Deno.env.get("VIRKSHOP_NIX_SHELL_DATA"))
+    if (!(namedArgs.nixPathFor in envData.packagePaths)) {
+        throw Error(`Couldn't find package/var ${JSON.stringify(namedArgs.nixPathFor)}. This probably means you need to add a saveVariableAs: ${JSON.stringify(namedArgs.nixPathFor)} to the system_tools.yaml file.\nThis error is being thrown by the @virkshop --nixPathFor ${JSON.stringify(namedArgs.nixPathFor)} command`)
+    }
+    console.log(envData.packagePaths[namedArgs.nixPathFor])
+} else if (namedArgs.nixLibPathFor) {
+    const envData = JSON.parse(Deno.env.get("VIRKSHOP_NIX_SHELL_DATA"))
+    if (!(namedArgs.nixLibPathFor in envData.libraryPaths)) {
+        throw Error(`Couldn't find package/var ${JSON.stringify(namedArgs.nixLibPathFor)}. This probably means you need to add a saveVariableAs: ${JSON.stringify(namedArgs.nixLibPathFor)} to the system_tools.yaml file.\nThis error is being thrown by the @virkshop --nixLibPathFor ${JSON.stringify(namedArgs.nixLibPathFor)} command`)
+    }
+    console.log(envData.libraryPaths[namedArgs.nixLibPathFor])
+} else {
+    console.error(`Unknown arguments ${JSON.stringify(Deno.args)}\n${helpString}`)
+}
