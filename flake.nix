@@ -1,5 +1,5 @@
 {
-    description = "Vix: virtual home environments powered nix";
+    description = "Xome: virtual home environments powered nix";
     inputs = {
         libSource.url = "github:divnix/nixpkgs.lib";
         home-manager.url = "github:nix-community/home-manager";
@@ -399,7 +399,8 @@
                                             export REAL_HOME="$HOME"
                                             export HOME=${lib.escapeShellArg homePath}
                                             mkdir -p "$HOME/.local/state/nix/profiles"
-                                            USER="default" HOME=${lib.escapeShellArg homePath} ${home.activationPackage.out}/activate 1>/dev/null 2>1 | grep -v "replacing old 'home-manager-path'"
+                                            # note: the grep is to remove common startup noise
+                                            USER="default" HOME=${lib.escapeShellArg homePath} ${home.activationPackage.out}/activate 2>&1 | ${systemSetup.defaultWarehouse.gnugrep}/bin/grep -v -E "Starting Home Manager activation|warning: unknown experimental feature 'repl-flake'|Activating checkFilesChanged|Activating checkLinkTargets|Activating writeBoundary|No change so reusing latest profile generation|Activating installPackages|warning: unknown experimental feature 'repl-flake'|replacing old 'home-manager-path'|installing 'home-manager-path'|Activating linkGeneration|Cleaning up orphan links from .*|Creating home file links in .*|Activating onFilesChange|Activating setupLaunchAgents"
                                             env -i VIX_ACTIVE=1 PATH=${lib.escapeShellArg homePath}/bin:${lib.escapeShellArg homePath}/.nix-profile/bin HOME=${lib.escapeShellArg homePath} USER="$USER" SHELL=${lib.escapeShellArg (builtins.elemAt shellCommandList 0)} TERM="$TERM" ${shellCommandString}
                                             exit $?
                                         '';
