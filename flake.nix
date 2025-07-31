@@ -1,5 +1,5 @@
 {
-    description = "Howdy!";
+    description = "Vix: virtual home environments powered nix";
     inputs = {
         libSource.url = "github:divnix/nixpkgs.lib";
         home-manager.url = "github:nix-community/home-manager";
@@ -319,6 +319,28 @@
                                             [[ -f ${systemSetup.pkgs.zsh}/share/zsh/site-functions/p10k.zsh ]] && source ${systemSetup.pkgs.zsh}/share/zsh/site-functions/p10k.zsh
                                         '';
                                     };
+                                    starship = {
+                                        enable = true;
+                                        enableZshIntegration = true;
+                                        settings = {
+                                            add_newline = false;
+                                            # prompt_order = [
+                                            #     "username"
+                                            #     "hostname"
+                                            #     "directory"
+                                            #     "git_branch"
+                                            #     "git_status"
+                                            #     "cmd_duration"
+                                            #     "line_break"
+                                            #     "jobs"
+                                            #     "character"
+                                            # ];
+                                            character = {
+                                                success_symbol = "[∫](bold green)";
+                                                error_symbol = "[✗](bold red)";
+                                            };
+                                        };
+                                    };
                                 };
                                 
                                 # vix is primairly for home-setup stuff
@@ -373,17 +395,15 @@
                                         inherit (systemSetup) buildInputs nativeBuildInputs propagatedBuildInputs;
                                         # FIXME: ENV vars
                                         # FIXME: PATH modifications/limiter
-                                        shellHook = builtins.trace homePath ''
+                                        shellHook = ''
                                             export REAL_HOME="$HOME"
                                             export HOME=${lib.escapeShellArg homePath}
                                             mkdir -p "$HOME/.local/state/nix/profiles"
-                                            USER="default" HOME=${lib.escapeShellArg homePath} ${home.activationPackage.out}/activate
+                                            USER="default" HOME=${lib.escapeShellArg homePath} ${home.activationPackage.out}/activate 1>/dev/null 2>1 | grep -v "replacing old 'home-manager-path'"
                                             env -i VIX_ACTIVE=1 PATH=${lib.escapeShellArg homePath}/bin:${lib.escapeShellArg homePath}/.nix-profile/bin HOME=${lib.escapeShellArg homePath} USER="$USER" SHELL=${lib.escapeShellArg (builtins.elemAt shellCommandList 0)} TERM="$TERM" ${shellCommandString}
                                             exit $?
                                         '';
                                     };
-                                    }
-                                    }
                                 }
                         )
                     ) // {
