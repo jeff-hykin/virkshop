@@ -1,5 +1,5 @@
 {
-    description = "Xome: virtual home environments powered nix";
+    description = "Vix: virtual home environments powered nix";
     inputs = {
         libSource.url = "github:divnix/nixpkgs.lib";
         home-manager.url = "github:nix-community/home-manager";
@@ -117,9 +117,10 @@
             # 
             # vix specifics
             # 
-                setup = ({ nixpkgs, warehouses, localPackages, builtins ? core, ... }:
+                setup = ({ nixpkgs, projectName, warehouses, localPackages, builtins ? core, ... }:
                     {
-                        inherit nixpkgs warehouses localPackages builtins;
+                        inherit nixpkgs projectName warehouses localPackages;
+                        builtins = assert builtins.isString projectName; builtins;
                         load = (system:
                             let
                                 defaultWarehouse = nixpkgs.legacyPackages.${system};
@@ -255,99 +256,88 @@
                 );
                 
                 mkShells = {
-                    vixSetup,
+                    vixBuilder,
                     supportedSystems,
-                    homeManagerConfigFunc ? system: let systemSetup = (vixSetup.load system); in {
-                        inherit (systemSetup) pkgs;
-                        modules = [
-                            {
-                                home.username = "default";
-                                home.homeDirectory = "/tmp/nix_temp_home";
-                                home.stateVersion = "25.11"; # vixSetup.nixpkgs.rev;
+                    homeManagerConfigFunc ? {system, vixBuilt ? (vixBuilder.load system), ... }: 
+                        {
+                            inherit (vixBuilt) pkgs;
+                            modules = [
+                                {
+                                    home.username = "default";
+                                    home.homeDirectory = "/tmp/vix_homes/${vixBuilder.projectName}";
+                                    home.stateVersion = "25.11"; # vixBuilder.nixpkgs.rev;
 
-                                programs = {
-                                    home-manager = {
-                                        enable = true;
-                                    };
-                                    zsh = {
-                                        enable = true;
-                                        package = systemSetup.pkgs.zsh;
-                                        enableCompletion = true;
-                                        autosuggestion.enable = true;
-                                        syntaxHighlighting.enable = true;
-                                        # ohMyZsh = {
-                                        #     enable = true;
-                                        #     theme = "powerlevel10k/powerlevel10k";
-                                        #     plugins = [
-                                        #         "git"
-                                        #         "z"
-                                        #         "sudo"
-                                        #         "history"
-                                        #         "command-not-found"
-                                        #         "colored-man-pages"
-                                        #     ];
-                                        # };
-                                        shellAliases = {
-                                            ll = "ls -la";
+                                    programs = {
+                                        home-manager = {
+                                            enable = true;
                                         };
-                                        history = {
-                                            size = 100000;  # large history size
-                                            save = 100000;
-                                            share = true;
-                                            ignoreDups = true;
-                                            extended = true;
+                                        zsh = {
+                                            enable = true;
+                                            package = vixBuilt.pkgs.zsh;
+                                            enableCompletion = true;
+                                            autosuggestion.enable = true;
+                                            syntaxHighlighting.enable = true;
+                                            shellAliases = {
+                                                ll = "ls -la";
+                                            };
+                                            history = {
+                                                size = 100000;  # large history size
+                                                save = 100000;
+                                                share = true;
+                                                ignoreDups = true;
+                                                extended = true;
+                                            };
+                                            initContent = ''
+                                                setopt HIST_IGNORE_ALL_DUPS
+                                                setopt HIST_REDUCE_BLANKS
+                                                setopt HIST_VERIFY
+                                                setopt SHARE_HISTORY
+                                                setopt INC_APPEND_HISTORY
+                                                setopt INTERACTIVE_COMMENTS
+
+                                                # Handy options
+                                                setopt AUTO_CD
+                                                setopt CORRECT
+                                                setopt NO_BEEP
+
+                                                # Set LS_COLORS using dircolors
+                                                if command -v dircolors &> /dev/null; then
+                                                    eval "$(dircolors -b)"
+                                                fi
+
+                                                # Enable Powerlevel10k if selected
+                                                [[ -f ${vixBuilt.pkgs.zsh}/share/zsh/site-functions/p10k.zsh ]] && source ${vixBuilt.pkgs.zsh}/share/zsh/site-functions/p10k.zsh
+                                            '';
                                         };
-                                        initContent = ''
-                                            setopt HIST_IGNORE_ALL_DUPS
-                                            setopt HIST_REDUCE_BLANKS
-                                            setopt HIST_VERIFY
-                                            setopt SHARE_HISTORY
-                                            setopt INC_APPEND_HISTORY
-                                            setopt INTERACTIVE_COMMENTS
-
-                                            # Handy options
-                                            setopt AUTO_CD
-                                            setopt CORRECT
-                                            setopt NO_BEEP
-
-                                            # Set LS_COLORS using dircolors
-                                            if command -v dircolors &> /dev/null; then
-                                                eval "$(dircolors -b)"
-                                            fi
-
-                                            # Enable Powerlevel10k if selected
-                                            [[ -f ${systemSetup.pkgs.zsh}/share/zsh/site-functions/p10k.zsh ]] && source ${systemSetup.pkgs.zsh}/share/zsh/site-functions/p10k.zsh
-                                        '';
-                                    };
-                                    starship = {
-                                        enable = true;
-                                        enableZshIntegration = true;
-                                        settings = {
-                                            add_newline = false;
-                                            # prompt_order = [
-                                            #     "username"
-                                            #     "hostname"
-                                            #     "directory"
-                                            #     "git_branch"
-                                            #     "git_status"
-                                            #     "cmd_duration"
-                                            #     "line_break"
-                                            #     "jobs"
-                                            #     "character"
-                                            # ];
-                                            character = {
-                                                success_symbol = "[∫](bold green)";
-                                                error_symbol = "[✗](bold red)";
+                                        starship = {
+                                            enable = true;
+                                            enableZshIntegration = true;
+                                            settings = {
+                                                add_newline = false;
+                                                # prompt_order = [
+                                                #     "username"
+                                                #     "hostname"
+                                                #     "directory"
+                                                #     "git_branch"
+                                                #     "git_status"
+                                                #     "cmd_duration"
+                                                #     "line_break"
+                                                #     "jobs"
+                                                #     "character"
+                                                # ];
+                                                character = {
+                                                    success_symbol = "[∫](bold green)";
+                                                    error_symbol = "[✗](bold red)";
+                                                };
                                             };
                                         };
                                     };
-                                };
-                                
-                                # vix is primairly for home-setup stuff
-                                home.packages = [ systemSetup.defaultWarehouse.coreutils ] ++ builtins.attrValues systemSetup.pkgs;
-                            }
-                        ];
-                    },
+                                    
+                                    # vix is primairly for home-setup stuff
+                                    home.packages = [ vixBuilt.defaultWarehouse.coreutils ] ++ builtins.attrValues vixBuilt.pkgs;
+                                }
+                            ];
+                        },
                     overrideShell ? null,
                     builtins ? core,
                 }:
@@ -355,13 +345,13 @@
                         supportedSystems
                         (system:
                             let
-                                systemSetup = (vixSetup.load system);
-                                homeBaseConfig = (homeManagerConfigFunc system);
+                                vixBuilt = (vixBuilder.load system);
+                                homeBaseConfig = (homeManagerConfigFunc { inherit system vixBuilt; });
                                 # make sure lib ends up in pkgs (even though thats not great, I'd have to fork home-manager to fix it)
                                 homeConfig = homeBaseConfig // { 
                                     pkgs = { 
                                         lib = lib;
-                                        inherit (systemSetup.defaultWarehouse) path config overlays stdenv;
+                                        inherit (vixBuilt.defaultWarehouse) path config overlays stdenv;
                                     } // homeBaseConfig.pkgs; 
                                 };
                                 home = (home-manager.lib.homeManagerConfiguration 
@@ -372,27 +362,27 @@
                                         "zsh"
                                     else if (home.config.programs.bash.enable) then
                                         "bash"
-                                    else if (builtins.isList overrideShell) then
+                                    else if (builtins.isFunction overrideShell) then
                                         true
                                     else
-                                        builtins.throw ''Sorry I don't support the shell you selected in home manager (I only support zsh and bash) However you can override this by giving vix an argument: overrideShell = [ "''${yourShellExecutablePath}" "--no-globalrcs" ]; ''
+                                        builtins.throw ''Sorry I don't support the shell you selected in home manager (I only support zsh and bash) However you can override this by giving vix an argument: overrideShell = system: [ "''${yourShellExecutablePath}" "--no-globalrcs" ]; ''
                                 );
                                 shellCommandList = (
                                     if (shellPackageNameProbably == "zsh") then
                                         [ "${home.pkgs.zsh}/bin/zsh" "--no-globalrcs" ]
                                     else if (shellPackageNameProbably == "bash") then
                                         [ "${home.pkgs.bash}/bin/bash" "--noprofile" ]
-                                    else if (builtins.isList overrideShell) then
-                                        overrideShell
+                                    else if (builtins.isFunction overrideShell) then
+                                        (overrideShell system)
                                     else
-                                        builtins.throw ''Note: this should be unreachable, but as a fallback: Sorry I don't support the shell you selected in home manager (I ). However you can override this by giving vix an argument: overrideShell = [ "''${yourShellExecutablePath}" "--no-globalrcs" ]; ''
+                                        builtins.throw ''Note: this should be unreachable, but as a fallback: Sorry I don't support the shell you selected in home manager (I only support zsh and bash at the moment). However you can override this by giving vix an argument: overrideShell = system: [ "''${yourShellExecutablePath}" "--no-globalrcs" ]; ''
                                 );
                                 shellCommandString = "${lib.concatStringsSep " " (builtins.map lib.escapeShellArg shellCommandList)}";
                                 homePath = home.config.home.homeDirectory;
                             in 
                                 {
-                                    default = (makeMkShell systemSetup.defaultWarehouse.stdenv) {
-                                        inherit (systemSetup) buildInputs nativeBuildInputs propagatedBuildInputs;
+                                    default = (makeMkShell vixBuilt.defaultWarehouse.stdenv) {
+                                        inherit (vixBuilt) buildInputs nativeBuildInputs propagatedBuildInputs;
                                         # FIXME: ENV vars
                                         # FIXME: PATH modifications/limiter
                                         shellHook = ''
@@ -400,7 +390,7 @@
                                             export HOME=${lib.escapeShellArg homePath}
                                             mkdir -p "$HOME/.local/state/nix/profiles"
                                             # note: the grep is to remove common startup noise
-                                            USER="default" HOME=${lib.escapeShellArg homePath} ${home.activationPackage.out}/activate 2>&1 | ${systemSetup.defaultWarehouse.gnugrep}/bin/grep -v -E "Starting Home Manager activation|warning: unknown experimental feature 'repl-flake'|Activating checkFilesChanged|Activating checkLinkTargets|Activating writeBoundary|No change so reusing latest profile generation|Activating installPackages|warning: unknown experimental feature 'repl-flake'|replacing old 'home-manager-path'|installing 'home-manager-path'|Activating linkGeneration|Cleaning up orphan links from .*|Creating home file links in .*|Activating onFilesChange|Activating setupLaunchAgents"
+                                            USER="default" HOME=${lib.escapeShellArg homePath} ${home.activationPackage.out}/activate 2>&1 | ${vixBuilt.defaultWarehouse.gnugrep}/bin/grep -v -E "Starting Home Manager activation|warning: unknown experimental feature 'repl-flake'|Activating checkFilesChanged|Activating checkLinkTargets|Activating writeBoundary|No change so reusing latest profile generation|Activating installPackages|warning: unknown experimental feature 'repl-flake'|replacing old 'home-manager-path'|installing 'home-manager-path'|Activating linkGeneration|Cleaning up orphan links from .*|Creating home file links in .*|Activating onFilesChange|Activating setupLaunchAgents"
                                             env -i VIX_ACTIVE=1 PATH=${lib.escapeShellArg homePath}/bin:${lib.escapeShellArg homePath}/.nix-profile/bin HOME=${lib.escapeShellArg homePath} USER="$USER" SHELL=${lib.escapeShellArg (builtins.elemAt shellCommandList 0)} TERM="$TERM" ${shellCommandString}
                                             exit $?
                                         '';
@@ -408,7 +398,7 @@
                                 }
                         )
                     ) // {
-                        _vix = vixSetup; # for introspection
+                        _vix = vixBuilder; # for introspection
                     }
                 ;
         in
