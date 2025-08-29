@@ -76,13 +76,13 @@ mergeActions = let
             
             # make sure all the mergeToolResults are evaluated
             recursiveEvaluateMergeToolResults = (maybeAttrSet: path:
-                if !(builtins.isAttrs (print "maybeAttrSet ${builtins.toJSON path}" maybeAttrSet)) then
+                if !(builtins.isAttrs (maybeAttrSet)) then
                     maybeAttrSet
                 # TODO: consider exploring/evaling lists too (revisit once merging-of-lists is supported)
                 else
                     let
                         shallowEvaled = (
-                            if print "isMergeToolResult1" (isMergeToolResult maybeAttrSet) then
+                            if (isMergeToolResult maybeAttrSet) then
                                 maybeAttrSet.eval path
                             else
                                 maybeAttrSet
@@ -155,20 +155,18 @@ mergeActions = let
             recursiveMerge = ({oldValue, newValue, path ? []}:
                 let
                     newValueResult = (
-                        if print "isMergeToolResult2" (isMergeToolResult newValue) then
+                        if (isMergeToolResult newValue) then
                             newValue.eval path
                         else
                             newValue
                     );
-                    # make sure all the mergeToolResults are evaluated
-                    # newValueResult = recursiveEvaluateMergeToolResults newValue path;
                 in
                     (recursiveEvaluateMergeToolResults 
                         (
                             # note this check NEEDS to be on newValue NOT newValueResult
                             # a merge tool value always wins (it will handle merging)
                             # if (print {prefix="path0";val=path;} ((print {prefix="oldValue0";val=oldValue;}) ((print {prefix="newValue0";val=newValue;}) (isMergeToolResult newValue)))) then
-                            if print "isMergeToolResult" (isMergeToolResult (print "newValue to check" newValue)) then
+                            if (isMergeToolResult newValue) then
                                 (recursiveRemoveDeleteKeys newValueResult)
                             # TODO: this is where list-merging should be added in the future
                             # if either is non-attrSet, new value wins
@@ -199,9 +197,9 @@ mergeActions = let
                                             in
                                                 accumulator // {
                                                     ${keyGettingMerged} = (recursiveMerge {
-                                                        oldValue = print "oldValue getting merged" oldValue;
-                                                        newValue = print "newValue getting merged" innerNewValue;
-                                                        path = print "path getting merged" (path ++ [ keyGettingMerged ]);
+                                                        oldValue = oldValue;
+                                                        newValue = innerNewValue;
+                                                        path = (path ++ [ keyGettingMerged ]);
                                                     });
                                                 }
                                         )
@@ -221,7 +219,7 @@ mergeActions = let
                             # mergeTools.override
                             override = (newValue: makeMergeToolResult accumulator ({ valueExisted, prevValue }:
                                 # always give new value, (e.g. skip merge)
-                                print "newValue" newValue
+                                newValue
                             ));
                             # mergeTools.noChange
                             noChange = (makeMergeToolResult accumulator ({ valueExisted, prevValue }:
