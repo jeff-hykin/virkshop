@@ -76,13 +76,13 @@ mergeActions = let
             
             # make sure all the mergeToolResults are evaluated
             recursiveEvaluateMergeToolResults = (maybeAttrSet: path:
-                if !(builtins.isAttrs maybeAttrSet) then
+                if !(builtins.isAttrs (print "maybeAttrSet ${builtins.toJSON path}" maybeAttrSet)) then
                     maybeAttrSet
                 # TODO: consider exploring/evaling lists too (revisit once merging-of-lists is supported)
                 else
                     let
                         shallowEvaled = (
-                            if isMergeToolResult maybeAttrSet then
+                            if print "isMergeToolResult1" (isMergeToolResult maybeAttrSet) then
                                 maybeAttrSet.eval path
                             else
                                 maybeAttrSet
@@ -154,52 +154,63 @@ mergeActions = let
             
             recursiveMerge = ({oldValue, newValue, path ? []}:
                 let
+                    newValueResult = (
+                        if print "isMergeToolResult2" (isMergeToolResult newValue) then
+                            newValue.eval path
+                        else
+                            newValue
+                    );
                     # make sure all the mergeToolResults are evaluated
-                    newValueResult = recursiveEvaluateMergeToolResults newValue path;
+                    # newValueResult = recursiveEvaluateMergeToolResults newValue path;
                 in
-                    # note this check NEEDS to be on newValue NOT newValueResult
-                    # a merge tool value always wins (it will handle merging)
-                    # if (print {prefix="path0";val=path;} ((print {prefix="oldValue0";val=oldValue;}) ((print {prefix="newValue0";val=newValue;}) (isMergeToolResult newValue)))) then
-                    if (isMergeToolResult newValue) then
-                        (recursiveRemoveDeleteKeys newValueResult)
-                    # TODO: this is where list-merging should be added in the future
-                    # if either is non-attrSet, new value wins
-                    else if (!(builtins.isAttrs oldValue) || !(builtins.isAttrs newValueResult)) then
-                        (recursiveRemoveDeleteKeys newValueResult)
-                    # if both are normal attrSets, then merge
-                    # (it should* be impossible for oldValue to be a mergeToolResult)
-                    else
-                        let
-                            allKeys = (builtins.attrNames newValueResult);
-                            keysToDelete = (builtins.filter
-                                (key: newValueResult.${key} == mergeToolDeleteIdentifier)
-                                allKeys
-                            );
-                            keysToCheck = (builtins.filter
-                                (key: newValueResult.${key} != mergeToolDeleteIdentifier)
-                                allKeys
-                            );
-                            oldValueAfterDeletingKeys = (builtins.removeAttrs oldValue keysToDelete);
-                        in 
-                            (builtins.foldl'
-                                (accumulator: keyGettingMerged:
-                                    let
-                                        innerOldValueExists = builtins.hasAttr keyGettingMerged accumulator;
-                                        innerOldValue = accumulator.${keyGettingMerged};
-                                        innerNewValue = newValueResult.${keyGettingMerged};
-                                        oldValue = (if innerOldValueExists then accumulator.${keyGettingMerged} else null);
-                                    in
-                                        accumulator // {
-                                            ${keyGettingMerged} = (recursiveMerge {
-                                                oldValue = oldValue;
-                                                newValue = innerNewValue;
-                                                path = path ++ [ keyGettingMerged ];
-                                            });
-                                        }
-                                )
-                                oldValueAfterDeletingKeys
-                                keysToCheck
-                            )
+                    (recursiveEvaluateMergeToolResults 
+                        (
+                            # note this check NEEDS to be on newValue NOT newValueResult
+                            # a merge tool value always wins (it will handle merging)
+                            # if (print {prefix="path0";val=path;} ((print {prefix="oldValue0";val=oldValue;}) ((print {prefix="newValue0";val=newValue;}) (isMergeToolResult newValue)))) then
+                            if print "isMergeToolResult" (isMergeToolResult (print "newValue to check" newValue)) then
+                                (recursiveRemoveDeleteKeys newValueResult)
+                            # TODO: this is where list-merging should be added in the future
+                            # if either is non-attrSet, new value wins
+                            else if (!(builtins.isAttrs oldValue) || !(builtins.isAttrs newValueResult)) then
+                                (recursiveRemoveDeleteKeys newValueResult)
+                            # if both are normal attrSets, then merge
+                            # (it should* be impossible for oldValue to be a mergeToolResult)
+                            else
+                                let
+                                    allKeys = (builtins.attrNames newValueResult);
+                                    keysToDelete = (builtins.filter
+                                        (key: newValueResult.${key} == mergeToolDeleteIdentifier)
+                                        allKeys
+                                    );
+                                    keysToCheck = (builtins.filter
+                                        (key: newValueResult.${key} != mergeToolDeleteIdentifier)
+                                        allKeys
+                                    );
+                                    oldValueAfterDeletingKeys = (builtins.removeAttrs oldValue keysToDelete);
+                                in 
+                                    (builtins.foldl'
+                                        (accumulator: keyGettingMerged:
+                                            let
+                                                innerOldValueExists = builtins.hasAttr keyGettingMerged accumulator;
+                                                innerOldValue = accumulator.${keyGettingMerged};
+                                                innerNewValue = newValueResult.${keyGettingMerged};
+                                                oldValue = (if innerOldValueExists then accumulator.${keyGettingMerged} else null);
+                                            in
+                                                accumulator // {
+                                                    ${keyGettingMerged} = (recursiveMerge {
+                                                        oldValue = print "oldValue getting merged" oldValue;
+                                                        newValue = print "newValue getting merged" innerNewValue;
+                                                        path = print "path getting merged" (path ++ [ keyGettingMerged ]);
+                                                    });
+                                                }
+                                        )
+                                        oldValueAfterDeletingKeys
+                                        keysToCheck
+                                    )
+                        )
+                        path
+                    )
             );
         in
             (builtins.foldl'
@@ -210,7 +221,7 @@ mergeActions = let
                             # mergeTools.override
                             override = (newValue: makeMergeToolResult accumulator ({ valueExisted, prevValue }:
                                 # always give new value, (e.g. skip merge)
-                                newValue
+                                print "newValue" newValue
                             ));
                             # mergeTools.noChange
                             noChange = (makeMergeToolResult accumulator ({ valueExisted, prevValue }:
@@ -242,9 +253,9 @@ in
     # builtins.length (builtins.attrNames oldValue) == 0
     mergeActions
 
-mergeActions [
-    (prev: mergeTools: { a = 10; })
-    (prev: mergeTools: { a = 11; b.c = 13; })
-    (prev: mergeTools: { a = 12; b.g = 88; })
-    (prev: mergeTools: { a = 12; b.g = 88; })
-]
+a =(mergeActions [
+    (prev: mergeTools: { b = { a=1; }; })
+    # (prev: mergeTools: { a = 11; b.c = 13; })
+    # (prev: mergeTools: { a = 12; b.g = 88; })
+    (prev: mergeTools: { b = { workd=1; }; })
+])
