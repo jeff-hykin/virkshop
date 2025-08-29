@@ -1,20 +1,4 @@
 mergeActions = let 
-    recursiveUpdateUntil = (pred: lhs: rhs:
-        let
-            recursiveCall = (attrPath:
-                builtins.zipAttrsWith (n: values:
-                    let
-                        here = attrPath ++ [ n ];
-                    in
-                        if builtins.length values == 1 || pred here (builtins.elemAt values 1) (builtins.head values) then
-                            builtins.head values
-                        else
-                            recursiveCall here values
-                )
-            );
-        in
-            recursiveCall [ ] [ rhs lhs ]
-    );
     # prefixing a trace is harder than you think because of additional traces that happen when evaluating the value (thus making prints appear out of order)
     # this tries to fix that
     noValue = { a= b: b; };
@@ -50,15 +34,6 @@ mergeActions = let
                     ending
                 )
     );
-    recursiveUpdate = (lhs: rhs:
-        (recursiveUpdateUntil
-            (path: lhs: rhs:
-                !(builtins.isAttrs lhs && builtins.isAttrs rhs)
-            )
-            lhs
-            rhs
-        )
-    );
     hasDeepAttribute = (
         let
             hasDeepAttributeInner = (attrSet: path:
@@ -89,98 +64,6 @@ mergeActions = let
             path
         )
     );
-
-    # hasDeepAttribute { a={b={c=10;};}; } [ "a" "b" "c" ] # true
-    # hasDeepAttribute { a={b={c=10;};}; } [ "a" "b" "f" ] # false
-    # recursiveMerge = (base: newValues:
-    #     if !builtins.isAttrs newValues then
-    #         newValues
-    #     else if !builtins.isAttrs base then
-    #         newValues
-    #     else 
-    #         (builtins.foldl'
-    #             (accumulator: keyGettingMerged:
-    #                 let
-    #                     oldValueExists = (builtins.hasAttr
-    #                         keyGettingMerged
-    #                         base
-    #                     );
-    #                     oldValue = accumulator.${keyGettingMerged};
-    #                     newValue = newValues.${keyGettingMerged};
-    #                 in
-    #                     if !oldValueExists then
-    #                         accumulator // { ${keyGettingMerged} = newValues.${keyGettingMerged}; }
-    #                     else if builtins.isAttrs oldValue && builtins.isAttrs newValue then
-    #                         accumulator // { ${keyGettingMerged} = recursiveMerge oldValue newValue; }
-    #                     else
-    #                         accumulator // { ${keyGettingMerged} = newValue; }
-    #             )
-    #             base
-    #             (builtins.attrNames newValues)
-    #         )
-    # );
-
-
-    # hasDeepAttribute { a={b={c=10;};}; } [ "a" "b" "c" ] # true
-    # hasDeepAttribute { a={b={c=10;};}; } [ "a" "b" "f" ] # false
-    recursiveMerge = (base: newValues:
-        if !builtins.isAttrs newValues then
-            newValues
-        else if !builtins.isAttrs base then
-            newValues
-        else 
-            (builtins.foldl'
-                (accumulator: keyGettingMerged:
-                    let
-                        oldValueExists = (builtins.hasAttr
-                            keyGettingMerged
-                            base
-                        );
-                        oldValue = accumulator.${keyGettingMerged};
-                        newValue = newValues.${keyGettingMerged};
-                    in
-                        if !oldValueExists then
-                            accumulator // { ${keyGettingMerged} = newValues.${keyGettingMerged}; }
-                        else if builtins.isAttrs oldValue && builtins.isAttrs newValue then
-                            accumulator // { ${keyGettingMerged} = recursiveMerge oldValue newValue; }
-                        else
-                            accumulator // { ${keyGettingMerged} = newValue; }
-                )
-                base
-                (builtins.attrNames newValues)
-            )
-    );
-    
-    # hasDeepAttribute { a={b={c=10;};}; } [ "a" "b" "c" ] # true
-    # hasDeepAttribute { a={b={c=10;};}; } [ "a" "b" "f" ] # false
-    recursiveMerge = (base: newValues:
-        if !builtins.isAttrs newValues then
-            newValues
-        else if !builtins.isAttrs base then
-            newValues
-        else 
-            (builtins.foldl'
-                (accumulator: keyGettingMerged:
-                    let
-                        oldValueExists = (builtins.hasAttr
-                            keyGettingMerged
-                            base
-                        );
-                        oldValue = accumulator.${keyGettingMerged};
-                        newValue = newValues.${keyGettingMerged};
-                    in
-                        if !oldValueExists then
-                            accumulator // { ${keyGettingMerged} = newValues.${keyGettingMerged}; }
-                        else if builtins.isAttrs oldValue && builtins.isAttrs newValue then
-                            accumulator // { ${keyGettingMerged} = recursiveMerge oldValue newValue; }
-                        else
-                            accumulator // { ${keyGettingMerged} = newValue; }
-                )
-                base
-                (builtins.attrNames newValues)
-            )
-    );
-    # g = recursiveMerge { a=10; c = {d=10;}; } { a=11; c={f=9;};}    
     mergeActions = (actions:
         let
             # this is a kind of "magic attrSet" e.g. an attrSet that only equal to itself (because of the function attribute)
@@ -276,26 +159,27 @@ mergeActions = let
                 in
                     # note this check NEEDS to be on newValue NOT newValueResult
                     # a merge tool value always wins (it will handle merging)
-                    if (print {prefix="path0";val=path;} ((print {prefix="oldValue0";val=oldValue;}) ((print {prefix="newValue0";val=newValue;}) (isMergeToolResult newValue)))) then
-                        builtins.trace "returningMergeResult" (recursiveRemoveDeleteKeys newValueResult)
+                    # if (print {prefix="path0";val=path;} ((print {prefix="oldValue0";val=oldValue;}) ((print {prefix="newValue0";val=newValue;}) (isMergeToolResult newValue)))) then
+                    if (isMergeToolResult newValue) then
+                        (recursiveRemoveDeleteKeys newValueResult)
                     # TODO: this is where list-merging should be added in the future
                     # if either is non-attrSet, new value wins
                     else if (!(builtins.isAttrs oldValue) || !(builtins.isAttrs newValueResult)) then
-                        builtins.trace "returningNonAttrSet result" (recursiveRemoveDeleteKeys newValueResult)
+                        (recursiveRemoveDeleteKeys newValueResult)
                     # if both are normal attrSets, then merge
                     # (it should* be impossible for oldValue to be a mergeToolResult)
                     else
                         let
-                            allKeys = (print "allKeys" (builtins.attrNames newValueResult));
+                            allKeys = (builtins.attrNames newValueResult);
                             keysToDelete = (builtins.filter
                                 (key: newValueResult.${key} == mergeToolDeleteIdentifier)
                                 allKeys
                             );
-                            keysToCheck = print "keysToCheck" (builtins.filter
+                            keysToCheck = (builtins.filter
                                 (key: newValueResult.${key} != mergeToolDeleteIdentifier)
                                 allKeys
                             );
-                            oldValueAfterDeletingKeys = print {prefix="oldValueAfterDeletingKeys";} (builtins.removeAttrs oldValue keysToDelete);
+                            oldValueAfterDeletingKeys = (builtins.removeAttrs oldValue keysToDelete);
                         in 
                             (builtins.foldl'
                                 (accumulator: keyGettingMerged:
@@ -303,7 +187,7 @@ mergeActions = let
                                         innerOldValueExists = builtins.hasAttr keyGettingMerged accumulator;
                                         innerOldValue = accumulator.${keyGettingMerged};
                                         innerNewValue = newValueResult.${keyGettingMerged};
-                                        oldValue = (if print "innerOldValueExists" innerOldValueExists then accumulator.${keyGettingMerged} else null);
+                                        oldValue = (if innerOldValueExists then accumulator.${keyGettingMerged} else null);
                                     in
                                         accumulator // {
                                             ${keyGettingMerged} = (recursiveMerge {
@@ -313,8 +197,8 @@ mergeActions = let
                                             });
                                         }
                                 )
-                                (print {prefix="oldValueAfterDeletingKeys2";} oldValueAfterDeletingKeys)
-                                (print {prefix="keysToCheck2,(builtins.attrNames newValueResult)"; val=allKeys;} keysToCheck)
+                                oldValueAfterDeletingKeys
+                                keysToCheck
                             )
             );
         in
@@ -348,7 +232,7 @@ mergeActions = let
                         };
                         next = action accumulator mergeTools;
                     in
-                        builtins.trace "about to call recursiveMerge1" (recursiveMerge { oldValue=accumulator; newValue=next; path=[]; })
+                        (recursiveMerge { oldValue=accumulator; newValue=next; path=[]; })
                 )
                 {} # Initial value of `accumulator`
                 actions
@@ -362,5 +246,5 @@ mergeActions [
     (prev: mergeTools: { a = 10; })
     (prev: mergeTools: { a = 11; b.c = 13; })
     (prev: mergeTools: { a = 12; b.g = 88; })
+    (prev: mergeTools: { a = 12; b.g = 88; })
 ]
-    
